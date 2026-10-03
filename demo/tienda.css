@@ -1,0 +1,520 @@
+/* Sereno demo store: simulated e-commerce skeleton + the in-page overlays shown
+   in mockups 02-06 (safe tooltip, warning modal, block modal, pending toast).
+   Loads shared/tokens.css first. No external resources, no @import. */
+
+/* ---------- simulated store page ---------- */
+
+.store-body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.store-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 20px 32px 72px;
+}
+
+.store-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0 16px;
+}
+
+.sk-logo {
+  display: block;
+  width: 90px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--line);
+}
+
+.store-nav {
+  display: flex;
+  gap: 22px;
+}
+
+.sk-dash {
+  display: block;
+  width: 44px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--line);
+}
+
+.store-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 24px;
+}
+
+.sk-panel {
+  background: var(--soft);
+  border-radius: var(--radius-lg);
+}
+
+/* Keeps the mockup proportion on desktop screens with a 200px floor. */
+.store-hero-main {
+  min-height: 200px;
+  aspect-ratio: 728 / 292;
+  padding: 36px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sk-line {
+  display: block;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--line);
+}
+
+.sk-line-lg {
+  height: 14px;
+  width: 55%;
+}
+
+.sk-line-sm {
+  width: 40%;
+}
+
+.sk-line-wide {
+  width: 85%;
+}
+
+.store-hero-side {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sk-cta {
+  display: block;
+  margin-top: auto;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--line);
+}
+
+.store-products {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  margin-top: 24px;
+}
+
+/* Same proportion as the mockup cards, never shorter than 150px. */
+.store-product {
+  min-height: 150px;
+  aspect-ratio: 1 / 1.15;
+}
+
+/* ---------- safe-site tooltip (mockup 02) ---------- */
+
+.demo-tooltip {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 70;
+  display: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--dark);
+  color: #FFFFFF;
+  font-size: 12.5px;
+  font-weight: 600;
+  box-shadow: 0 8px 20px rgba(17, 24, 39, 0.22);
+}
+
+.demo-tooltip.is-visible {
+  display: block;
+  animation: demo-fade 3s ease forwards;
+}
+
+/* ---------- pending toast (mockup 06) ---------- */
+
+.demo-toast {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 70;
+  display: none;
+  align-items: flex-start;
+  gap: 10px;
+  width: 344px;
+  max-width: calc(100vw - 32px);
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  box-shadow: 0 12px 30px rgba(17, 24, 39, 0.18);
+}
+
+.demo-toast.is-visible {
+  display: flex;
+  animation: demo-fade 6s ease forwards;
+}
+
+.demo-toast-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--dark);
+  color: #FFFFFF;
+}
+
+.demo-toast-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.demo-toast-text {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.demo-toast-retry {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  color: #9CA3AF;
+}
+
+@keyframes demo-fade {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ---------- verdict modals (mockups 03/04/05) ---------- */
+
+.demo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.demo-overlay[hidden],
+.verdict-details[hidden] {
+  display: none;
+}
+
+.verdict-modal {
+  width: 100%;
+  max-width: 520px;
+  border-radius: 14px;
+  background: var(--bg);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+}
+
+.verdict-band {
+  padding: 20px 22px 18px;
+}
+
+.verdict-band-warning {
+  background: var(--amber-bg);
+}
+
+.verdict-band-block {
+  background: var(--red-bg);
+}
+
+.verdict-band-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: #FFFFFF;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.verdict-band-warning .verdict-band-icon {
+  background: var(--amber-600);
+}
+
+.verdict-band-block .verdict-band-icon {
+  background: var(--red-600);
+}
+
+.verdict-title {
+  margin: 12px 0 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.verdict-title-warning {
+  color: #92400E;
+}
+
+.verdict-title-block {
+  color: var(--red-700);
+}
+
+.verdict-body {
+  padding: 16px 22px 18px;
+}
+
+.verdict-domain-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--page);
+}
+
+.verdict-domain {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+.verdict-text {
+  margin: 14px 0 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.verdict-details {
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.verdict-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.verdict-detail-label {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.verdict-detail-value {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.verdict-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.verdict-score-track {
+  display: inline-block;
+  width: 120px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.verdict-score-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+}
+
+.score-92 {
+  width: 92%;
+  background: var(--amber-600);
+}
+
+.score-97 {
+  width: 97%;
+  background: var(--red-600);
+}
+
+.verdict-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.verdict-action {
+  flex: 1;
+}
+
+.verdict-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 22px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.verdict-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.verdict-logo {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.verdict-toggle {
+  padding: 4px 2px;
+  font-size: 12.5px;
+}
+
+/* ---------- demo control panel ---------- */
+
+.demo-panel {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 80;
+  width: 236px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  background: var(--dark);
+  color: #F9FAFB;
+  box-shadow: 0 16px 36px rgba(17, 24, 39, 0.32);
+}
+
+.demo-panel-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.demo-panel-sub {
+  margin: 2px 0 10px;
+  font-size: 11px;
+  color: #9CA3AF;
+}
+
+.demo-panel-actions {
+  display: grid;
+  gap: 4px;
+}
+
+.demo-scenario {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: #E5E7EB;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.demo-scenario:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.demo-scenario:focus-visible {
+  outline: 2px solid #818CF8;
+  outline-offset: 1px;
+}
+
+.demo-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.demo-dot-seguro {
+  background: var(--green-600);
+}
+
+.demo-dot-advertencia {
+  background: var(--amber-600);
+}
+
+.demo-dot-bloqueo {
+  background: var(--red-600);
+}
+
+.demo-dot-pendiente {
+  background: var(--muted);
+}
+
+.demo-panel-hint {
+  margin: 10px 0 0;
+  font-size: 10.5px;
+  color: #9CA3AF;
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 900px) {
+  .store-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .store-products {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .verdict-title {
+    font-size: 21px;
+  }
+}
+
+@media (max-width: 520px) {
+  .store-page {
+    padding: 16px 16px 72px;
+  }
+
+  .store-products {
+    grid-template-columns: 1fr;
+  }
+
+  .verdict-actions {
+    flex-direction: column;
+  }
+}

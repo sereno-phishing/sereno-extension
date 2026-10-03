@@ -1,0 +1,553 @@
+/* Sereno options (admin) page: sidebar shell plus the metrics, per-domain
+   policy and cache sections. Loaded after shared/tokens.css. */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+}
+
+.options-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ---------------- Sidebar ---------------- */
+
+.sidebar {
+  display: flex;
+  flex: 0 0 240px;
+  flex-direction: column;
+  width: 240px;
+  min-height: 100vh;
+  padding: 22px 14px 18px;
+  border-right: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 8px;
+}
+
+.sidebar-logo {
+  display: block;
+  width: 28px;
+  height: 28px;
+}
+
+.sidebar-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 2px;
+  margin-top: 30px;
+}
+
+.nav-item {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: #374151;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-item:hover {
+  background: var(--soft);
+}
+
+.nav-item.is-active {
+  background: var(--indigo-50);
+  color: var(--indigo-700);
+  font-weight: 600;
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  padding: 0 8px;
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--indigo-100);
+  color: var(--indigo-700);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sidebar-username {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.sidebar-role {
+  margin-top: 1px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.sidebar-demo {
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--indigo-600);
+  font-size: 11.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-demo:hover {
+  text-decoration: underline;
+}
+
+/* ---------------- Content shell ---------------- */
+
+.options-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 32px;
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.section-sub {
+  margin: 7px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.section-ago {
+  padding-top: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.section-banner {
+  margin-bottom: 16px;
+}
+
+/* ---------------- Stat cards ---------------- */
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+}
+
+.stat-label {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.stat-value {
+  margin-top: 8px;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.stat-sub {
+  margin-top: 7px;
+  font-size: 12px;
+}
+
+.stat-sub-green {
+  color: var(--green-700);
+}
+
+.stat-sub-muted {
+  color: var(--muted);
+}
+
+.stat-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 22px;
+  margin-top: 16px;
+}
+
+.stat-bar {
+  flex: 1 1 0;
+  border-radius: 3px 3px 2px 2px;
+  background: var(--indigo-600);
+}
+
+.stat-bars-indigo .stat-bar:last-child {
+  background: var(--indigo-700);
+}
+
+.stat-bars-red .stat-bar {
+  background: var(--red-600);
+}
+
+.stat-bars-amber .stat-bar {
+  background: var(--amber-600);
+}
+
+.stat-bars-green .stat-bar {
+  background: var(--green-600);
+}
+
+/* ---------------- Cards ---------------- */
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.card-sub {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* ---------------- Chart ---------------- */
+
+.chart-card {
+  margin-bottom: 16px;
+  padding: 18px 20px 20px;
+}
+
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 180px;
+  margin-top: 20px;
+}
+
+.chart-bar {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.seg {
+  display: block;
+  width: 100%;
+}
+
+.chart-bar .seg:first-child {
+  border-radius: 3px 3px 0 0;
+}
+
+.seg-seguro {
+  background: var(--green-600);
+}
+
+.seg-advertencia {
+  background: var(--amber-600);
+}
+
+.seg-bloqueo {
+  background: var(--red-600);
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot-green {
+  background: var(--green-600);
+}
+
+.dot-amber {
+  background: var(--amber-600);
+}
+
+.dot-red {
+  background: var(--red-600);
+}
+
+.dot-grey {
+  background: #D1D5DB;
+}
+
+/* ---------------- Tables ---------------- */
+
+.table-card {
+  overflow: hidden;
+  margin-bottom: 16px;
+  padding: 0;
+}
+
+.table-card .card-head {
+  padding: 16px 20px;
+}
+
+.table-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--indigo-600);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.table-link:hover {
+  text-decoration: underline;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  padding: 10px 20px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.data-table td {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* ---------------- Add domain ---------------- */
+
+.add-domain {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 16px;
+}
+
+.add-domain-input {
+  flex: 1 1 auto;
+}
+
+.policy-picker {
+  display: flex;
+  gap: 8px;
+}
+
+.policy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.policy-chip:hover {
+  background: var(--line);
+}
+
+.policy-chip.is-amber {
+  background: var(--amber-bg);
+  color: var(--amber-700);
+}
+
+.policy-chip.is-amber:hover {
+  background: var(--amber-bg);
+}
+
+.policy-chip.is-red {
+  background: var(--red-bg);
+  color: var(--red-700);
+}
+
+.policy-chip.is-red:hover {
+  background: var(--red-bg);
+}
+
+.policy-pair {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.cell-action {
+  text-align: right;
+}
+
+.remove-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--red-600);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.remove-link:hover {
+  text-decoration: underline;
+}
+
+/* ---------------- Note + save row ---------------- */
+
+.note-bar {
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: var(--indigo-50);
+  color: var(--indigo-700);
+  font-size: 12.5px;
+}
+
+.save-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.save-note {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* ---------------- Cache ---------------- */
+
+.cache-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.cache-card {
+  padding: 20px;
+}
+
+.ttl-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.ttl-label {
+  flex: 1 1 auto;
+  font-size: 12.5px;
+}
+
+.ttl-input {
+  width: 72px;
+  text-align: center;
+}
+
+.ttl-unit {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.cache-card .btn {
+  margin-top: 18px;
+}
+
+.invalidate-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.invalidate-row .input {
+  flex: 1 1 auto;
+}

@@ -1,0 +1,358 @@
+/* Sereno design tokens + base component classes.
+   Loaded by popup.html, options.html and privacidad.html so every page shares
+   the same palette and controls. Mobile-first, no external resources. */
+
+:root {
+  --indigo-600: #4F46E5;
+  --indigo-700: #4338CA;
+  --indigo-100: #E0E7FF;
+  --indigo-50: #EEF2FF;
+
+  --ink: #111827;
+  --muted: #6B7280;
+  --line: #E5E7EB;
+  --bg: #FFFFFF;
+  --page: #F7F8FA;
+  --soft: #F3F4F6;
+
+  --green-600: #16A34A;
+  --green-700: #15803D;
+  --green-bg: #DCFCE7;
+
+  --amber-600: #D97706;
+  --amber-700: #B45309;
+  --amber-bg: #FEF3C7;
+
+  --red-600: #DC2626;
+  --red-700: #B91C1C;
+  --red-bg: #FEE2E2;
+
+  --dark: #111827;
+
+  --font-sans: Inter, "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+  --shadow-soft: 0 1px 2px rgba(17, 24, 39, 0.06);
+  --shadow-pop: 0 10px 24px rgba(17, 24, 39, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--indigo-600);
+  color: #FFFFFF;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--indigo-700);
+}
+
+.btn-ghost {
+  background: var(--bg);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--soft);
+}
+
+.btn-danger {
+  background: var(--red-600);
+  color: #FFFFFF;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--red-700);
+}
+
+.btn-dark {
+  background: var(--dark);
+  color: #FFFFFF;
+}
+
+.btn-dark:hover:not(:disabled) {
+  background: #1F2937;
+}
+
+.btn-text {
+  padding: 6px 8px;
+  background: none;
+  border: 0;
+  color: var(--indigo-600);
+}
+
+.btn-text:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* ---------- Cards ---------- */
+
+.card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+}
+
+/* ---------- Chips ---------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.chip-seguro {
+  background: var(--green-600);
+  color: #FFFFFF;
+}
+
+.chip-advertencia {
+  background: var(--amber-600);
+  color: #FFFFFF;
+}
+
+.chip-bloqueado {
+  background: var(--red-600);
+  color: #FFFFFF;
+}
+
+.chip-soft-seguro {
+  background: var(--green-bg);
+  color: var(--green-700);
+}
+
+.chip-soft-advertencia {
+  background: var(--amber-bg);
+  color: var(--amber-700);
+}
+
+.chip-soft-bloqueado {
+  background: var(--red-bg);
+  color: var(--red-700);
+}
+
+.chip-soft-neutral {
+  background: var(--soft);
+  color: var(--muted);
+}
+
+.hu-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--indigo-50);
+  color: var(--indigo-700);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* ---------- Forms ---------- */
+
+.field {
+  display: grid;
+  gap: 5px;
+}
+
+.field-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.input::placeholder {
+  color: #9CA3AF;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--indigo-600);
+  box-shadow: 0 0 0 3px var(--indigo-100);
+}
+
+.input.has-error {
+  border-color: var(--red-600);
+}
+
+.input.has-error:focus {
+  border-color: var(--red-600);
+  box-shadow: 0 0 0 3px var(--red-bg);
+}
+
+.field-help {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.field-help-error {
+  color: var(--red-600);
+}
+
+/* ---------- Banners ---------- */
+
+.banner-error,
+.banner-success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.banner-error {
+  background: var(--red-bg);
+  color: var(--red-700);
+}
+
+.banner-success {
+  background: var(--green-bg);
+  color: var(--green-700);
+}
+
+.banner-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.banner-error .banner-icon {
+  background: var(--red-600);
+}
+
+.banner-success .banner-icon {
+  background: var(--green-600);
+}
+
+/* ---------- Tabs (segmented control) ---------- */
+
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  background: var(--soft);
+}
+
+.tabs button {
+  padding: 7px 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tabs button.active {
+  background: var(--bg);
+  border-color: var(--line);
+  color: var(--ink);
+  box-shadow: var(--shadow-soft);
+}
+
+/* ---------- Identity ---------- */
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--indigo-100);
+  color: var(--indigo-700);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--dark);
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ---------- Misc ---------- */
+
+.footnote {
+  font-size: 11px;
+  color: var(--muted);
+}
