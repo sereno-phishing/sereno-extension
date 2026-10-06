@@ -1,27 +1,23 @@
-# Sereno — Prototipo funcional (Sprint 1)
+# Sereno: prototipo funcional (Sprint 1)
 
-Extensión de Chrome (Manifest V3) sin backend que replica las vistas reales de
-Sereno, la extensión anti-phishing. Incluye el popup completo, el panel de
-administración, la política de privacidad y una tienda de demo donde se ven los
-avisos en página.
+Este prototipo del Sprint 1 replica las vistas reales de Sereno, una extensión
+anti-phishing para Chrome (Manifest V3). Incluye el popup completo, el panel de
+administración, la política de privacidad y una tienda de demo para probar los
+flujos y ver los avisos en página.
 
-## Qué es
+El popup, el panel y la tienda comparten el estado en `chrome.storage.local`.
+Lo que simulas en la tienda también se ve en el resto de la extensión.
 
-Prototipo funcional sin backend del Sprint 1: replica las vistas reales de la
-extensión y permite recorrer los flujos con datos simulados. Todo el estado vive
-en `chrome.storage.local`, así que el popup, el panel de administración y la
-tienda de demo comparten la misma información: lo que simulas en la tienda se ve
-en el resto de la extensión.
-
-Los datos son de ejemplo (usuarios, historial, dominios, caché, métricas y
-encuesta SUS). No hay servidor, no hay modelo real y no se envía nada a internet.
+Los usuarios, el historial, los dominios, la caché, las métricas y la encuesta
+SUS usan datos de ejemplo. El prototipo no tiene backend ni modelo real y no
+envía nada a internet.
 
 ## Requisitos
 
 - Google Chrome 88 o superior (Manifest V3). También funciona en navegadores
   basados en Chromium (Edge, Brave, Opera).
-- No requiere Node.js, servidor ni conexión a internet.
-- No hay dependencias ni paso de compilación: la carpeta se carga tal cual.
+- Para usarlo no necesitas Node.js, un servidor ni conexión a internet.
+- Carga la carpeta tal cual, sin instalar dependencias ni compilar.
 
 ## Instalación
 
@@ -34,31 +30,33 @@ encuesta SUS). No hay servidor, no hay modelo real y no se envía nada a interne
 
 ## Cómo probar la demo
 
-1. **Primer uso.** Abre el popup de Sereno: verás el onboarding de 3 pasos
+1. Abre el popup de Sereno. La primera vez verás el onboarding de 3 pasos
    (qué hace, qué permiso necesita y cómo leer una alerta). Pulsa **Empezar**.
-2. **Inicia sesión** con una de las cuentas demo (contraseña `sereno123` para
+2. Inicia sesión con una de las cuentas demo (contraseña `sereno123` para
    ambas), o crea una cuenta nueva si prefieres ver el historial vacío:
-   - `andres.torres` — rol **usuario**: historial con datos, pestañas Inicio/Historial.
-   - `admin.sereno` — rol **administrador**: tarjeta de administración y acceso al panel.
-3. **Abre la tienda de demo** desde el panel de administración (botón
+   - `andres.torres` (rol usuario): historial con datos, pestañas Inicio/Historial.
+   - `admin.sereno` (rol administrador): tarjeta de administración y acceso al panel.
+3. Abre la tienda de demo desde el panel de administración (botón
    **Abrir tienda de demo**, abajo a la izquierda) o directamente en
    `chrome-extension://<ID>/app/demo-store/store.html`, reemplazando `<ID>` por el ID de
    la extensión que muestra `chrome://extensions`.
-4. **Prueba los 4 escenarios** del simulador (esquina inferior izquierda):
-   - **Sitio seguro**: badge verde `✓` y tooltip «Sereno: sitio seguro».
-   - **Advertencia**: modal ámbar con la opción de **Ver detalle** o
+4. Prueba los 4 escenarios del simulador, en la esquina inferior izquierda:
+   - Sitio seguro: badge verde `✓` y tooltip «Sereno: sitio seguro».
+   - Advertencia: modal ámbar con la opción de **Ver detalle** o
      **Continuar bajo riesgo**.
-   - **Bloqueo**: modal rojo sin opción de continuar.
-   - **Pendiente**: toast «Evaluación pendiente».
+   - Bloqueo: modal rojo sin opción de continuar.
+   - Pendiente: toast «Evaluación pendiente».
    Cada escenario pasa por un estado «Evaluando…» de ~0.7 s antes del veredicto.
-5. **Vuelve al popup**: el estado del sitio y el historial reflejan la navegación
-   que simulaste, y el panel de administración refleja la operación (métricas,
-   dominios y caché). Con `andres.torres` ves la experiencia de usuario (tarjeta
-   «Este sitio», pestañas Inicio/Historial); con `admin.sereno` ves la tarjeta de
+5. Vuelve al popup para ver el estado del sitio y el historial de la navegación
+   que simulaste. En el panel de administración puedes ver las métricas,
+   los dominios y la caché de esa operación. Con `andres.torres` ves la experiencia
+   de usuario (tarjeta «Este sitio», pestañas Inicio/Historial); con `admin.sereno`
+   ves la tarjeta de
    administración que abre el panel.
 
-Para empezar de cero, borra el historial desde el propio popup o quita y vuelve
-a cargar la extensión en `chrome://extensions` (se restauran los datos semilla).
+Para empezar de cero, borra el historial desde el popup. También puedes quitar
+y volver a cargar la extensión en `chrome://extensions` para restaurar los datos
+semilla.
 
 ## Mapa de vistas ↔ HU
 
@@ -87,11 +85,11 @@ a cargar la extensión en `chrome://extensions` (se restauran los datos semilla)
 
 ## Estructura del proyecto
 
-Las carpetas de primer nivel nombran el negocio (arquitectura que «grita» el
-dominio). Cada dominio se divide en `domain/` (reglas puras), `application/`
-(casos de uso que reciben el store como puerto) y `ui/` (vistas
-presentacionales que reciben datos y devuelven HTML). Las páginas viven en
-`app/`, y los bordes técnicos en `platform/` y `ui/`.
+Las carpetas de primer nivel corresponden a los dominios del negocio. Cada
+dominio se divide en `domain/` (reglas puras), `application/` (casos de uso que
+reciben el store como puerto) y `ui/` (vistas presentacionales que reciben datos
+y devuelven HTML). Las páginas están en `app/`; los bordes técnicos, en
+`platform/` y `ui/`.
 
 ```
 sereno-extension/
@@ -128,32 +126,33 @@ sereno-extension/
 
 ## Notas técnicas
 
-- **Manifest V3** sin service worker a propósito: el prototipo no intercepta
-  navegación real; la tienda de demo simula la operación.
-- **Scripts clásicos, sin compilación**: cada archivo es una IIFE que se
-  registra en un único espacio de nombres `globalThis.Sereno` (por ejemplo
-  `Sereno.history` o `Sereno.verdictUi`). Cada página los carga con etiquetas
+- El prototipo usa Manifest V3 y omite el service worker a propósito: no
+  intercepta la navegación real. La tienda de demo simula la operación.
+- Los scripts son clásicos y no necesitan compilación. Cada archivo es una
+  IIFE que se registra en el único espacio de nombres `globalThis.Sereno`
+  (por ejemplo, `Sereno.history` o `Sereno.verdictUi`). Cada página los carga con etiquetas
   `<script>` en orden: plataforma, dominios, casos de uso, átomos, vistas y por
   último el contenedor. Funciona igual dentro de la extensión y abriendo las
   páginas con `file://`.
-- **Regla de dependencias**: los archivos `*/domain/*` son puros (sin `window`,
-  `document`, `chrome` ni `localStorage`); los casos de uso reciben el store como
-  parámetro; solo `platform/` toca `chrome.*` y `localStorage`; las vistas
-  reciben datos y devuelven HTML, sin acceso al store ni eventos; los
-  contenedores (`app/*/*-page.js`) tienen el estado de la página, la delegación
-  de eventos y la suscripción al store.
-- **Persistencia**: `chrome.storage.local` bajo la clave `sereno.state.v1`. El
-  store también acepta `localStorage` o memoria para poder probarse en Node.
-- **Permisos**: solo `storage` y `tabs`. El badge por pestaña se pinta con
-  `chrome.action.setBadgeText` / `setBadgeBackgroundColor` usando el `tabId` de
+- Los archivos `*/domain/*` son puros: no usan `window`, `document`, `chrome`
+  ni `localStorage`. Los casos de uso reciben el store como parámetro y solo
+  `platform/` toca `chrome.*` y `localStorage`. Las vistas reciben datos y
+  devuelven HTML, sin acceso al store ni eventos. Los contenedores
+  (`app/*/*-page.js`) tienen el estado de la página, la delegación de eventos y
+  la suscripción al store.
+- El estado se guarda en `chrome.storage.local` bajo la clave `sereno.state.v1`.
+  El store también acepta `localStorage` o memoria para probarlo en Node.
+- La extensión solo pide los permisos `storage` y `tabs`. Pinta el badge de
+  cada pestaña con `chrome.action.setBadgeText` / `setBadgeBackgroundColor`
+  usando el `tabId` de
   `chrome.tabs.getCurrent()`.
-- **CSP**: scripts clásicos externos, sin `onclick` en el HTML, sin CDNs, sin
+- La CSP permite scripts clásicos externos. El HTML no usa `onclick`, CDNs,
   fuentes ni imágenes remotas.
-- **Datos simulados**: usuarios, historial, reglas por dominio, caché y métricas
-  viven en `platform/seed.js`; ningún archivo de dominio depende de ellos. El
-  botón **Abrir tienda de demo** del panel de administración abre
+- Los datos simulados de usuarios, historial, reglas por dominio, caché y
+  métricas están en `platform/seed.js`. Ningún archivo de dominio depende de
+  ellos. El botón **Abrir tienda de demo** del panel de administración abre
   `app/demo-store/store.html`.
-- **Estado compartido**: la tienda de demo escribe `currentSite` e historial en el
-  mismo store que lee el popup, por eso los tres frentes quedan sincronizados.
-- **Pruebas**: `node --test` desde la raíz (Node 18 o superior, sin
-  dependencias).
+- La tienda de demo escribe `currentSite` e historial en el mismo store que
+  lee el popup. Así se mantienen sincronizados el popup, el panel y la tienda.
+- Ejecuta las pruebas con `node --test` desde la raíz. Necesitas Node 18 o
+  superior, sin dependencias.

@@ -1,5 +1,6 @@
 # Local AI agent tooling (skills, MCP config)
 .agents/
+.atl/
 .claude/
 .mcp.json
 skills-lock.json
