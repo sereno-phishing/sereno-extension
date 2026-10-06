@@ -5,13 +5,19 @@
 (function () {
   "use strict";
 
-  var Store = window.SerenoStore;
-  var DATA = window.SERENO_DATA || { susQuestions: [] };
-  var QUESTIONS = DATA.susQuestions || [];
+  var time = Sereno.time;
+  var verdict = Sereno.verdict;
+  var account = Sereno.account;
+  var history = Sereno.history;
+  var survey = Sereno.survey;
+  var onboarding = Sereno.onboarding;
+  var protection = Sereno.protection;
+  var browser = Sereno.browser;
+  var preferences = Sereno.preferences;
+  var store = Sereno.stateStore.open();
+  var QUESTIONS = survey.QUESTIONS;
 
   var UI_KEY = "sereno.ui.v1";
-  var MODEL_VERSION = "1.2";
-  var MODEL_UPDATED_VERSION = "1.3";
 
   var STATUS_META = {
     seguro: {
@@ -98,80 +104,14 @@
     return STATUS_META[status] || STATUS_META.pendiente;
   }
 
-  function riskLabel(entry) {
-    if (entry.status === "bloqueo") {
-      return "Alto";
-    }
-    if (entry.status === "advertencia") {
-      return entry.score >= 0.85 ? "Alto" : "Medio";
-    }
-    if (entry.status === "seguro") {
-      return "Bajo";
-    }
-    return "—";
-  }
-
-  function sourceLabel(source) {
-    return source === "cache" ? "Caché" : "Modelo";
-  }
-
-  function computeSusResult(answers) {
-    var total = 0;
-    for (var index = 0; index < QUESTIONS.length; index += 1) {
-      var value = Number(answers[index]) || 0;
-      total += index % 2 === 0 ? value - 1 : 5 - value;
-    }
-    var score = Math.round(total * 2.5);
-    var band = "A mejorar";
-    var bandClass = "sus-band-mejorar";
-    if (score >= 85) {
-      band = "Excelente";
-      bandClass = "sus-band-excelente";
-    } else if (score >= 70) {
-      band = "Bueno";
-      bandClass = "sus-band-bueno";
-    } else if (score >= 50) {
-      band = "Aceptable";
-      bandClass = "sus-band-aceptable";
-    }
-    return { score: score, band: band, bandClass: bandClass };
-  }
-
-  function openGeneratedPage(file) {
-    try {
-      if (typeof chrome !== "undefined" && chrome.tabs && typeof chrome.tabs.create === "function") {
-        var url = chrome.runtime && typeof chrome.runtime.getURL === "function" ? chrome.runtime.getURL(file) : "../../" + file;
-        chrome.tabs.create({ url: url });
-        return;
-      }
-      if (typeof window !== "undefined" && typeof window.open === "function") {
-        window.open("../../" + file, "_blank");
-      }
-    } catch (error) {
-      /* prototype: never block the UI on a navigation error */
-    }
-  }
-
   function saveUi() {
-    try {
-      localStorage.setItem(UI_KEY, JSON.stringify({ tab: App.tab }));
-    } catch (error) {
-      /* private mode: UI persistence is best effort */
-    }
+    preferences.write(UI_KEY, { tab: App.tab });
   }
 
   function restoreUi() {
-    try {
-      var raw = localStorage.getItem(UI_KEY);
-      if (!raw) {
-        return;
-      }
-      var ui = JSON.parse(raw);
-      if (ui && (ui.tab === "home" || ui.tab === "history")) {
-        App.tab = ui.tab;
-      }
-    } catch (error) {
-      /* ignore malformed UI state */
+    var ui = preferences.read(UI_KEY);
+    if (ui && (ui.tab === "home" || ui.tab === "history")) {
+      App.tab = ui.tab;
     }
   }
 
@@ -225,31 +165,27 @@
     if (!session) {
       return "";
     }
-    if (session.role === "administrador") {
+    if (account.isAdmin(session)) {
       return '<button type="button" class="admin-pill" data-action="toggle-menu" aria-haspopup="menu">Admin</button>';
     }
     return (
       '<button type="button" class="avatar" data-action="toggle-menu" aria-haspopup="menu" ' +
-      'aria-label="Cuenta de ' + esc(session.username) + '">' + esc(Store.initials(session.username)) + "</button>"
+      'aria-label="Cuenta de ' + esc(session.username) + '">' + esc(account.initials(session.username)) + "</button>"
     );
   }
 
   function footerHtml(state) {
-    var updated = noticeVisible(state);
+    var updated = protection.isNoticeVisible(state);
     return (
       '<footer class="app-footer">' +
       '<button type="button" class="footer-link" data-action="open-privacy">Política de privacidad</button>' +
       '<span class="footer-model' + (updated ? " is-updated" : "") + '">Modelo v' +
-      (updated ? MODEL_UPDATED_VERSION : MODEL_VERSION) +
+      protection.modelVersion(state) +
       "</span></footer>"
     );
   }
 
   /* ---------------- shared view pieces ---------------- */
-
-  function noticeVisible(state) {
-    return !!(state.session && !state.modelNoticeDismissed);
-  }
 
   function tabsHtml(large) {
     var homeActive = App.view === "home";
@@ -303,14 +239,14 @@
   }
 
   function noticeHtml(state) {
-    if (!noticeVisible(state)) {
+    if (!protection.isNoticeVisible(state)) {
       return "";
     }
     return (
       '<button type="button" class="notice-card" data-action="dismiss-notice">' +
       artHtml("brand", "28") +
       '<span class="notice-body">' +
-      '<span class="notice-title">Modelo actualizado a v' + MODEL_UPDATED_VERSION + "</span>" +
+      '<span class="notice-title">Modelo actualizado a v' + protection.UPDATED_MODEL_VERSION + "</span>" +
       '<span class="notice-text">Se actualizó en el servidor. No tienes que reinstalar nada.</span>' +
       "</span></button>"
     );
@@ -408,7 +344,7 @@
   function viewHome(state) {
     var session = state.session;
     var parts = [];
-    if (session && session.role !== "administrador") {
+    if (session && !account.isAdmin(session)) {
       parts.push(tabsHtml(true));
     }
     parts.push(protectionCardHtml());
@@ -423,13 +359,13 @@
         '<button type="button" class="btn btn-ghost btn-block" data-action="go-register">Crear cuenta</button>' +
         "</div>"
       );
-    } else if (session.role === "administrador") {
+    } else if (account.isAdmin(session)) {
       parts.push(adminCardHtml());
       parts.push(noticeHtml(state));
     } else {
       parts.push(noticeHtml(state));
     }
-    var adminHome = session && session.role === "administrador";
+    var adminHome = account.isAdmin(session);
     return '<section class="view view-home' + (adminHome ? " view-home-admin" : "") + '">' + parts.join("") + "</section>";
   }
 
@@ -497,7 +433,7 @@
 
   function historyItemHtml(entry) {
     var meta = statusMeta(entry.status);
-    var full = Store.formatDate(entry.ts);
+    var full = time.formatDateTime(entry.ts);
     var chunks = full.split(" ");
     var dateText = chunks[0] + (chunks[1] ? " · " + chunks[1] : "");
     return (
@@ -514,13 +450,8 @@
 
   function viewHistory(state) {
     var session = state.session;
-    var entries = session && state.history[session.username] ? state.history[session.username] : [];
-    var filtered =
-      App.historyFilter === "todas"
-        ? entries
-        : entries.filter(function (entry) {
-            return entry.status === App.historyFilter;
-          });
+    var entries = history.entriesOf(state.history, session && session.username);
+    var filtered = history.filter(entries, App.historyFilter);
     var html = '<section class="view view-history">';
     html += tabsHtml(false);
     html += filtersHtml();
@@ -546,16 +477,7 @@
 
   function findEntry(state, id) {
     var session = state.session;
-    if (!session || !state.history[session.username]) {
-      return null;
-    }
-    var list = state.history[session.username];
-    for (var index = 0; index < list.length; index += 1) {
-      if (list[index].id === id) {
-        return list[index];
-      }
-    }
-    return null;
+    return history.findById(history.entriesOf(state.history, session && session.username), id);
   }
 
   function detailRow(label, valueHtml) {
@@ -569,7 +491,7 @@
     }
     var meta = statusMeta(entry.status);
     var score = Number(entry.score) || 0;
-    var percent = Math.max(0, Math.min(100, Math.round(score * 100)));
+    var percent = verdict.scorePercent(score);
     return (
       '<section class="view view-detail">' +
       '<div class="status-card ' + meta.card + '">' +
@@ -577,15 +499,15 @@
       '<span class="status-title status-title-' + meta.band + '">' + esc(meta.title) + "</span></div>" +
       '<div class="status-domain">' + esc(entry.domain) + "</div></div>" +
       '<div class="detail-rows">' +
-      detailRow("Nivel de riesgo", '<span class="detail-value">' + riskLabel(entry) + "</span>") +
+      detailRow("Nivel de riesgo", '<span class="detail-value">' + verdict.riskLevel(entry) + "</span>") +
       detailRow(
         "Score del modelo",
         '<span class="detail-score"><span class="score-track"><span class="score-fill score-fill-' + meta.band +
           '" style="width:' + percent + '%"></span></span>' +
           '<span class="detail-value">' + score.toFixed(2) + "</span></span>"
       ) +
-      detailRow("Fecha de clasificación", '<span class="detail-value">' + esc(Store.formatDate(entry.ts)) + "</span>") +
-      detailRow("Fuente del veredicto", '<span class="hu-chip">' + sourceLabel(entry.source) + "</span>") +
+      detailRow("Fecha de clasificación", '<span class="detail-value">' + esc(time.formatDateTime(entry.ts)) + "</span>") +
+      detailRow("Fuente del veredicto", '<span class="hu-chip">' + verdict.sourceLabel(entry.source) + "</span>") +
       "</div>" +
       '<div class="flex-spacer"></div>' +
       '<div class="detail-note">Solo se guarda el dominio, no la dirección completa.</div>' +
@@ -624,11 +546,11 @@
   }
 
   function viewSurveyResult() {
-    var result = computeSusResult(App.surveyAnswers);
+    var result = survey.score(App.surveyAnswers);
     return (
       '<section class="view view-survey-result"><div class="sus-result">' +
       '<div class="sus-score">' + result.score + " / 100</div>" +
-      '<div class="sus-band ' + result.bandClass + '">' + result.band + "</div>" +
+      '<div class="sus-band sus-band-' + result.bandId + '">' + result.band + "</div>" +
       '<p class="sus-note">Tus respuestas son anónimas.</p>' +
       '<button type="button" class="btn btn-primary sus-close" data-action="survey-close">Cerrar</button>' +
       "</div></section>"
@@ -646,7 +568,7 @@
     html +=
       '<div class="menu-head"><div class="menu-user">' + esc(session.username) + "</div>" +
       '<div class="menu-role">Rol: ' + esc(session.role) + "</div></div>";
-    if (session.role === "administrador") {
+    if (account.isAdmin(session)) {
       html +=
         '<button type="button" class="menu-item" role="menuitem" data-action="open-admin">Panel de administración</button>';
     }
@@ -710,24 +632,12 @@
   /* ---------------- survey flow ---------------- */
 
   function resetSurveyDraftFromState() {
-    var stored = App.state && App.state.survey && App.state.survey.answers ? App.state.survey.answers : [];
-    var answers = [];
-    for (var index = 0; index < QUESTIONS.length; index += 1) {
-      answers.push(stored[index] || null);
-    }
-    App.surveyAnswers = answers;
+    App.surveyAnswers = survey.draftAnswers(App.state && App.state.survey && App.state.survey.answers);
     App.surveyIndex = 0;
   }
 
   function persistSurvey(completed) {
-    var answers = App.surveyAnswers.slice();
-    Store.update(function (current) {
-      var survey = Object.assign({}, current.survey, { answers: answers });
-      if (completed) {
-        survey.completedAt = Store.todayStamp();
-      }
-      return { survey: survey };
-    });
+    Sereno.surveyService.saveAnswers(store, App.surveyAnswers, completed, new Date());
   }
 
   function selectAnswer(value) {
@@ -743,7 +653,7 @@
     if (!App.surveyAnswers[App.surveyIndex]) {
       return;
     }
-    if (App.surveyIndex >= QUESTIONS.length - 1) {
+    if (survey.isLastQuestion(App.surveyIndex)) {
       App.view = "surveyResult";
       persistSurvey(true);
       render();
@@ -758,15 +668,15 @@
   function handleAction(action, target) {
     switch (action) {
       case "onboarding-next":
-        App.onboardingStep = Math.min(3, App.onboardingStep + 1);
+        App.onboardingStep = onboarding.next(App.onboardingStep);
         render();
         break;
       case "onboarding-back":
-        App.onboardingStep = Math.max(1, App.onboardingStep - 1);
+        App.onboardingStep = onboarding.back(App.onboardingStep);
         render();
         break;
       case "onboarding-start":
-        Store.set({ onboardingDone: true }).then(function () {
+        Sereno.onboardingService.complete(store).then(function () {
           App.view = "home";
           App.tab = "home";
           saveUi();
@@ -794,7 +704,7 @@
         }
         break;
       case "logout":
-        Store.logout().then(function () {
+        Sereno.accountService.logout(store).then(function () {
           App.menuOpen = false;
           App.view = "home";
           App.tab = "home";
@@ -807,10 +717,10 @@
       case "open-admin":
         App.menuOpen = false;
         render();
-        openGeneratedPage("app/admin/admin.html");
+        browser.openPage("app/admin/admin.html");
         break;
       case "open-privacy":
-        openGeneratedPage("app/privacy/privacy.html");
+        browser.openPage("app/privacy/privacy.html");
         break;
       case "open-survey":
         App.menuOpen = false;
@@ -869,7 +779,7 @@
         clearHistoryNow();
         break;
       case "dismiss-notice":
-        Store.set({ modelNoticeDismissed: true });
+        Sereno.protectionService.dismissModelNotice(store);
         break;
       default:
         break;
@@ -881,7 +791,7 @@
     if (!session) {
       return;
     }
-    Store.clearHistory(session.username).then(function () {
+    Sereno.historyService.clear(store, session.username).then(function () {
       App.confirmOpen = false;
       App.view = "history";
       App.tab = "history";
@@ -910,7 +820,7 @@
   }
 
   function submitLogin(username, password) {
-    Store.login(username, password).then(function (result) {
+    Sereno.accountService.login(store, username, password, new Date()).then(function (result) {
       if (!result.ok) {
         App.loginError = true;
         render();
@@ -927,7 +837,7 @@
   }
 
   function submitRegister(username, password) {
-    Store.register(username, password).then(function (result) {
+    Sereno.accountService.register(store, username, password, new Date()).then(function (result) {
       if (!result.ok) {
         App.registerError = true;
         render();
@@ -985,23 +895,18 @@
     root.addEventListener("click", onClick);
     root.addEventListener("submit", onSubmit);
     document.addEventListener("keydown", onKeydown);
-    Store.subscribe(function (state) {
+    store.subscribe(function (state) {
       App.state = state;
       render();
     });
-    Store.ready().then(function (state) {
+    store.ready().then(function (state) {
       App.state = state;
-      var stored = state.survey && state.survey.answers ? state.survey.answers : [];
-      var answers = [];
-      for (var index = 0; index < QUESTIONS.length; index += 1) {
-        answers.push(stored[index] || null);
-      }
-      App.surveyAnswers = answers;
-      if (!state.onboardingDone) {
+      App.surveyAnswers = survey.draftAnswers(state.survey && state.survey.answers);
+      if (!onboarding.isDone(state)) {
         App.view = "onboarding";
         App.onboardingStep = 1;
       } else {
-        var tabAvailable = state.session && state.session.role !== "administrador" && App.tab === "history";
+        var tabAvailable = state.session && !account.isAdmin(state.session) && App.tab === "history";
         App.view = tabAvailable ? "history" : "home";
         App.tab = App.view;
       }

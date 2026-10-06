@@ -1,7 +1,9 @@
-/* Sereno seed data. Classic script: exposes window.SERENO_DATA.
-   Plain JSON-like data only (no DOM, no storage access). */
+/* Platform · seed data of the front-only prototype: demo users, history,
+   domains, cache and the fixed admin dashboard. Classic script that registers
+   Sereno.seed. Plain JSON-like data only; no domain module depends on it,
+   only the state store (defaults) and the admin page (dashboard) read it. */
 
-(function () {
+(function (Sereno) {
   "use strict";
 
   var DEFAULT_STATE = {
@@ -48,19 +50,6 @@
       ]
     }
   };
-
-  var SUS_QUESTIONS = [
-    "Creo que me gustaría usar Sereno con frecuencia.",
-    "Encontré que Sereno era innecesariamente complejo.",
-    "Me pareció que Sereno era fácil de usar.",
-    "Creo que necesitaría apoyo técnico para poder usar Sereno.",
-    "Encontré que las distintas funciones de Sereno estaban bien integradas.",
-    "Encontré que Sereno era demasiado inconsistente.",
-    "Imagino que la mayoría de la gente aprendería a usar Sereno muy rápido.",
-    "Encontré que Sereno era muy engorroso de usar.",
-    "Me sentí muy seguro/a usando Sereno.",
-    "Necesité aprender muchas cosas antes de poder empezar a usar Sereno."
-  ];
 
   /* Fixed dashboard data for the options page, copied from the Figma metrics
      frame. Each hourly bar is one solid colour (level) with its height in px
@@ -143,9 +132,8 @@
     ]
   };
 
-  window.SERENO_DATA = {
+  Sereno.seed = {
     defaultState: DEFAULT_STATE,
-    susQuestions: SUS_QUESTIONS,
     metrics: METRICS
   };
-})();
+})(globalThis.Sereno = globalThis.Sereno || {});

@@ -5,9 +5,12 @@
 (function () {
   "use strict";
 
-  var Store = window.SerenoStore;
-  var DATA = window.SERENO_DATA || {};
-  var METRICS = DATA.metrics || {};
+  var time = Sereno.time;
+  var account = Sereno.account;
+  var domainPolicy = Sereno.domainPolicy;
+  var admin = Sereno.administrationService;
+  var store = Sereno.stateStore.open();
+  var METRICS = Sereno.seed.metrics || {};
 
   var NOTICE_MS = 2600;
   var QUERY_PREVIEW = 3;
@@ -52,10 +55,6 @@
       .replace(/'/g, "&#39;");
   }
 
-  function pad2(number) {
-    return number < 10 ? "0" + number : String(number);
-  }
-
   function formatInt(number) {
     return String(number).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   }
@@ -64,48 +63,9 @@
     return STATUS_META[status] || STATUS_META.seguro;
   }
 
-  function todayIso() {
-    var now = new Date();
-    return now.getFullYear() + "-" + pad2(now.getMonth() + 1) + "-" + pad2(now.getDate());
-  }
-
-  /* Renders YYYY-MM-DD without timezone drift (plain Date parsing would shift
-     the day in negative offsets). Falls back to the store formatter. */
-  function formatDay(value) {
-    var match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ""));
-    if (match) {
-      return match[3] + "/" + match[2] + "/" + match[1];
-    }
-    return Store.formatDateShort(value);
-  }
-
-  /* Invalidation dates may be seeded as ISO (2026-09-22) or written as display
-     dates (formatDateShort output). Render both as DD/MM/YYYY. */
-  function formatInvalidationDate(value) {
-    var text = String(value || "");
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(text)) {
-      return text;
-    }
-    return formatDay(text);
-  }
-
   function readValue(selector) {
     var input = root ? root.querySelector(selector) : null;
     return input ? input.value : "";
-  }
-
-  function publicDomain(row) {
-    return { domain: row.domain, policy: row.policy, updatedAt: row.updatedAt };
-  }
-
-  function openDemoPage() {
-    try {
-      if (typeof chrome !== "undefined" && chrome.tabs && typeof chrome.tabs.create === "function") {
-        chrome.tabs.create({ url: chrome.runtime.getURL("app/demo-store/store.html") });
-      }
-    } catch (error) {
-      /* prototype: the demo page may not exist yet, never block the UI */
-    }
   }
 
   function clearNotice(kind) {
@@ -140,7 +100,7 @@
 
   function sidebarHtml(state) {
     var session = state.session;
-    var roleLabel = session.role === "administrador" ? "Administrador" : session.role;
+    var roleLabel = account.roleTitle(session.role);
     return (
       '<aside class="sidebar">' +
       '<div class="sidebar-brand"><img class="sidebar-logo" src="../../assets/logo.png" alt="Sereno">' +
@@ -280,7 +240,7 @@
           "<tr><td>" + esc(row.domain) + '</td><td><span class="policy-pair">' +
           rowPolicyChip(row.domain, "advertencia", row.policy === "advertencia") +
           rowPolicyChip(row.domain, "bloqueo", row.policy === "bloqueo") + "</span></td><td>" +
-          esc(formatDay(row.updatedAt)) + "</td><td>" +
+          esc(time.formatDay(row.updatedAt)) + "</td><td>" +
           '<button type="button" class="remove-link" data-action="remove-domain" data-domain="' +
           esc(row.domain) + '">Quitar</button></td></tr>'
         );
@@ -354,7 +314,7 @@
       .map(function (item) {
         return (
           "<tr><td>" + esc(item.domain) + "</td><td>" + esc(item.status) + "</td><td>" +
-          esc(formatInvalidationDate(item.date)) + "</td><td></td></tr>"
+          esc(time.formatAnyDay(item.date)) + "</td><td></td></tr>"
         );
       })
       .join("");
@@ -385,66 +345,38 @@
 
   function addDomain() {
     var input = root.querySelector('[name="newDomain"]');
-    var value = input ? input.value.trim().toLowerCase() : "";
+    var value = domainPolicy.normalizeDomain(input ? input.value : "");
     if (!value) {
       if (input) {
         input.classList.add("has-error");
       }
       return;
     }
-    var draft = (App.domainsDraft || []).slice();
-    var exists = draft.some(function (row) {
-      return row.domain === value;
-    });
-    if (!exists) {
-      var added = { domain: value, policy: App.addPolicy, updatedAt: todayIso() };
-      draft.unshift(added);
-      App.domainsDraft = draft;
-      /* Persist only the new row; pending edits in the draft wait for Guardar. */
-      Store.update(function (current) {
-        var stored = (current.domains || []).filter(function (row) {
-          return row.domain !== added.domain;
-        });
-        return { domains: [publicDomain(added)].concat(stored) };
-      });
+    var outcome = domainPolicy.addRow(App.domainsDraft || [], value, App.addPolicy, time.isoDay(new Date()));
+    if (outcome.added) {
+      App.domainsDraft = outcome.rows;
+      admin.addDomain(store, outcome.added);
     }
-    App.addPolicy = "advertencia";
+    App.addPolicy = domainPolicy.DEFAULT_POLICY;
     render();
   }
 
   function setDraftPolicy(domain, policy) {
-    if (policy !== "advertencia" && policy !== "bloqueo") {
+    if (!domainPolicy.isPolicy(policy)) {
       return;
     }
-    App.domainsDraft = (App.domainsDraft || []).map(function (row) {
-      return row.domain === domain ? { domain: row.domain, policy: policy, updatedAt: row.updatedAt } : row;
-    });
+    App.domainsDraft = domainPolicy.withPolicy(App.domainsDraft || [], domain, policy);
     render();
   }
 
   function removeDraftDomain(domain) {
-    App.domainsDraft = (App.domainsDraft || []).filter(function (row) {
-      return row.domain !== domain;
-    });
+    App.domainsDraft = domainPolicy.without(App.domainsDraft || [], domain);
     render();
   }
 
   function saveDomains() {
-    var today = todayIso();
     var stored = (App.state && App.state.domains) || [];
-    var next = (App.domainsDraft || []).map(function (row) {
-      var previous = null;
-      stored.forEach(function (item) {
-        if (item.domain === row.domain) {
-          previous = item;
-        }
-      });
-      var updatedAt = row.updatedAt;
-      if (!previous || previous.policy !== row.policy) {
-        updatedAt = today;
-      }
-      return { domain: row.domain, policy: row.policy, updatedAt: updatedAt };
-    });
+    var next = domainPolicy.stampChanges(App.domainsDraft || [], stored, time.isoDay(new Date()));
     App.domainsDraft = next;
     App.domainsBanner = true;
     clearNotice("domains");
@@ -452,7 +384,7 @@
       App.domainsBanner = false;
       render();
     }, NOTICE_MS);
-    Store.set({ domains: next });
+    admin.saveDomains(store, next);
     render();
   }
 
@@ -466,37 +398,21 @@
   }
 
   function saveTtl() {
-    var days = parseInt(readValue('[name="ttlPhishingDays"]'), 10);
-    var hours = parseInt(readValue('[name="ttlLegitHours"]'), 10);
-    var cache = Object.assign({}, App.state.cache);
-    if (days > 0) {
-      cache.ttlPhishingDays = days;
-    }
-    if (hours > 0) {
-      cache.ttlLegitHours = hours;
-    }
-    Store.set({ cache: cache });
+    admin.saveTtl(store, readValue('[name="ttlPhishingDays"]'), readValue('[name="ttlLegitHours"]'));
     showCacheNotice("TTL guardado.");
     render();
   }
 
   function invalidateDomain() {
     var input = root.querySelector('[name="invalidateDomain"]');
-    var domain = input ? input.value.trim().toLowerCase() : "";
+    var domain = domainPolicy.normalizeDomain(input ? input.value : "");
     if (!domain) {
       if (input) {
         input.classList.add("has-error");
       }
       return;
     }
-    var record = {
-      domain: domain,
-      status: "Se reevaluará en la próxima consulta",
-      date: Store.formatDateShort(new Date().toISOString())
-    };
-    var cache = Object.assign({}, App.state.cache);
-    cache.invalidations = [record].concat(cache.invalidations || []);
-    Store.set({ cache: cache });
+    admin.invalidateDomain(store, domain, new Date());
     showCacheNotice(domain + " se invalidó. La siguiente consulta irá al modelo.");
     render();
   }
@@ -512,7 +428,7 @@
         render();
         break;
       case "pick-add-policy":
-        App.addPolicy = target.getAttribute("data-policy") === "bloqueo" ? "bloqueo" : "advertencia";
+        App.addPolicy = domainPolicy.policyOrDefault(target.getAttribute("data-policy"));
         render();
         break;
       case "add-domain":
@@ -534,7 +450,7 @@
         invalidateDomain();
         break;
       case "open-demo":
-        openDemoPage();
+        Sereno.browser.openPage("app/demo-store/store.html");
         break;
       default:
         break;
@@ -552,10 +468,6 @@
     }
   }
 
-  function isAdmin(state) {
-    return !!(state.session && state.session.role === "administrador");
-  }
-
   /* Shown instead of the panel when nobody, or a non-admin user, is signed in. */
   function accessGateHtml() {
     return (
@@ -571,7 +483,7 @@
     if (!App.initialized || !root || !App.state) {
       return;
     }
-    if (!isAdmin(App.state)) {
+    if (!account.isAdmin(App.state.session)) {
       root.innerHTML = accessGateHtml();
       return;
     }
@@ -600,13 +512,13 @@
     }
     App.initialized = true;
     root.addEventListener("click", onClick);
-    Store.subscribe(function (state) {
+    store.subscribe(function (state) {
       App.state = state;
       render();
     });
-    Store.ready().then(function (state) {
+    store.ready().then(function (state) {
       App.state = state;
-      App.domainsDraft = (state.domains || []).map(publicDomain);
+      App.domainsDraft = (state.domains || []).map(domainPolicy.toRow);
       render();
     });
   }

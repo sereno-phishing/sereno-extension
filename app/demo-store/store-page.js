@@ -9,51 +9,20 @@
 (function () {
   "use strict";
 
-  var Store = window.SerenoStore;
+  var time = Sereno.time;
+  var scenarios = Sereno.demoScenarios;
+  var store = Sereno.stateStore.open();
 
   var EVAL_MS = 700;
   var TOOLTIP_MS = 3000;
   var TOAST_MS = 6000;
 
-  /* Scenario metadata: domain, verdict, score, source and badge appearance
-     mirror the mockups and the seed history. */
-  var SCENARIOS = {
-    seguro: {
-      domain: "tienda-servicios.pe",
-      status: "seguro",
-      score: 0.04,
-      source: "modelo",
-      latencyMs: 142,
-      badge: "✓",
-      badgeColor: "#16A34A"
-    },
-    advertencia: {
-      domain: "paypal-secure-login.com",
-      status: "advertencia",
-      score: 0.92,
-      source: "modelo",
-      latencyMs: 186,
-      badge: "!",
-      badgeColor: "#D97706"
-    },
-    bloqueo: {
-      domain: "pago-servicios-linea.net",
-      status: "bloqueo",
-      score: 0.97,
-      source: "cache",
-      latencyMs: 38,
-      badge: "✕",
-      badgeColor: "#DC2626"
-    },
-    pendiente: {
-      domain: "reservas-hotel-lima.com",
-      status: "pendiente",
-      score: null,
-      source: null,
-      latencyMs: null,
-      badge: "…",
-      badgeColor: "#6B7280"
-    }
+  /* Toolbar badge per verdict status. */
+  var BADGES = {
+    seguro: { text: "✓", color: "#16A34A" },
+    advertencia: { text: "!", color: "#D97706" },
+    bloqueo: { text: "✕", color: "#DC2626" },
+    pendiente: { text: "…", color: "#6B7280" }
   };
 
   /* Latest run wins: a click that arrives while another evaluation is in
@@ -72,35 +41,12 @@
     });
   }
 
-  function buildSite(meta) {
-    return {
-      domain: meta.domain,
-      status: meta.status,
-      score: meta.score,
-      source: meta.source,
-      ts: Store.todayStamp()
-    };
+  function nowStamp() {
+    return time.stamp(new Date());
   }
 
-  /* ---------------- badge bridge ---------------- */
-
-  function chromeRef() {
-    return typeof chrome !== "undefined" ? chrome : undefined;
-  }
-
-  async function applyBadge(meta) {
-    var ext = chromeRef();
-    try {
-      var tab = await ext?.tabs?.getCurrent?.();
-      var tabId = tab && tab.id;
-      if (tabId === undefined || tabId === null) {
-        return;
-      }
-      ext?.action?.setBadgeText?.({ tabId: tabId, text: meta.badge });
-      ext?.action?.setBadgeBackgroundColor?.({ tabId: tabId, color: meta.badgeColor });
-    } catch (error) {
-      /* prototype: the badge is cosmetic and never blocks the demo flow */
-    }
+  function applyBadge(scenario) {
+    return Sereno.browser.setTabBadge(BADGES[scenario.status]);
   }
 
   /* ---------------- overlays ---------------- */
@@ -108,7 +54,7 @@
   function setStamp(id) {
     var node = byId(id);
     if (node) {
-      node.textContent = Store.formatDate(Store.todayStamp());
+      node.textContent = time.formatDateTime(nowStamp());
     }
   }
 
@@ -210,39 +156,18 @@
     closeModals();
   }
 
-  /* ---------------- history ---------------- */
-
-  function logHistory(meta) {
-    return Store.get().then(function (state) {
-      var session = state ? state.session : null;
-      if (!session || !session.username) {
-        return undefined;
-      }
-      return Store.appendHistory(session.username, {
-        domain: meta.domain,
-        status: meta.status,
-        score: meta.score,
-        source: meta.source,
-        latencyMs: meta.latencyMs,
-        ts: Store.todayStamp()
-      });
-    });
-  }
-
   /* ---------------- scenario runner ---------------- */
 
   function runScenario(name) {
-    var meta = SCENARIOS[name];
-    if (!meta) {
+    var scenario = scenarios.find(name);
+    if (!scenario) {
       return Promise.resolve(false);
     }
     var token = runToken + 1;
     runToken = token;
     hideFeedback();
 
-    return Store.set({
-      currentSite: { domain: meta.domain, status: "evaluando", score: null, source: null, ts: Store.todayStamp() }
-    })
+    return Sereno.protectionService.showSite(store, Sereno.protection.evaluatingSite(scenario.domain, nowStamp()))
       .then(function () {
         return wait(EVAL_MS);
       })
@@ -250,16 +175,16 @@
         if (token !== runToken) {
           return false;
         }
-        return Store.set({ currentSite: buildSite(meta) })
+        return Sereno.protectionService.showSite(store, scenarios.siteOf(scenario, nowStamp()))
           .then(function () {
-            return applyBadge(meta);
+            return applyBadge(scenario);
           })
           .then(function () {
             showFeedback(name);
-            if (meta.status === "pendiente") {
+            if (!scenarios.isRecorded(scenario)) {
               return undefined;
             }
-            return logHistory(meta);
+            return Sereno.historyService.recordVisit(store, scenarios.visitOf(scenario, nowStamp()), new Date());
           })
           .then(function () {
             return true;
@@ -276,10 +201,10 @@
   function resetToSafe() {
     runToken += 1;
     hideFeedback();
-    var meta = SCENARIOS.seguro;
-    return Store.set({ currentSite: buildSite(meta) })
+    var scenario = scenarios.find(scenarios.SAFE);
+    return Sereno.protectionService.showSite(store, scenarios.siteOf(scenario, nowStamp()))
       .then(function () {
-        return applyBadge(meta);
+        return applyBadge(scenario);
       })
       .catch(function () {
         /* prototype: never block the reset */
