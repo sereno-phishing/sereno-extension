@@ -62,10 +62,10 @@
     "Necesité aprender muchas cosas antes de poder empezar a usar Sereno."
   ];
 
-  /* Fixed dashboard data for the options page. The hourly bars are segment
-     heights in px and reproduce the shape of the metrics mockup: short bars on
-     the left, the tallest cluster around the middle-right, one prominent tall
-     red bar at position 14 and amber segments scattered across the chart. */
+  /* Fixed dashboard data for the options page, copied from the Figma metrics
+     frame. Each hourly bar is one solid colour (level) with its height in px
+     inside a 110px chart; sparklines are the heights (px) of the 7 mini bars
+     inside the 36px strip of each stat card. */
   var METRICS = {
     analyzed: 1284,
     deltaPct: 12,
@@ -74,28 +74,37 @@
     latencyMs: 142,
     latencyTargetMs: 200,
     cacheHitPct: 67,
+    sparklines: {
+      indigo: [14.4, 18, 16.2, 21.6, 25.2, 23.4, 32.4],
+      red: [10.8, 18, 14.4, 12.6, 21.6, 16.2, 18],
+      amber: [25.2, 21.6, 23.4, 18, 19.8, 18, 16.2],
+      green: [14.4, 16.2, 18, 19.8, 21.6, 22.32, 24.12]
+    },
     hourly: [
-      { seguro: 52, advertencia: 0, bloqueo: 0 },
-      { seguro: 40, advertencia: 0, bloqueo: 0 },
-      { seguro: 24, advertencia: 12, bloqueo: 0 },
-      { seguro: 32, advertencia: 8, bloqueo: 0 },
-      { seguro: 12, advertencia: 0, bloqueo: 20 },
-      { seguro: 28, advertencia: 0, bloqueo: 0 },
-      { seguro: 36, advertencia: 16, bloqueo: 0 },
-      { seguro: 64, advertencia: 0, bloqueo: 0 },
-      { seguro: 76, advertencia: 12, bloqueo: 0 },
-      { seguro: 96, advertencia: 0, bloqueo: 0 },
-      { seguro: 24, advertencia: 0, bloqueo: 60 },
-      { seguro: 88, advertencia: 20, bloqueo: 0 },
-      { seguro: 100, advertencia: 24, bloqueo: 0 },
-      { seguro: 20, advertencia: 0, bloqueo: 116 },
-      { seguro: 116, advertencia: 24, bloqueo: 0 },
-      { seguro: 108, advertencia: 16, bloqueo: 0 },
-      { seguro: 92, advertencia: 24, bloqueo: 0 },
-      { seguro: 80, advertencia: 20, bloqueo: 0 },
-      { seguro: 68, advertencia: 0, bloqueo: 0 },
-      { seguro: 48, advertencia: 16, bloqueo: 0 },
-      { seguro: 32, advertencia: 0, bloqueo: 0 }
+      { level: "seguro", height: 33 },
+      { level: "seguro", height: 27.5 },
+      { level: "advertencia", height: 22 },
+      { level: "bloqueo", height: 16.5 },
+      { level: "seguro", height: 13.2 },
+      { level: "seguro", height: 19.8 },
+      { level: "seguro", height: 33 },
+      { level: "advertencia", height: 49.5 },
+      { level: "seguro", height: 66 },
+      { level: "seguro", height: 77 },
+      { level: "bloqueo", height: 88 },
+      { level: "seguro", height: 82.5 },
+      { level: "advertencia", height: 77 },
+      { level: "seguro", height: 79.2 },
+      { level: "seguro", height: 85.8 },
+      { level: "seguro", height: 93.5 },
+      { level: "seguro", height: 99 },
+      { level: "bloqueo", height: 88 },
+      { level: "seguro", height: 77 },
+      { level: "seguro", height: 71.5 },
+      { level: "seguro", height: 66 },
+      { level: "seguro", height: 55 },
+      { level: "advertencia", height: 46.2 },
+      { level: "seguro", height: 38.5 }
     ],
     queries: [
       { domain: "pago-servicios-linea.net", stamp: "21/09/2026 10:14", source: "Caché", latencyMs: 38, status: "bloqueo" },

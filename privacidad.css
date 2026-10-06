@@ -1,5 +1,5 @@
 /* Sereno privacy policy page: single centered card with four green-check
-   sections. Loaded after shared/tokens.css. */
+   sections. Loaded after shared/tokens.css. Values follow the Figma frame. */
 
 html,
 body {
@@ -8,81 +8,86 @@ body {
 }
 
 body {
-  background: var(--page);
+  background: var(--slate-50);
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: 13px;
+  line-height: 1.21;
   -webkit-font-smoothing: antialiased;
 }
 
+/* 760px card + 16px gutters on narrow viewports. */
 .privacy-wrap {
-  max-width: 760px;
-  margin: 72px auto 48px;
+  max-width: 792px;
+  margin: 40px auto 48px;
   padding: 0 16px;
 }
 
 .privacy-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
   padding: 40px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--bg);
-  box-shadow: var(--shadow-soft);
 }
 
 .privacy-head {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 34px;
+  gap: 12px;
 }
 
 .privacy-logo {
   display: block;
+  flex: 0 0 auto;
   width: 36px;
-  height: 36px;
+  height: 35.86px;
 }
 
 .privacy-title {
   margin: 0;
   font-size: 26px;
   font-weight: 700;
-  letter-spacing: -0.01em;
 }
 
 .privacy-rows {
-  display: grid;
-  gap: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .privacy-row {
   display: flex;
+  align-items: flex-start;
   gap: 14px;
 }
 
 .privacy-check {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  margin-top: 1px;
-  border-radius: 50%;
-  background: var(--green-600);
-  color: #FFFFFF;
-  font-size: 12px;
-  font-weight: 700;
+  width: 24px;
+  height: 24px;
+}
+
+.privacy-text {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
 .privacy-item-title {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
 }
 
 .privacy-item-body {
-  margin: 4px 0 0;
-  font-size: 13.5px;
-  line-height: 1.5;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
   color: var(--muted);
 }

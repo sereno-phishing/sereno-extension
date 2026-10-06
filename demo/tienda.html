@@ -9,67 +9,62 @@
 </head>
 <body class="store-body">
 
-  <!-- Simulated e-commerce page: grey skeleton, the background of mockups 02-06. -->
+  <!-- Simulated e-commerce page: grey skeleton, the backdrop of the Figma frames. -->
   <div class="store-page" aria-hidden="true">
     <header class="store-topbar">
       <span class="sk-logo"></span>
       <nav class="store-nav">
-        <span class="sk-dash"></span>
-        <span class="sk-dash"></span>
-        <span class="sk-dash"></span>
-        <span class="sk-dash"></span>
+        <span class="sk-nav"></span>
+        <span class="sk-nav"></span>
+        <span class="sk-nav"></span>
+        <span class="sk-nav"></span>
       </nav>
     </header>
     <main class="store-main">
       <section class="store-hero">
-        <div class="sk-panel store-hero-main">
-          <span class="sk-line sk-line-lg"></span>
-          <span class="sk-line sk-line-sm"></span>
+        <div class="store-hero-main">
+          <span class="sk-hero-title"></span>
+          <span class="sk-hero-text"></span>
         </div>
-        <aside class="sk-panel store-hero-side">
-          <span class="sk-line sk-line-wide"></span>
-          <span class="sk-line sk-line-sm"></span>
-          <span class="sk-cta"></span>
+        <aside class="store-checkout">
+          <span class="sk-line sk-line-full"></span>
+          <span class="sk-line sk-line-short"></span>
+          <span class="sk-pay"></span>
         </aside>
       </section>
       <section class="store-products">
-        <article class="sk-panel store-product"></article>
-        <article class="sk-panel store-product"></article>
-        <article class="sk-panel store-product"></article>
-        <article class="sk-panel store-product"></article>
+        <article class="store-product"></article>
+        <article class="store-product"></article>
+        <article class="store-product"></article>
+        <article class="store-product"></article>
       </section>
     </main>
   </div>
 
-  <!-- Safe-site tooltip (HU-04, mockup 02). Shown transiently by the simulator. -->
+  <!-- Safe-site tooltip (HU-04). Shown transiently by the simulator. -->
   <div class="demo-tooltip" id="safe-tooltip" role="status">Sereno: sitio seguro</div>
 
-  <!-- Pending-evaluation toast (HU-25, mockup 06). Shown transiently. -->
+  <!-- Pending-evaluation toast (HU-25). Shown transiently. -->
   <aside class="demo-toast" id="pending-toast" role="status" aria-live="polite">
-    <span class="demo-toast-icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" width="16" height="16" focusable="false" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"></circle>
-        <path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-      </svg>
-    </span>
+    <img class="demo-toast-icon" src="../assets/icons/toast-pending-32.svg" width="32" height="32" alt="">
     <div class="demo-toast-body">
       <p class="demo-toast-title">Evaluación pendiente</p>
       <p class="demo-toast-text">Aún no pudimos revisar este sitio. Evita ingresar datos de pago hasta que termine.</p>
-      <p class="demo-toast-retry">Reintentando automáticamente…</p>
+      <p class="demo-toast-retry">Reintentando automáticamente...</p>
     </div>
   </aside>
 
-  <!-- Warning verdict (HU-05, mockups 03/04). -->
+  <!-- Warning verdict (HU-05 / HU-20). -->
   <div class="demo-overlay" id="warning-overlay" hidden>
     <section class="verdict-modal" role="dialog" aria-modal="true" aria-labelledby="warning-title">
-      <header class="verdict-band verdict-band-warning">
-        <span class="verdict-band-icon" aria-hidden="true">!</span>
-        <h2 class="verdict-title verdict-title-warning" id="warning-title">Este sitio puede ser phishing</h2>
+      <header class="verdict-band verdict-band-warn">
+        <img class="verdict-icon" src="../assets/icons/alert-warn-44.svg" width="44" height="44" alt="">
+        <h2 class="verdict-title verdict-title-warn" id="warning-title">Este sitio puede ser phishing</h2>
       </header>
       <div class="verdict-body">
         <div class="verdict-domain-row">
           <span class="verdict-domain">paypal-secure-login.com</span>
-          <span class="chip chip-soft-advertencia">! Riesgo alto</span>
+          <span class="verdict-pill verdict-pill-warn"><img src="../assets/icons/alert-warn-14.svg" width="14" height="14" alt="">Riesgo alto</span>
         </div>
         <p class="verdict-text">El dominio imita a un sitio de pagos conocido. Si ingresas tus datos aquí, podrían robarlos.</p>
         <div class="verdict-details" id="warning-details" hidden>
@@ -80,7 +75,7 @@
           <div class="verdict-detail-row">
             <span class="verdict-detail-label">Score del modelo</span>
             <span class="verdict-score">
-              <span class="verdict-score-track"><span class="verdict-score-fill score-92"></span></span>
+              <span class="verdict-score-track"><span class="verdict-score-fill verdict-score-fill-warn score-92"></span></span>
               <span class="verdict-detail-value">0.92</span>
             </span>
           </div>
@@ -90,34 +85,34 @@
           </div>
           <div class="verdict-detail-row">
             <span class="verdict-detail-label">Fuente del veredicto</span>
-            <span class="hu-chip">Modelo</span>
+            <span class="verdict-source">Modelo</span>
           </div>
         </div>
         <div class="verdict-actions">
-          <button type="button" class="btn btn-dark verdict-action" data-action="volver">Volver</button>
-          <button type="button" class="btn btn-ghost verdict-action" data-action="continuar">Continuar bajo riesgo</button>
+          <button type="button" class="verdict-btn verdict-btn-dark" data-action="volver">Volver</button>
+          <button type="button" class="verdict-btn verdict-btn-ghost" data-action="continuar">Continuar bajo riesgo</button>
         </div>
       </div>
       <footer class="verdict-foot">
         <span class="verdict-brand"><img class="verdict-logo" src="../assets/logo.png" alt="">Protegido por Sereno</span>
-        <button type="button" class="btn-text verdict-toggle" data-action="toggle-detail" data-detail="warning" aria-expanded="false" aria-controls="warning-details">Ver detalle</button>
+        <button type="button" class="verdict-toggle" data-action="toggle-detail" data-detail="warning" aria-expanded="false" aria-controls="warning-details">Ver detalle</button>
       </footer>
     </section>
   </div>
 
-  <!-- Block verdict (HU-22, mockup 05). -->
+  <!-- Block verdict (HU-22). -->
   <div class="demo-overlay" id="block-overlay" hidden>
     <section class="verdict-modal" role="dialog" aria-modal="true" aria-labelledby="block-title">
-      <header class="verdict-band verdict-band-block">
-        <span class="verdict-band-icon" aria-hidden="true">✕</span>
-        <h2 class="verdict-title verdict-title-block" id="block-title">Sitio bloqueado</h2>
+      <header class="verdict-band verdict-band-bad">
+        <img class="verdict-icon" src="../assets/icons/alert-bad-44.svg" width="44" height="44" alt="">
+        <h2 class="verdict-title verdict-title-bad" id="block-title">Sitio bloqueado</h2>
       </header>
       <div class="verdict-body">
         <div class="verdict-domain-row">
           <span class="verdict-domain">pago-servicios-linea.net</span>
-          <span class="chip chip-soft-bloqueado">✕ Riesgo alto</span>
+          <span class="verdict-pill verdict-pill-bad"><img src="../assets/icons/alert-bad-14.svg" width="14" height="14" alt="">Riesgo alto</span>
         </div>
-        <p class="verdict-text">Este dominio está clasificado como phishing y la política no permite continuar. Tus datos no se enviarán.</p>
+        <p class="verdict-text">Este dominio está clasificado como phishing y la política no permite continuar. Tus datos no se enviaron.</p>
         <div class="verdict-details" id="block-details" hidden>
           <div class="verdict-detail-row">
             <span class="verdict-detail-label">Nivel de riesgo</span>
@@ -126,7 +121,7 @@
           <div class="verdict-detail-row">
             <span class="verdict-detail-label">Score del modelo</span>
             <span class="verdict-score">
-              <span class="verdict-score-track"><span class="verdict-score-fill score-97"></span></span>
+              <span class="verdict-score-track"><span class="verdict-score-fill verdict-score-fill-bad score-97"></span></span>
               <span class="verdict-detail-value">0.97</span>
             </span>
           </div>
@@ -136,16 +131,16 @@
           </div>
           <div class="verdict-detail-row">
             <span class="verdict-detail-label">Fuente del veredicto</span>
-            <span class="hu-chip">Caché</span>
+            <span class="verdict-source">Caché</span>
           </div>
         </div>
         <div class="verdict-actions">
-          <button type="button" class="btn btn-danger verdict-action" data-action="volver">Volver a un sitio seguro</button>
+          <button type="button" class="verdict-btn verdict-btn-danger" data-action="volver">Volver a un sitio seguro</button>
         </div>
       </div>
       <footer class="verdict-foot">
         <span class="verdict-brand"><img class="verdict-logo" src="../assets/logo.png" alt="">Protegido por Sereno</span>
-        <button type="button" class="btn-text verdict-toggle" data-action="toggle-detail" data-detail="block" aria-expanded="false" aria-controls="block-details">Ver detalle</button>
+        <button type="button" class="verdict-toggle" data-action="toggle-detail" data-detail="block" aria-expanded="false" aria-controls="block-details">Ver detalle</button>
       </footer>
     </section>
   </div>

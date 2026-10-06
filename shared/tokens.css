@@ -2,15 +2,24 @@
    Loaded by popup.html, options.html and privacidad.html so every page shares
    the same palette and controls. Mobile-first, no external resources. */
 
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../assets/fonts/inter-latin-wght-normal.woff2") format("woff2");
+}
+
 :root {
   --indigo-600: #4F46E5;
   --indigo-700: #4338CA;
   --indigo-100: #E0E7FF;
   --indigo-50: #EEF2FF;
 
-  --ink: #111827;
-  --muted: #6B7280;
-  --line: #E5E7EB;
+  --ink: #0F172A;
+  --muted: #64748B;
+  --subtle: #94A3B8;
+  --line: #E2E8F0;
   --bg: #FFFFFF;
   --page: #F7F8FA;
   --soft: #F3F4F6;
@@ -28,6 +37,17 @@
   --red-bg: #FEE2E2;
 
   --dark: #111827;
+
+  /* Extra Figma shades shared by popup, options, privacy and demo pages. */
+  --slate-50: #F8FAFC;
+  --slate-100: #F1F5F9;
+  --slate-300: #CBD5E1;
+  --slate-600: #475569;
+  --slate-800: #1E293B;
+  --green-800: #166534;
+  --amber-800: #92400E;
+  --red-800: #991B1B;
+  --shadow-fig: 0 12px 32px rgba(15, 23, 41, 0.18);
 
   --font-sans: Inter, "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
   --radius-sm: 8px;

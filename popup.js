@@ -18,8 +18,8 @@
       label: "Seguro",
       title: "Sitio seguro",
       glyph: "✓",
-      solid: "chip-seguro",
-      soft: "chip-soft-seguro",
+      art: "ok",
+      pill: "pill-ok",
       icon: "status-icon-seguro",
       card: "status-card-seguro",
       band: "seguro"
@@ -28,8 +28,8 @@
       label: "Advertencia",
       title: "Advertencia",
       glyph: "!",
-      solid: "chip-advertencia",
-      soft: "chip-soft-advertencia",
+      art: "warn",
+      pill: "pill-warn",
       icon: "status-icon-advertencia",
       card: "status-card-advertencia",
       band: "advertencia"
@@ -38,8 +38,8 @@
       label: "Bloqueado",
       title: "Sitio bloqueado",
       glyph: "✕",
-      solid: "chip-bloqueado",
-      soft: "chip-soft-bloqueado",
+      art: "bad",
+      pill: "pill-bad",
       icon: "status-icon-bloqueo",
       card: "status-card-bloqueo",
       band: "bloqueo"
@@ -48,8 +48,8 @@
       label: "Evaluando…",
       title: "Evaluación pendiente",
       glyph: "◔",
-      solid: "chip-soft-neutral",
-      soft: "chip-soft-neutral",
+      art: "",
+      pill: "pill-neutral",
       icon: "status-icon-pendiente",
       card: "status-card-pendiente",
       band: "pendiente"
@@ -58,9 +58,9 @@
 
   var FILTERS = [
     { id: "todas", label: "Todas" },
-    { id: "seguro", label: "Seguro", dot: "dot-green" },
-    { id: "advertencia", label: "Advertencia", dot: "dot-amber" },
-    { id: "bloqueo", label: "Bloqueado", dot: "dot-red" }
+    { id: "seguro", label: "Seguro", dot: "green" },
+    { id: "advertencia", label: "Advertencia", dot: "amber" },
+    { id: "bloqueo", label: "Bloqueado", dot: "red" }
   ];
 
   var App = {
@@ -76,7 +76,9 @@
     menuOpen: false,
     confirmOpen: false,
     loginError: false,
-    registerError: false
+    registerError: false,
+    draftUsername: "",
+    draftPassword: ""
   };
 
   var root = null;
@@ -173,12 +175,38 @@
     }
   }
 
+  /* ---------------- static art helpers ---------------- */
+
+  function artHtml(name, size) {
+    return '<img class="art art-' + size + '" src="assets/icons/' + name + '.svg" alt="">';
+  }
+
+  function dotHtml(color, size) {
+    return '<img class="art art-' + size + '" src="assets/icons/dot-' + color + '.svg" alt="">';
+  }
+
+  /* Status badge: Figma art when it exists, glyph fallback for the pending state. */
+  function badgeHtml(meta, size) {
+    if (meta.art) {
+      return artHtml(meta.art, size);
+    }
+    return '<span class="art-glyph art-' + size + '">' + meta.glyph + "</span>";
+  }
+
+  function pillHtml(meta, size) {
+    var iconSize = size === "sm" ? "12" : "14";
+    return (
+      '<span class="pill pill-' + size + " " + meta.pill + '">' + badgeHtml(meta, iconSize) +
+      "<span>" + esc(meta.label) + "</span></span>"
+    );
+  }
+
   /* ---------------- header / footer ---------------- */
 
   function headerHtml(state) {
     var left;
     if (App.view === "detail") {
-      left = '<button type="button" class="back-link" data-action="back-history">← Historial</button>';
+      left = '<button type="button" class="back-link" data-action="back-history">←  Historial</button>';
     } else {
       left =
         '<div class="brand">' +
@@ -207,7 +235,7 @@
   }
 
   function footerHtml(state) {
-    var updated = !!state.modelNoticeDismissed;
+    var updated = noticeVisible(state);
     return (
       '<footer class="app-footer">' +
       '<button type="button" class="footer-link" data-action="open-privacy">Política de privacidad</button>' +
@@ -219,10 +247,14 @@
 
   /* ---------------- shared view pieces ---------------- */
 
-  function tabsHtml() {
+  function noticeVisible(state) {
+    return !!(state.session && !state.modelNoticeDismissed);
+  }
+
+  function tabsHtml(large) {
     var homeActive = App.view === "home";
     return (
-      '<div class="tabs" role="tablist">' +
+      '<div class="tabs' + (large ? " tabs-lg" : "") + '" role="tablist">' +
       '<button type="button" role="tab" data-action="tab" data-tab="home" class="' + (homeActive ? "active" : "") +
       '" aria-selected="' + homeActive + '">Inicio</button>' +
       '<button type="button" role="tab" data-action="tab" data-tab="history" class="' + (!homeActive ? "active" : "") +
@@ -233,9 +265,8 @@
 
   function protectionCardHtml() {
     return (
-      '<div class="protection-card">' +
-      '<span class="protection-icon">✓</span>' +
-      '<div><div class="protection-title">Protección activa</div>' +
+      '<div class="protection-card">' + artHtml("ok", "36") +
+      '<div class="protection-text"><div class="protection-title">Protección activa</div>' +
       '<div class="protection-sub">Modo por defecto: Advertencia</div></div>' +
       "</div>"
     );
@@ -245,11 +276,9 @@
     var site = state.currentSite || {};
     var meta = statusMeta(site.status);
     return (
-      '<div class="card site-card">' +
-      '<div><div class="site-label">Este sitio</div>' +
-      '<div class="site-domain">' + esc(site.domain) + "</div></div>" +
-      '<span class="chip ' + meta.soft + '">' + meta.glyph + " " + esc(meta.label) + "</span>" +
-      "</div>"
+      '<div class="site-card"><div class="site-label">Este sitio</div>' +
+      '<div class="site-row"><div class="site-domain">' + esc(site.domain) + "</div>" +
+      pillHtml(meta, "md") + "</div></div>"
     );
   }
 
@@ -257,16 +286,16 @@
     return (
       '<div class="icon-legend"><div class="legend-title">Estados del ícono</div>' +
       '<div class="legend-items">' +
-      '<span class="legend-item"><i class="dot dot-green"></i>Activa</span>' +
-      '<span class="legend-item"><i class="dot dot-grey"></i>Inactiva</span>' +
-      '<span class="legend-item"><i class="dot dot-amber"></i>Sin conexión</span>' +
+      '<span class="legend-item">' + dotHtml("green", "10") + "Activa</span>" +
+      '<span class="legend-item">' + dotHtml("grey", "10") + "Inactiva</span>" +
+      '<span class="legend-item">' + dotHtml("amber", "10") + "Sin conexión</span>" +
       "</div></div>"
     );
   }
 
   function adminCardHtml() {
     return (
-      '<div class="card admin-card"><div class="admin-title">Administración</div>' +
+      '<div class="admin-card"><div class="admin-title">Administración</div>' +
       '<p class="admin-text">Métricas, política por dominio y caché.</p>' +
       '<button type="button" class="btn btn-primary btn-block" data-action="open-admin">Abrir panel de administración</button>' +
       "</div>"
@@ -274,12 +303,12 @@
   }
 
   function noticeHtml(state) {
-    if (!state.session || state.modelNoticeDismissed) {
+    if (!noticeVisible(state)) {
       return "";
     }
     return (
       '<button type="button" class="notice-card" data-action="dismiss-notice">' +
-      '<span class="notice-icon">✓</span>' +
+      artHtml("brand", "28") +
       '<span class="notice-body">' +
       '<span class="notice-title">Modelo actualizado a v' + MODEL_UPDATED_VERSION + "</span>" +
       '<span class="notice-text">Se actualizó en el servidor. No tienes que reinstalar nada.</span>' +
@@ -288,28 +317,29 @@
   }
 
   function bannerError(message) {
-    return '<div class="banner-error" role="alert"><span class="banner-icon">✕</span><span>' + esc(message) + "</span></div>";
+    return '<div class="banner-error" role="alert">' + artHtml("bad", "16") + "<span>" + esc(message) + "</span></div>";
   }
 
-  function fieldHtml(label, name, type, placeholder, hasError, help) {
+  function fieldHtml(label, name, type, placeholder, hasError, help, helpIsError, value) {
     var html =
       '<label class="field"><span class="field-label">' + esc(label) + "</span>" +
       '<input class="input' + (hasError ? " has-error" : "") + '" type="' + type + '" name="' + name + '"' +
       (placeholder ? ' placeholder="' + esc(placeholder) + '"' : "") +
+      (value ? ' value="' + esc(value) + '"' : "") +
       ' autocomplete="off" spellcheck="false">';
     if (help) {
-      html += '<span class="field-help field-help-error">' + esc(help) + "</span>";
+      html += '<span class="field-help' + (helpIsError ? " field-help-error" : "") + '">' + esc(help) + "</span>";
     }
     return html + "</label>";
   }
 
   function checkItem(text) {
-    return '<div class="check-item"><span class="check-icon">✓</span><span>' + esc(text) + "</span></div>";
+    return '<div class="check-item">' + artHtml("ok", "16") + "<span>" + esc(text) + "</span></div>";
   }
 
-  function legendRow(chipClass, chipText, text) {
+  function legendRow(meta, text) {
     return (
-      '<div class="legend-row"><span class="chip ' + chipClass + '">' + chipText + "</span>" +
+      '<div class="legend-row">' + pillHtml(meta, "md") +
       '<span class="legend-row-text">' + esc(text) + "</span></div>"
     );
   }
@@ -331,7 +361,7 @@
       html +=
         '<div class="illustration"><span class="illust-logo-wrap">' +
         '<img class="illust-logo" src="assets/logo.png" alt="">' +
-        '<span class="illust-badge">✓</span></span></div>';
+        '<img class="illust-badge" src="assets/icons/ok.svg" alt=""></span></div>';
       html += '<h1 class="onboarding-title">Revisamos el sitio antes de que pagues</h1>';
       html +=
         '<p class="onboarding-body">Si el enlace es seguro, sigues navegando. Si parece phishing, ' +
@@ -349,16 +379,14 @@
     } else {
       html +=
         '<div class="illustration"><div class="illust-circles">' +
-        '<span class="illust-circle illust-circle-green">✓</span>' +
-        '<span class="illust-circle illust-circle-amber">!</span>' +
-        '<span class="illust-circle illust-circle-red">✕</span>' +
+        artHtml("ok", "40") + artHtml("warn", "40") + artHtml("bad", "40") +
         "</div></div>";
       html += '<h1 class="onboarding-title">Cómo leer una alerta</h1>';
       html +=
         '<div class="legend-rows">' +
-        legendRow("chip-soft-seguro", "✓ Seguro", "Nada se interrumpe") +
-        legendRow("chip-soft-advertencia", "! Advertencia", "Puedes volver o continuar") +
-        legendRow("chip-soft-bloqueado", "✕ Bloqueado", "No se puede seguir") +
+        legendRow(STATUS_META.seguro, "Nada se interrumpe") +
+        legendRow(STATUS_META.advertencia, "Puedes volver o continuar") +
+        legendRow(STATUS_META.bloqueo, "No se puede seguir") +
         "</div>";
       html +=
         '<p class="onboarding-body onboarding-note">La protección queda activa en modo Advertencia. ' +
@@ -381,7 +409,7 @@
     var session = state.session;
     var parts = [];
     if (session && session.role !== "administrador") {
-      parts.push(tabsHtml());
+      parts.push(tabsHtml(true));
     }
     parts.push(protectionCardHtml());
     if (!session) {
@@ -399,11 +427,10 @@
       parts.push(adminCardHtml());
       parts.push(noticeHtml(state));
     } else {
-      parts.push(siteCardHtml(state));
-      parts.push(iconLegendHtml());
       parts.push(noticeHtml(state));
     }
-    return '<section class="view view-home">' + parts.join("") + "</section>";
+    var adminHome = session && session.role === "administrador";
+    return '<section class="view view-home' + (adminHome ? " view-home-admin" : "") + '">' + parts.join("") + "</section>";
   }
 
   function viewLogin() {
@@ -414,12 +441,14 @@
     if (App.loginError) {
       html += bannerError("Usuario o contraseña incorrectos.");
     }
-    html += fieldHtml("Usuario", "username", "text", "nombre de usuario", false, "");
-    html += fieldHtml("Contraseña", "password", "password", "", App.loginError, "");
+    html += fieldHtml("Usuario", "username", "text", "nombre de usuario", false, "", false,
+      App.loginError ? App.draftUsername : "");
+    html += fieldHtml("Contraseña", "password", "password", "", App.loginError, "", false,
+      App.loginError ? App.draftPassword : "");
     html += '<button type="submit" class="btn btn-primary btn-block">Iniciar sesión</button>';
     html += "</form>";
     html +=
-      '<p class="center-note">¿No tienes cuenta? ' +
+      '<p class="center-note"><span>¿No tienes cuenta?</span>' +
       '<button type="button" class="link-btn" data-action="go-register">Crea una</button></p>';
     html += "</section>";
     return html;
@@ -439,14 +468,16 @@
       "text",
       "nombre de usuario",
       App.registerError,
-      App.registerError ? "Elige otro nombre de usuario." : ""
+      App.registerError ? "Elige otro nombre de usuario." : "",
+      true,
+      App.registerError ? App.draftUsername : ""
     );
-    html += fieldHtml("Contraseña", "password", "password", "", false, "");
-    html += '<p class="field-help">Se guarda cifrada. No pedimos tu correo.</p>';
+    html += fieldHtml("Contraseña", "password", "password", "", false, "Se guarda cifrada. No pedimos tu correo.", false,
+      App.registerError ? App.draftPassword : "");
     html += '<button type="submit" class="btn btn-primary btn-block">Crear cuenta</button>';
     html += "</form>";
     html +=
-      '<p class="center-note">¿Ya tienes cuenta? ' +
+      '<p class="center-note"><span>¿Ya tienes cuenta?</span>' +
       '<button type="button" class="link-btn" data-action="go-login">Inicia sesión</button></p>';
     html += "</section>";
     return html;
@@ -456,7 +487,7 @@
     var html = '<div class="filter-chips">';
     FILTERS.forEach(function (filter) {
       var active = App.historyFilter === filter.id;
-      var dot = filter.dot ? '<i class="dot ' + filter.dot + '"></i>' : "";
+      var dot = filter.dot ? dotHtml(filter.dot, "8") : "";
       html +=
         '<button type="button" class="filter-chip' + (active ? " is-active" : "") + '" data-action="filter" ' +
         'data-filter="' + filter.id + '" aria-pressed="' + active + '">' + dot + esc(filter.label) + "</button>";
@@ -475,8 +506,8 @@
       '<span class="history-domain">' + esc(entry.domain) + "</span>" +
       '<span class="history-date">' + esc(dateText) + "</span>" +
       "</span>" +
-      '<span class="history-right"><span class="chip ' + meta.solid + '">' + meta.glyph + " " + esc(meta.label) +
-      '</span><span class="chevron">›</span></span>' +
+      '<span class="history-right">' + pillHtml(meta, "sm") +
+      '<span class="chevron">›</span></span>' +
       "</button>"
     );
   }
@@ -491,7 +522,7 @@
             return entry.status === App.historyFilter;
           });
     var html = '<section class="view view-history">';
-    html += tabsHtml();
+    html += tabsHtml(false);
     html += filtersHtml();
     if (!entries.length) {
       html +=
@@ -503,6 +534,7 @@
     } else {
       html += '<div class="history-list">' + filtered.map(historyItemHtml).join("") + "</div>";
     }
+    html += '<div class="flex-spacer"></div>';
     if (entries.length) {
       html +=
         '<button type="button" class="btn btn-ghost history-delete" data-action="confirm-clear">' +
@@ -541,9 +573,9 @@
     return (
       '<section class="view view-detail">' +
       '<div class="status-card ' + meta.card + '">' +
-      '<span class="status-icon ' + meta.icon + '">' + meta.glyph + "</span>" +
-      '<div><div class="status-title status-title-' + meta.band + '">' + esc(meta.title) + "</div>" +
-      '<div class="status-domain">' + esc(entry.domain) + "</div></div></div>" +
+      '<div class="status-head">' + badgeHtml(meta, "32") +
+      '<span class="status-title status-title-' + meta.band + '">' + esc(meta.title) + "</span></div>" +
+      '<div class="status-domain">' + esc(entry.domain) + "</div></div>" +
       '<div class="detail-rows">' +
       detailRow("Nivel de riesgo", '<span class="detail-value">' + riskLabel(entry) + "</span>") +
       detailRow(
@@ -555,6 +587,7 @@
       detailRow("Fecha de clasificación", '<span class="detail-value">' + esc(Store.formatDate(entry.ts)) + "</span>") +
       detailRow("Fuente del veredicto", '<span class="hu-chip">' + sourceLabel(entry.source) + "</span>") +
       "</div>" +
+      '<div class="flex-spacer"></div>' +
       '<div class="detail-note">Solo se guarda el dominio, no la dirección completa.</div>' +
       "</section>"
     );
@@ -867,6 +900,8 @@
     var passwordInput = form.querySelector('[name="password"]');
     var username = usernameInput ? usernameInput.value.trim() : "";
     var password = passwordInput ? passwordInput.value : "";
+    App.draftUsername = username;
+    App.draftPassword = password;
     if (kind === "login") {
       submitLogin(username, password);
     } else if (kind === "register") {

@@ -10,21 +10,21 @@
   var METRICS = DATA.metrics || {};
 
   var NOTICE_MS = 2600;
-  var QUERY_PREVIEW = 15;
+  var QUERY_PREVIEW = 3;
+  var ICON_DIR = "assets/icons/";
 
   var STATUS_META = {
-    seguro: { label: "Seguro", glyph: "✓", solid: "chip-seguro" },
-    advertencia: { label: "Advertencia", glyph: "!", solid: "chip-advertencia" },
-    bloqueo: { label: "Bloqueado", glyph: "✕", solid: "chip-bloqueado" }
+    seguro: { label: "Seguro", icon: "admin-pill-ok.svg", pill: "pill-seguro" },
+    advertencia: { label: "Advertencia", icon: "admin-pill-warn.svg", pill: "pill-advertencia" },
+    bloqueo: { label: "Bloqueado", icon: "admin-pill-bad.svg", pill: "pill-bloqueo" }
   };
 
-  /* Fixed mini-strip heights (px) for the four stat cards. */
-  var MINI_BARS = {
-    indigo: [10, 12, 9, 14, 11, 13, 10, 15, 12, 14, 11, 16],
-    red: [8, 10, 9, 11, 8, 12, 10, 13, 9, 11, 10, 12],
-    amber: [9, 11, 10, 12, 9, 13, 11, 14, 10, 12, 11, 13],
-    green: [11, 10, 12, 11, 13, 12, 14, 13, 15, 14, 16, 15]
-  };
+  /* Mini-strip heights (px) for the four stat cards live in METRICS.sparklines. */
+  var SPARKLINES = METRICS.sparklines || {};
+
+  function iconImg(cls, file) {
+    return '<img class="' + cls + '" src="' + ICON_DIR + file + '" alt="">';
+  }
 
   var App = {
     initialized: false,
@@ -139,19 +139,18 @@
   }
 
   function sidebarHtml(state) {
-    var session = state.session || { username: "andres.torres", role: "administrador" };
+    var session = state.session;
     var roleLabel = session.role === "administrador" ? "Administrador" : session.role;
-    var initial = String(session.username || "?").charAt(0).toUpperCase();
     return (
       '<aside class="sidebar">' +
       '<div class="sidebar-brand"><img class="sidebar-logo" src="assets/logo.png" alt="Sereno">' +
       '<span class="sidebar-name">Sereno</span></div>' +
       navHtml() +
       '<div class="sidebar-foot">' +
-      '<div class="sidebar-user"><span class="sidebar-avatar">' + esc(initial) + "</span>" +
+      '<button type="button" class="sidebar-demo" data-action="open-demo">Abrir tienda de demo</button>' +
+      '<div class="sidebar-user"><span class="sidebar-avatar" aria-hidden="true"></span>' +
       '<div><div class="sidebar-username">' + esc(session.username) + "</div>" +
       '<div class="sidebar-role">' + esc(roleLabel) + "</div></div></div>" +
-      '<button type="button" class="sidebar-demo" data-action="open-demo">Abrir tienda de demo</button>' +
       "</div></aside>"
     );
   }
@@ -177,9 +176,9 @@
   function legendHtml() {
     return (
       '<div class="legend">' +
-      '<span class="legend-item"><i class="dot dot-green"></i>Seguro</span>' +
-      '<span class="legend-item"><i class="dot dot-amber"></i>Advertencia</span>' +
-      '<span class="legend-item"><i class="dot dot-red"></i>Bloqueado</span>' +
+      '<span class="legend-item">' + iconImg("dot", "admin-dot-green.svg") + "Seguro</span>" +
+      '<span class="legend-item">' + iconImg("dot", "admin-dot-amber.svg") + "Advertencia</span>" +
+      '<span class="legend-item">' + iconImg("dot", "admin-dot-red.svg") + "Bloqueado</span>" +
       "</div>"
     );
   }
@@ -187,17 +186,7 @@
   function chartCard() {
     var bars = (METRICS.hourly || [])
       .map(function (hour) {
-        var segments = "";
-        if (hour.bloqueo) {
-          segments += '<span class="seg seg-bloqueo" style="height:' + hour.bloqueo + 'px"></span>';
-        }
-        if (hour.advertencia) {
-          segments += '<span class="seg seg-advertencia" style="height:' + hour.advertencia + 'px"></span>';
-        }
-        if (hour.seguro) {
-          segments += '<span class="seg seg-seguro" style="height:' + hour.seguro + 'px"></span>';
-        }
-        return '<div class="chart-bar">' + segments + "</div>";
+        return '<span class="chart-bar level-' + esc(hour.level) + '" style="height:' + hour.height + 'px"></span>';
       })
       .join("");
     return (
@@ -215,8 +204,8 @@
         var meta = statusMeta(row.status);
         return (
           "<tr><td>" + esc(row.domain) + "</td><td>" + esc(row.stamp) + "</td><td>" + esc(row.source) +
-          "</td><td>" + esc(row.latencyMs + " ms") + '</td><td><span class="chip ' + meta.solid + '">' +
-          meta.glyph + " " + esc(meta.label) + "</span></td></tr>"
+          "</td><td>" + esc(row.latencyMs + " ms") + '</td><td><span class="pill ' + meta.pill + '">' +
+          iconImg("pill-img", meta.icon) + esc(meta.label) + "</span></td></tr>"
         );
       })
       .join("");
@@ -225,7 +214,7 @@
       '<div class="card-head"><div class="card-title">Últimas consultas (hasta 50)</div>' +
       '<button type="button" class="table-link" data-action="toggle-queries">' +
       (App.showAllQueries ? "Ver menos" : "Ver todas") + "</button></div>" +
-      '<table class="data-table"><thead><tr><th>Dominio</th><th>Fecha y hora</th><th>Fuente</th>' +
+      '<table class="data-table t-queries"><thead><tr><th>Dominio</th><th>Fecha y hora</th><th>Fuente</th>' +
       "<th>Latencia</th><th>Resultado</th></tr></thead><tbody>" + rows + "</tbody></table></div>"
     );
   }
@@ -234,13 +223,13 @@
     var m = METRICS;
     var html = '<section class="section section-metricas">';
     html +=
-      '<div class="section-head"><div><h1 class="section-title">Métricas de operación</h1></div>' +
+      '<div class="section-head"><h1 class="section-title">Métricas de operación</h1>' +
       '<span class="section-ago">Últimas 24 horas</span></div>';
     html += '<div class="stat-grid">';
-    html += statCard("URLs analizadas", formatInt(m.analyzed), "+" + m.deltaPct + " % frente a ayer", "stat-sub-green", "indigo", MINI_BARS.indigo);
-    html += statCard("% phishing", m.phishingPct + " %", m.phishingCount + " URLs detectadas", "stat-sub-muted", "red", MINI_BARS.red);
-    html += statCard("Latencia media", m.latencyMs + " ms", "Meta ≤ " + m.latencyTargetMs + " ms", "stat-sub-muted", "amber", MINI_BARS.amber);
-    html += statCard("Tasa de aciertos del caché", m.cacheHitPct + " %", "HIT frente a MISS", "stat-sub-muted", "green", MINI_BARS.green);
+    html += statCard("URLs analizadas", formatInt(m.analyzed), "+" + m.deltaPct + "% frente a ayer", "stat-sub-muted", "indigo", SPARKLINES.indigo || []);
+    html += statCard("% phishing", m.phishingPct + " %", m.phishingCount + " URLs detectadas", "stat-sub-muted", "red", SPARKLINES.red || []);
+    html += statCard("Latencia media", m.latencyMs + " ms", "Meta ≤ " + m.latencyTargetMs + " ms", "stat-sub-muted", "amber", SPARKLINES.amber || []);
+    html += statCard("Tasa de aciertos del caché", m.cacheHitPct + " %", "HIT frente a MISS", "stat-sub-muted", "green", SPARKLINES.green || []);
     html += "</div>";
     html += chartCard();
     html += queriesCard();
@@ -254,7 +243,7 @@
     var isBlock = policy === "bloqueo";
     var cls = active ? (isBlock ? " is-red" : " is-amber") : "";
     var label = isBlock ? "Bloqueo duro" : "Advertencia";
-    var dot = active ? '<i class="dot ' + (isBlock ? "dot-red" : "dot-amber") + '"></i>' : "";
+    var dot = active ? iconImg("dot", isBlock ? "admin-dot-red.svg" : "admin-dot-amber.svg") : "";
     return (
       '<button type="button" class="policy-chip' + cls + '" data-action="pick-add-policy" ' +
       'data-policy="' + policy + '" aria-pressed="' + active + '">' + dot + esc(label) + "</button>"
@@ -276,7 +265,7 @@
     var isBlock = policy === "bloqueo";
     var cls = active ? (isBlock ? " is-red" : " is-amber") : "";
     var label = isBlock ? "Bloqueo duro" : "Advertencia";
-    var dot = active ? '<i class="dot ' + (isBlock ? "dot-red" : "dot-amber") + '"></i>' : "";
+    var dot = active ? iconImg("dot", isBlock ? "admin-dot-red.svg" : "admin-dot-amber.svg") : "";
     return (
       '<button type="button" class="policy-chip' + cls + '" data-action="pick-row-policy" ' +
       'data-domain="' + esc(domain) + '" data-policy="' + policy + '" aria-pressed="' + active + '">' +
@@ -291,14 +280,14 @@
           "<tr><td>" + esc(row.domain) + '</td><td><span class="policy-pair">' +
           rowPolicyChip(row.domain, "advertencia", row.policy === "advertencia") +
           rowPolicyChip(row.domain, "bloqueo", row.policy === "bloqueo") + "</span></td><td>" +
-          esc(formatDay(row.updatedAt)) + '</td><td class="cell-action">' +
+          esc(formatDay(row.updatedAt)) + "</td><td>" +
           '<button type="button" class="remove-link" data-action="remove-domain" data-domain="' +
           esc(row.domain) + '">Quitar</button></td></tr>'
         );
       })
       .join("");
     return (
-      '<div class="card table-card"><table class="data-table"><thead><tr>' +
+      '<div class="card table-card"><table class="data-table t-policy"><thead><tr>' +
       "<th>Dominio</th><th>Política</th><th>Modificado</th><th></th>" +
       "</tr></thead><tbody>" + rows + "</tbody></table></div>"
     );
@@ -326,7 +315,7 @@
 
   function successBanner(text) {
     return (
-      '<div class="banner-success section-banner" role="status"><span class="banner-icon">✓</span>' +
+      '<div class="banner-success section-banner" role="status">' + iconImg("banner-img", "admin-banner-ok.svg") +
       "<span>" + esc(text) + "</span></div>"
     );
   }
@@ -365,14 +354,14 @@
       .map(function (item) {
         return (
           "<tr><td>" + esc(item.domain) + "</td><td>" + esc(item.status) + "</td><td>" +
-          esc(formatInvalidationDate(item.date)) + "</td></tr>"
+          esc(formatInvalidationDate(item.date)) + "</td><td></td></tr>"
         );
       })
       .join("");
     return (
       '<div class="card table-card"><div class="card-head">' +
       '<div class="card-title">Invalidaciones recientes</div></div>' +
-      '<table class="data-table"><thead><tr><th>Dominio</th><th>Estado</th><th>Fecha</th></tr></thead>' +
+      '<table class="data-table t-cache"><thead><tr><th>Dominio</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>' +
       "<tbody>" + rows + "</tbody></table></div>"
     );
   }
@@ -408,9 +397,16 @@
       return row.domain === value;
     });
     if (!exists) {
-      draft.unshift({ domain: value, policy: App.addPolicy, updatedAt: todayIso() });
+      var added = { domain: value, policy: App.addPolicy, updatedAt: todayIso() };
+      draft.unshift(added);
       App.domainsDraft = draft;
-      Store.set({ domains: draft.map(publicDomain) });
+      /* Persist only the new row; pending edits in the draft wait for Guardar. */
+      Store.update(function (current) {
+        var stored = (current.domains || []).filter(function (row) {
+          return row.domain !== added.domain;
+        });
+        return { domains: [publicDomain(added)].concat(stored) };
+      });
     }
     App.addPolicy = "advertencia";
     render();
@@ -556,8 +552,27 @@
     }
   }
 
+  function isAdmin(state) {
+    return !!(state.session && state.session.role === "administrador");
+  }
+
+  /* Shown instead of the panel when nobody, or a non-admin user, is signed in. */
+  function accessGateHtml() {
+    return (
+      '<main class="access-gate"><div class="card access-gate-card">' +
+      '<img class="access-gate-logo" src="assets/logo.png" alt="Sereno">' +
+      '<h1 class="access-gate-title">Panel de administración</h1>' +
+      '<p class="access-gate-text">Inicia sesión con una cuenta de administrador desde el popup de Sereno ' +
+      "para ver este panel.</p></div></main>"
+    );
+  }
+
   function render() {
     if (!App.initialized || !root || !App.state) {
+      return;
+    }
+    if (!isAdmin(App.state)) {
+      root.innerHTML = accessGateHtml();
       return;
     }
     root.innerHTML = sidebarHtml(App.state) + '<main class="options-content">' + sectionHtml(App.state) + "</main>";

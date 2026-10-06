@@ -87,22 +87,49 @@
     return number < 10 ? "0" + number : String(number);
   }
 
+  function fromStored(stored) {
+    var base = clone(DEFAULT_STATE);
+    if (stored && typeof stored === "object") {
+      Object.keys(stored).forEach(function (key) {
+        if (stored[key] !== undefined) {
+          base[key] = stored[key];
+        }
+      });
+    }
+    return base;
+  }
+
   function load() {
     if (!loadPromise) {
       loadPromise = driver.get(STORAGE_KEY).then(function (stored) {
-        var base = clone(DEFAULT_STATE);
-        if (stored && typeof stored === "object") {
-          Object.keys(stored).forEach(function (key) {
-            if (stored[key] !== undefined) {
-              base[key] = stored[key];
-            }
-          });
-        }
-        state = base;
+        state = fromStored(stored);
         return clone(state);
       });
     }
     return loadPromise;
+  }
+
+  /* Re-reads storage before a mutation: another extension page (popup,
+     options, demo store) may have written since this page loaded, and the
+     whole state is persisted on every commit. */
+  function refresh() {
+    return driver.get(STORAGE_KEY).then(function (stored) {
+      state = fromStored(stored);
+    });
+  }
+
+  /* Applies a write made by another page and tells this page's listeners.
+     Skips echoes of this page's own writes. */
+  function applyExternal(stored) {
+    if (!state) {
+      return;
+    }
+    var next = fromStored(stored);
+    if (JSON.stringify(next) === JSON.stringify(state)) {
+      return;
+    }
+    state = next;
+    notify();
   }
 
   function persist() {
@@ -135,6 +162,8 @@
   function enqueue(task) {
     var run = queue.then(function () {
       return load();
+    }).then(function () {
+      return refresh();
     }).then(function () {
       return task();
     });
@@ -345,6 +374,25 @@
       var history = Object.assign({}, current.history);
       history[username] = [];
       return { history: history };
+    });
+  }
+
+  if (hasChromeStorage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener(function (changes, area) {
+      if (area === "local" && changes[STORAGE_KEY]) {
+        applyExternal(changes[STORAGE_KEY].newValue);
+      }
+    });
+  } else if (!hasChromeStorage && typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("storage", function (event) {
+      if (event.key !== STORAGE_KEY) {
+        return;
+      }
+      try {
+        applyExternal(event.newValue ? JSON.parse(event.newValue) : undefined);
+      } catch (error) {
+        /* ignore malformed external writes */
+      }
     });
   }
 
