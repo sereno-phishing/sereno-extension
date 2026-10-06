@@ -2,5 +2,7 @@
 .agents/
 .atl/
 .claude/
+.codegraph/
+.codex/
 .mcp.json
 skills-lock.json
