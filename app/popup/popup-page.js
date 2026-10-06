@@ -140,12 +140,12 @@
   function openGeneratedPage(file) {
     try {
       if (typeof chrome !== "undefined" && chrome.tabs && typeof chrome.tabs.create === "function") {
-        var url = chrome.runtime && typeof chrome.runtime.getURL === "function" ? chrome.runtime.getURL(file) : file;
+        var url = chrome.runtime && typeof chrome.runtime.getURL === "function" ? chrome.runtime.getURL(file) : "../../" + file;
         chrome.tabs.create({ url: url });
         return;
       }
       if (typeof window !== "undefined" && typeof window.open === "function") {
-        window.open(file, "_blank");
+        window.open("../../" + file, "_blank");
       }
     } catch (error) {
       /* prototype: never block the UI on a navigation error */
@@ -178,11 +178,11 @@
   /* ---------------- static art helpers ---------------- */
 
   function artHtml(name, size) {
-    return '<img class="art art-' + size + '" src="assets/icons/' + name + '.svg" alt="">';
+    return '<img class="art art-' + size + '" src="../../assets/icons/' + name + '.svg" alt="">';
   }
 
   function dotHtml(color, size) {
-    return '<img class="art art-' + size + '" src="assets/icons/dot-' + color + '.svg" alt="">';
+    return '<img class="art art-' + size + '" src="../../assets/icons/dot-' + color + '.svg" alt="">';
   }
 
   /* Status badge: Figma art when it exists, glyph fallback for the pending state. */
@@ -210,7 +210,7 @@
     } else {
       left =
         '<div class="brand">' +
-        '<img class="brand-logo" src="assets/logo.png" alt="Sereno">' +
+        '<img class="brand-logo" src="../../assets/logo.png" alt="Sereno">' +
         '<span class="brand-name">Sereno</span>' +
         "</div>";
     }
@@ -360,14 +360,14 @@
     if (step === 1) {
       html +=
         '<div class="illustration"><span class="illust-logo-wrap">' +
-        '<img class="illust-logo" src="assets/logo.png" alt="">' +
-        '<img class="illust-badge" src="assets/icons/ok.svg" alt=""></span></div>';
+        '<img class="illust-logo" src="../../assets/logo.png" alt="">' +
+        '<img class="illust-badge" src="../../assets/icons/ok.svg" alt=""></span></div>';
       html += '<h1 class="onboarding-title">Revisamos el sitio antes de que pagues</h1>';
       html +=
         '<p class="onboarding-body">Si el enlace es seguro, sigues navegando. Si parece phishing, ' +
         "te avisamos antes de que ingreses tus datos.</p>";
     } else if (step === 2) {
-      html += '<div class="illustration"><img class="illust-logo" src="assets/logo.png" alt=""></div>';
+      html += '<div class="illustration"><img class="illust-logo" src="../../assets/logo.png" alt=""></div>';
       html += '<h1 class="onboarding-title">Qué permiso necesitamos</h1>';
       html += '<p class="onboarding-body">Solo leemos la dirección de la pestaña actual para evaluarla.</p>';
       html +=
@@ -807,10 +807,10 @@
       case "open-admin":
         App.menuOpen = false;
         render();
-        openGeneratedPage("options.html");
+        openGeneratedPage("app/admin/admin.html");
         break;
       case "open-privacy":
-        openGeneratedPage("privacidad.html");
+        openGeneratedPage("app/privacy/privacy.html");
         break;
       case "open-survey":
         App.menuOpen = false;

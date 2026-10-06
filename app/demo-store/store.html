@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tienda de demo — Sereno</title>
-  <link rel="stylesheet" href="../shared/tokens.css">
-  <link rel="stylesheet" href="tienda.css">
+  <link rel="stylesheet" href="../../ui/tokens.css">
+  <link rel="stylesheet" href="store.css">
 </head>
 <body class="store-body">
 
@@ -46,7 +46,7 @@
 
   <!-- Pending-evaluation toast (HU-25). Shown transiently. -->
   <aside class="demo-toast" id="pending-toast" role="status" aria-live="polite">
-    <img class="demo-toast-icon" src="../assets/icons/toast-pending-32.svg" width="32" height="32" alt="">
+    <img class="demo-toast-icon" src="../../assets/icons/toast-pending-32.svg" width="32" height="32" alt="">
     <div class="demo-toast-body">
       <p class="demo-toast-title">Evaluación pendiente</p>
       <p class="demo-toast-text">Aún no pudimos revisar este sitio. Evita ingresar datos de pago hasta que termine.</p>
@@ -58,13 +58,13 @@
   <div class="demo-overlay" id="warning-overlay" hidden>
     <section class="verdict-modal" role="dialog" aria-modal="true" aria-labelledby="warning-title">
       <header class="verdict-band verdict-band-warn">
-        <img class="verdict-icon" src="../assets/icons/alert-warn-44.svg" width="44" height="44" alt="">
+        <img class="verdict-icon" src="../../assets/icons/alert-warn-44.svg" width="44" height="44" alt="">
         <h2 class="verdict-title verdict-title-warn" id="warning-title">Este sitio puede ser phishing</h2>
       </header>
       <div class="verdict-body">
         <div class="verdict-domain-row">
           <span class="verdict-domain">paypal-secure-login.com</span>
-          <span class="verdict-pill verdict-pill-warn"><img src="../assets/icons/alert-warn-14.svg" width="14" height="14" alt="">Riesgo alto</span>
+          <span class="verdict-pill verdict-pill-warn"><img src="../../assets/icons/alert-warn-14.svg" width="14" height="14" alt="">Riesgo alto</span>
         </div>
         <p class="verdict-text">El dominio imita a un sitio de pagos conocido. Si ingresas tus datos aquí, podrían robarlos.</p>
         <div class="verdict-details" id="warning-details" hidden>
@@ -94,7 +94,7 @@
         </div>
       </div>
       <footer class="verdict-foot">
-        <span class="verdict-brand"><img class="verdict-logo" src="../assets/logo.png" alt="">Protegido por Sereno</span>
+        <span class="verdict-brand"><img class="verdict-logo" src="../../assets/logo.png" alt="">Protegido por Sereno</span>
         <button type="button" class="verdict-toggle" data-action="toggle-detail" data-detail="warning" aria-expanded="false" aria-controls="warning-details">Ver detalle</button>
       </footer>
     </section>
@@ -104,13 +104,13 @@
   <div class="demo-overlay" id="block-overlay" hidden>
     <section class="verdict-modal" role="dialog" aria-modal="true" aria-labelledby="block-title">
       <header class="verdict-band verdict-band-bad">
-        <img class="verdict-icon" src="../assets/icons/alert-bad-44.svg" width="44" height="44" alt="">
+        <img class="verdict-icon" src="../../assets/icons/alert-bad-44.svg" width="44" height="44" alt="">
         <h2 class="verdict-title verdict-title-bad" id="block-title">Sitio bloqueado</h2>
       </header>
       <div class="verdict-body">
         <div class="verdict-domain-row">
           <span class="verdict-domain">pago-servicios-linea.net</span>
-          <span class="verdict-pill verdict-pill-bad"><img src="../assets/icons/alert-bad-14.svg" width="14" height="14" alt="">Riesgo alto</span>
+          <span class="verdict-pill verdict-pill-bad"><img src="../../assets/icons/alert-bad-14.svg" width="14" height="14" alt="">Riesgo alto</span>
         </div>
         <p class="verdict-text">Este dominio está clasificado como phishing y la política no permite continuar. Tus datos no se enviaron.</p>
         <div class="verdict-details" id="block-details" hidden>
@@ -139,7 +139,7 @@
         </div>
       </div>
       <footer class="verdict-foot">
-        <span class="verdict-brand"><img class="verdict-logo" src="../assets/logo.png" alt="">Protegido por Sereno</span>
+        <span class="verdict-brand"><img class="verdict-logo" src="../../assets/logo.png" alt="">Protegido por Sereno</span>
         <button type="button" class="verdict-toggle" data-action="toggle-detail" data-detail="block" aria-expanded="false" aria-controls="block-details">Ver detalle</button>
       </footer>
     </section>
@@ -166,8 +166,8 @@
     <p class="demo-panel-hint">Cuentas demo: andres.torres · admin.sereno / sereno123</p>
   </aside>
 
-  <script src="../shared/data.js"></script>
-  <script src="../shared/store.js"></script>
-  <script src="tienda.js"></script>
+  <script src="../../platform/seed.js"></script>
+  <script src="../../platform/state-store.js"></script>
+  <script src="store-page.js"></script>
 </body>
 </html>

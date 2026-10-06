@@ -11,7 +11,7 @@
 
   var NOTICE_MS = 2600;
   var QUERY_PREVIEW = 3;
-  var ICON_DIR = "assets/icons/";
+  var ICON_DIR = "../../assets/icons/";
 
   var STATUS_META = {
     seguro: { label: "Seguro", icon: "admin-pill-ok.svg", pill: "pill-seguro" },
@@ -101,7 +101,7 @@
   function openDemoPage() {
     try {
       if (typeof chrome !== "undefined" && chrome.tabs && typeof chrome.tabs.create === "function") {
-        chrome.tabs.create({ url: chrome.runtime.getURL("demo/tienda.html") });
+        chrome.tabs.create({ url: chrome.runtime.getURL("app/demo-store/store.html") });
       }
     } catch (error) {
       /* prototype: the demo page may not exist yet, never block the UI */
@@ -143,7 +143,7 @@
     var roleLabel = session.role === "administrador" ? "Administrador" : session.role;
     return (
       '<aside class="sidebar">' +
-      '<div class="sidebar-brand"><img class="sidebar-logo" src="assets/logo.png" alt="Sereno">' +
+      '<div class="sidebar-brand"><img class="sidebar-logo" src="../../assets/logo.png" alt="Sereno">' +
       '<span class="sidebar-name">Sereno</span></div>' +
       navHtml() +
       '<div class="sidebar-foot">' +
@@ -560,7 +560,7 @@
   function accessGateHtml() {
     return (
       '<main class="access-gate"><div class="card access-gate-card">' +
-      '<img class="access-gate-logo" src="assets/logo.png" alt="Sereno">' +
+      '<img class="access-gate-logo" src="../../assets/logo.png" alt="Sereno">' +
       '<h1 class="access-gate-title">Panel de administración</h1>' +
       '<p class="access-gate-text">Inicia sesión con una cuenta de administrador desde el popup de Sereno ' +
       "para ver este panel.</p></div></main>"
