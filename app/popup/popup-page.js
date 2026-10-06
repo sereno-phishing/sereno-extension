@@ -1,73 +1,19 @@
-/* Sereno popup controller: state machine + renderer for every popup view.
-   Classic script. No inline handlers: all interaction flows through delegated
-   data-action attributes. */
+/* Popup · container: owns the popup UI state, subscribes to the shared
+   store, delegates every data-action click to a use case or a UI transition,
+   and re-renders through the presentational Sereno.popupViews.
+   Classic script. No inline handlers (MV3 CSP). */
 
 (function () {
   "use strict";
 
-  var time = Sereno.time;
-  var verdict = Sereno.verdict;
   var account = Sereno.account;
   var history = Sereno.history;
   var survey = Sereno.survey;
   var onboarding = Sereno.onboarding;
-  var protection = Sereno.protection;
-  var browser = Sereno.browser;
   var preferences = Sereno.preferences;
   var store = Sereno.stateStore.open();
-  var QUESTIONS = survey.QUESTIONS;
 
   var UI_KEY = "sereno.ui.v1";
-
-  var STATUS_META = {
-    seguro: {
-      label: "Seguro",
-      title: "Sitio seguro",
-      glyph: "✓",
-      art: "ok",
-      pill: "pill-ok",
-      icon: "status-icon-seguro",
-      card: "status-card-seguro",
-      band: "seguro"
-    },
-    advertencia: {
-      label: "Advertencia",
-      title: "Advertencia",
-      glyph: "!",
-      art: "warn",
-      pill: "pill-warn",
-      icon: "status-icon-advertencia",
-      card: "status-card-advertencia",
-      band: "advertencia"
-    },
-    bloqueo: {
-      label: "Bloqueado",
-      title: "Sitio bloqueado",
-      glyph: "✕",
-      art: "bad",
-      pill: "pill-bad",
-      icon: "status-icon-bloqueo",
-      card: "status-card-bloqueo",
-      band: "bloqueo"
-    },
-    pendiente: {
-      label: "Evaluando…",
-      title: "Evaluación pendiente",
-      glyph: "◔",
-      art: "",
-      pill: "pill-neutral",
-      icon: "status-icon-pendiente",
-      card: "status-card-pendiente",
-      band: "pendiente"
-    }
-  };
-
-  var FILTERS = [
-    { id: "todas", label: "Todas" },
-    { id: "seguro", label: "Seguro", dot: "green" },
-    { id: "advertencia", label: "Advertencia", dot: "amber" },
-    { id: "bloqueo", label: "Bloqueado", dot: "red" }
-  ];
 
   var App = {
     initialized: false,
@@ -75,7 +21,7 @@
     view: "home",
     onboardingStep: 1,
     tab: "home",
-    historyFilter: "todas",
+    historyFilter: history.ALL,
     detailId: null,
     surveyIndex: 0,
     surveyAnswers: [],
@@ -89,20 +35,7 @@
 
   var root = null;
 
-  /* ---------------- small helpers ---------------- */
-
-  function esc(value) {
-    return String(value === undefined || value === null ? "" : value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-
-  function statusMeta(status) {
-    return STATUS_META[status] || STATUS_META.pendiente;
-  }
+  /* ---------------- UI state helpers ---------------- */
 
   function saveUi() {
     preferences.write(UI_KEY, { tab: App.tab });
@@ -115,518 +48,16 @@
     }
   }
 
-  /* ---------------- static art helpers ---------------- */
-
-  function artHtml(name, size) {
-    return '<img class="art art-' + size + '" src="../../assets/icons/' + name + '.svg" alt="">';
-  }
-
-  function dotHtml(color, size) {
-    return '<img class="art art-' + size + '" src="../../assets/icons/dot-' + color + '.svg" alt="">';
-  }
-
-  /* Status badge: Figma art when it exists, glyph fallback for the pending state. */
-  function badgeHtml(meta, size) {
-    if (meta.art) {
-      return artHtml(meta.art, size);
-    }
-    return '<span class="art-glyph art-' + size + '">' + meta.glyph + "</span>";
-  }
-
-  function pillHtml(meta, size) {
-    var iconSize = size === "sm" ? "12" : "14";
-    return (
-      '<span class="pill pill-' + size + " " + meta.pill + '">' + badgeHtml(meta, iconSize) +
-      "<span>" + esc(meta.label) + "</span></span>"
-    );
-  }
-
-  /* ---------------- header / footer ---------------- */
-
-  function headerHtml(state) {
-    var left;
-    if (App.view === "detail") {
-      left = '<button type="button" class="back-link" data-action="back-history">←  Historial</button>';
-    } else {
-      left =
-        '<div class="brand">' +
-        '<img class="brand-logo" src="../../assets/logo.png" alt="Sereno">' +
-        '<span class="brand-name">Sereno</span>' +
-        "</div>";
-    }
-    return '<header class="app-header">' + left + '<div class="header-slot">' + headerSlotHtml(state) + "</div></header>";
-  }
-
-  function headerSlotHtml(state) {
-    if (App.view === "onboarding") {
-      return '<span class="step-counter">' + App.onboardingStep + " de 3</span>";
-    }
-    var session = state.session;
-    if (!session) {
-      return "";
-    }
-    if (account.isAdmin(session)) {
-      return '<button type="button" class="admin-pill" data-action="toggle-menu" aria-haspopup="menu">Admin</button>';
-    }
-    return (
-      '<button type="button" class="avatar" data-action="toggle-menu" aria-haspopup="menu" ' +
-      'aria-label="Cuenta de ' + esc(session.username) + '">' + esc(account.initials(session.username)) + "</button>"
-    );
-  }
-
-  function footerHtml(state) {
-    var updated = protection.isNoticeVisible(state);
-    return (
-      '<footer class="app-footer">' +
-      '<button type="button" class="footer-link" data-action="open-privacy">Política de privacidad</button>' +
-      '<span class="footer-model' + (updated ? " is-updated" : "") + '">Modelo v' +
-      protection.modelVersion(state) +
-      "</span></footer>"
-    );
-  }
-
-  /* ---------------- shared view pieces ---------------- */
-
-  function tabsHtml(large) {
-    var homeActive = App.view === "home";
-    return (
-      '<div class="tabs' + (large ? " tabs-lg" : "") + '" role="tablist">' +
-      '<button type="button" role="tab" data-action="tab" data-tab="home" class="' + (homeActive ? "active" : "") +
-      '" aria-selected="' + homeActive + '">Inicio</button>' +
-      '<button type="button" role="tab" data-action="tab" data-tab="history" class="' + (!homeActive ? "active" : "") +
-      '" aria-selected="' + !homeActive + '">Historial</button>' +
-      "</div>"
-    );
-  }
-
-  function protectionCardHtml() {
-    return (
-      '<div class="protection-card">' + artHtml("ok", "36") +
-      '<div class="protection-text"><div class="protection-title">Protección activa</div>' +
-      '<div class="protection-sub">Modo por defecto: Advertencia</div></div>' +
-      "</div>"
-    );
-  }
-
-  function siteCardHtml(state) {
-    var site = state.currentSite || {};
-    var meta = statusMeta(site.status);
-    return (
-      '<div class="site-card"><div class="site-label">Este sitio</div>' +
-      '<div class="site-row"><div class="site-domain">' + esc(site.domain) + "</div>" +
-      pillHtml(meta, "md") + "</div></div>"
-    );
-  }
-
-  function iconLegendHtml() {
-    return (
-      '<div class="icon-legend"><div class="legend-title">Estados del ícono</div>' +
-      '<div class="legend-items">' +
-      '<span class="legend-item">' + dotHtml("green", "10") + "Activa</span>" +
-      '<span class="legend-item">' + dotHtml("grey", "10") + "Inactiva</span>" +
-      '<span class="legend-item">' + dotHtml("amber", "10") + "Sin conexión</span>" +
-      "</div></div>"
-    );
-  }
-
-  function adminCardHtml() {
-    return (
-      '<div class="admin-card"><div class="admin-title">Administración</div>' +
-      '<p class="admin-text">Métricas, política por dominio y caché.</p>' +
-      '<button type="button" class="btn btn-primary btn-block" data-action="open-admin">Abrir panel de administración</button>' +
-      "</div>"
-    );
-  }
-
-  function noticeHtml(state) {
-    if (!protection.isNoticeVisible(state)) {
-      return "";
-    }
-    return (
-      '<button type="button" class="notice-card" data-action="dismiss-notice">' +
-      artHtml("brand", "28") +
-      '<span class="notice-body">' +
-      '<span class="notice-title">Modelo actualizado a v' + protection.UPDATED_MODEL_VERSION + "</span>" +
-      '<span class="notice-text">Se actualizó en el servidor. No tienes que reinstalar nada.</span>' +
-      "</span></button>"
-    );
-  }
-
-  function bannerError(message) {
-    return '<div class="banner-error" role="alert">' + artHtml("bad", "16") + "<span>" + esc(message) + "</span></div>";
-  }
-
-  function fieldHtml(label, name, type, placeholder, hasError, help, helpIsError, value) {
-    var html =
-      '<label class="field"><span class="field-label">' + esc(label) + "</span>" +
-      '<input class="input' + (hasError ? " has-error" : "") + '" type="' + type + '" name="' + name + '"' +
-      (placeholder ? ' placeholder="' + esc(placeholder) + '"' : "") +
-      (value ? ' value="' + esc(value) + '"' : "") +
-      ' autocomplete="off" spellcheck="false">';
-    if (help) {
-      html += '<span class="field-help' + (helpIsError ? " field-help-error" : "") + '">' + esc(help) + "</span>";
-    }
-    return html + "</label>";
-  }
-
-  function checkItem(text) {
-    return '<div class="check-item">' + artHtml("ok", "16") + "<span>" + esc(text) + "</span></div>";
-  }
-
-  function legendRow(meta, text) {
-    return (
-      '<div class="legend-row">' + pillHtml(meta, "md") +
-      '<span class="legend-row-text">' + esc(text) + "</span></div>"
-    );
-  }
-
-  function dotsHtml(step) {
-    var html = '<div class="dots">';
-    for (var index = 1; index <= 3; index += 1) {
-      html += '<span class="dot-step' + (index === step ? " active" : "") + '"></span>';
-    }
-    return html + "</div>";
-  }
-
-  /* ---------------- views ---------------- */
-
-  function viewOnboarding() {
-    var step = App.onboardingStep;
-    var html = '<section class="view view-onboarding">';
-    if (step === 1) {
-      html +=
-        '<div class="illustration"><span class="illust-logo-wrap">' +
-        '<img class="illust-logo" src="../../assets/logo.png" alt="">' +
-        '<img class="illust-badge" src="../../assets/icons/ok.svg" alt=""></span></div>';
-      html += '<h1 class="onboarding-title">Revisamos el sitio antes de que pagues</h1>';
-      html +=
-        '<p class="onboarding-body">Si el enlace es seguro, sigues navegando. Si parece phishing, ' +
-        "te avisamos antes de que ingreses tus datos.</p>";
-    } else if (step === 2) {
-      html += '<div class="illustration"><img class="illust-logo" src="../../assets/logo.png" alt=""></div>';
-      html += '<h1 class="onboarding-title">Qué permiso necesitamos</h1>';
-      html += '<p class="onboarding-body">Solo leemos la dirección de la pestaña actual para evaluarla.</p>';
-      html +=
-        '<div class="check-list">' +
-        checkItem("No leemos el contenido de la página") +
-        checkItem("No guardamos la dirección completa") +
-        checkItem("Funciona sin crear una cuenta") +
-        "</div>";
-    } else {
-      html +=
-        '<div class="illustration"><div class="illust-circles">' +
-        artHtml("ok", "40") + artHtml("warn", "40") + artHtml("bad", "40") +
-        "</div></div>";
-      html += '<h1 class="onboarding-title">Cómo leer una alerta</h1>';
-      html +=
-        '<div class="legend-rows">' +
-        legendRow(STATUS_META.seguro, "Nada se interrumpe") +
-        legendRow(STATUS_META.advertencia, "Puedes volver o continuar") +
-        legendRow(STATUS_META.bloqueo, "No se puede seguir") +
-        "</div>";
-      html +=
-        '<p class="onboarding-body onboarding-note">La protección queda activa en modo Advertencia. ' +
-        "No tienes que configurar nada.</p>";
-    }
-    html += '<div class="onboarding-controls">' + dotsHtml(step) + '<div class="onboarding-buttons">';
-    if (step > 1) {
-      html += '<button type="button" class="btn btn-ghost" data-action="onboarding-back">Atrás</button>';
-    }
-    if (step < 3) {
-      html += '<button type="button" class="btn btn-primary" data-action="onboarding-next">Siguiente</button>';
-    } else {
-      html += '<button type="button" class="btn btn-primary" data-action="onboarding-start">Empezar</button>';
-    }
-    html += "</div></div></section>";
-    return html;
-  }
-
-  function viewHome(state) {
-    var session = state.session;
-    var parts = [];
-    if (session && !account.isAdmin(session)) {
-      parts.push(tabsHtml(true));
-    }
-    parts.push(protectionCardHtml());
-    if (!session) {
-      parts.push(siteCardHtml(state));
-      parts.push(iconLegendHtml());
-      parts.push('<div class="flex-spacer"></div>');
-      parts.push('<p class="muted-line">Inicia sesión para guardar tu historial.</p>');
-      parts.push(
-        '<div class="actions-stack">' +
-        '<button type="button" class="btn btn-primary btn-block" data-action="go-login">Iniciar sesión</button>' +
-        '<button type="button" class="btn btn-ghost btn-block" data-action="go-register">Crear cuenta</button>' +
-        "</div>"
-      );
-    } else if (account.isAdmin(session)) {
-      parts.push(adminCardHtml());
-      parts.push(noticeHtml(state));
-    } else {
-      parts.push(noticeHtml(state));
-    }
-    var adminHome = account.isAdmin(session);
-    return '<section class="view view-home' + (adminHome ? " view-home-admin" : "") + '">' + parts.join("") + "</section>";
-  }
-
-  function viewLogin() {
-    var html = '<section class="view view-form">';
-    html += '<h1 class="view-title">Inicia sesión</h1>';
-    html += '<p class="view-sub">Accede a tu historial de sitios evaluados.</p>';
-    html += '<form class="form" data-form="login" novalidate>';
-    if (App.loginError) {
-      html += bannerError("Usuario o contraseña incorrectos.");
-    }
-    html += fieldHtml("Usuario", "username", "text", "nombre de usuario", false, "", false,
-      App.loginError ? App.draftUsername : "");
-    html += fieldHtml("Contraseña", "password", "password", "", App.loginError, "", false,
-      App.loginError ? App.draftPassword : "");
-    html += '<button type="submit" class="btn btn-primary btn-block">Iniciar sesión</button>';
-    html += "</form>";
-    html +=
-      '<p class="center-note"><span>¿No tienes cuenta?</span>' +
-      '<button type="button" class="link-btn" data-action="go-register">Crea una</button></p>';
-    html += "</section>";
-    return html;
-  }
-
-  function viewRegister() {
-    var html = '<section class="view view-form">';
-    html += '<h1 class="view-title">Crea tu cuenta</h1>';
-    html += '<p class="view-sub">Guarda tu historial y úsalo en otros dispositivos.</p>';
-    html += '<form class="form" data-form="register" novalidate>';
-    if (App.registerError) {
-      html += bannerError("El usuario ya existe.");
-    }
-    html += fieldHtml(
-      "Usuario",
-      "username",
-      "text",
-      "nombre de usuario",
-      App.registerError,
-      App.registerError ? "Elige otro nombre de usuario." : "",
-      true,
-      App.registerError ? App.draftUsername : ""
-    );
-    html += fieldHtml("Contraseña", "password", "password", "", false, "Se guarda cifrada. No pedimos tu correo.", false,
-      App.registerError ? App.draftPassword : "");
-    html += '<button type="submit" class="btn btn-primary btn-block">Crear cuenta</button>';
-    html += "</form>";
-    html +=
-      '<p class="center-note"><span>¿Ya tienes cuenta?</span>' +
-      '<button type="button" class="link-btn" data-action="go-login">Inicia sesión</button></p>';
-    html += "</section>";
-    return html;
-  }
-
-  function filtersHtml() {
-    var html = '<div class="filter-chips">';
-    FILTERS.forEach(function (filter) {
-      var active = App.historyFilter === filter.id;
-      var dot = filter.dot ? dotHtml(filter.dot, "8") : "";
-      html +=
-        '<button type="button" class="filter-chip' + (active ? " is-active" : "") + '" data-action="filter" ' +
-        'data-filter="' + filter.id + '" aria-pressed="' + active + '">' + dot + esc(filter.label) + "</button>";
-    });
-    return html + "</div>";
-  }
-
-  function historyItemHtml(entry) {
-    var meta = statusMeta(entry.status);
-    var full = time.formatDateTime(entry.ts);
-    var chunks = full.split(" ");
-    var dateText = chunks[0] + (chunks[1] ? " · " + chunks[1] : "");
-    return (
-      '<button type="button" class="history-item" data-action="open-detail" data-id="' + esc(entry.id) + '">' +
-      "<span>" +
-      '<span class="history-domain">' + esc(entry.domain) + "</span>" +
-      '<span class="history-date">' + esc(dateText) + "</span>" +
-      "</span>" +
-      '<span class="history-right">' + pillHtml(meta, "sm") +
-      '<span class="chevron">›</span></span>' +
-      "</button>"
-    );
-  }
-
-  function viewHistory(state) {
-    var session = state.session;
-    var entries = history.entriesOf(state.history, session && session.username);
-    var filtered = history.filter(entries, App.historyFilter);
-    var html = '<section class="view view-history">';
-    html += tabsHtml(false);
-    html += filtersHtml();
-    if (!entries.length) {
-      html +=
-        '<div class="empty-state"><span class="empty-circle"></span>' +
-        '<p class="empty-title">Todavía no hay sitios evaluados en esta cuenta.</p>' +
-        '<p class="empty-sub">Cuando navegues, los sitios aparecerán aquí.</p></div>';
-    } else if (!filtered.length) {
-      html += '<p class="filter-empty">No hay sitios con este resultado.</p>';
-    } else {
-      html += '<div class="history-list">' + filtered.map(historyItemHtml).join("") + "</div>";
-    }
-    html += '<div class="flex-spacer"></div>';
-    if (entries.length) {
-      html +=
-        '<button type="button" class="btn btn-ghost history-delete" data-action="confirm-clear">' +
-        "Borrar historial</button>";
-    }
-    html += "</section>";
-    return html;
-  }
-
-  function findEntry(state, id) {
-    var session = state.session;
-    return history.findById(history.entriesOf(state.history, session && session.username), id);
-  }
-
-  function detailRow(label, valueHtml) {
-    return '<div class="detail-row"><span class="detail-label">' + esc(label) + "</span>" + valueHtml + "</div>";
-  }
-
-  function viewDetail(state) {
-    var entry = findEntry(state, App.detailId);
-    if (!entry) {
-      return '<section class="view view-detail"><p class="filter-empty">No hay sitios con este resultado.</p></section>';
-    }
-    var meta = statusMeta(entry.status);
-    var score = Number(entry.score) || 0;
-    var percent = verdict.scorePercent(score);
-    return (
-      '<section class="view view-detail">' +
-      '<div class="status-card ' + meta.card + '">' +
-      '<div class="status-head">' + badgeHtml(meta, "32") +
-      '<span class="status-title status-title-' + meta.band + '">' + esc(meta.title) + "</span></div>" +
-      '<div class="status-domain">' + esc(entry.domain) + "</div></div>" +
-      '<div class="detail-rows">' +
-      detailRow("Nivel de riesgo", '<span class="detail-value">' + verdict.riskLevel(entry) + "</span>") +
-      detailRow(
-        "Score del modelo",
-        '<span class="detail-score"><span class="score-track"><span class="score-fill score-fill-' + meta.band +
-          '" style="width:' + percent + '%"></span></span>' +
-          '<span class="detail-value">' + score.toFixed(2) + "</span></span>"
-      ) +
-      detailRow("Fecha de clasificación", '<span class="detail-value">' + esc(time.formatDateTime(entry.ts)) + "</span>") +
-      detailRow("Fuente del veredicto", '<span class="hu-chip">' + verdict.sourceLabel(entry.source) + "</span>") +
-      "</div>" +
-      '<div class="flex-spacer"></div>' +
-      '<div class="detail-note">Solo se guarda el dominio, no la dirección completa.</div>' +
-      "</section>"
-    );
-  }
-
-  function viewSurvey() {
-    var index = App.surveyIndex;
-    var total = QUESTIONS.length;
-    var selected = App.surveyAnswers[index];
-    var progress = Math.round(((index + 1) / total) * 100);
-    var html = '<section class="view view-survey">';
-    html += '<div class="survey-meta">Pregunta ' + (index + 1) + " de " + total + "</div>";
-    html += '<div class="progress-track"><div class="progress-fill" style="width:' + progress + '%"></div></div>';
-    html += '<h2 class="survey-question">' + esc(QUESTIONS[index]) + "</h2>";
-    html += '<div class="scale">';
-    for (var value = 1; value <= 5; value += 1) {
-      html +=
-        '<button type="button" class="scale-btn' + (selected === value ? " is-selected" : "") +
-        '" data-action="answer" data-value="' + value + '" aria-pressed="' + (selected === value) + '">' + value + "</button>";
-    }
-    html += "</div>";
-    html += '<div class="scale-labels"><span>Totalmente en desacuerdo</span><span>Totalmente de acuerdo</span></div>';
-    html += '<div class="flex-spacer"></div>';
-    html += '<p class="survey-note">Tus respuestas son anónimas.</p>';
-    html += '<div class="survey-actions">';
-    html +=
-      '<button type="button" class="btn btn-ghost" data-action="survey-back"' + (index === 0 ? " disabled" : "") +
-      ">Atrás</button>";
-    html +=
-      '<button type="button" class="btn btn-primary" data-action="survey-next"' + (selected ? "" : " disabled") + ">" +
-      (index === total - 1 ? "Finalizar" : "Siguiente") + "</button>";
-    html += "</div></section>";
-    return html;
-  }
-
-  function viewSurveyResult() {
-    var result = survey.score(App.surveyAnswers);
-    return (
-      '<section class="view view-survey-result"><div class="sus-result">' +
-      '<div class="sus-score">' + result.score + " / 100</div>" +
-      '<div class="sus-band sus-band-' + result.bandId + '">' + result.band + "</div>" +
-      '<p class="sus-note">Tus respuestas son anónimas.</p>' +
-      '<button type="button" class="btn btn-primary sus-close" data-action="survey-close">Cerrar</button>' +
-      "</div></section>"
-    );
-  }
-
-  function menuHtml(state) {
-    if (!App.menuOpen || !state.session) {
-      return "";
-    }
-    var session = state.session;
-    var html =
-      '<div class="menu-overlay" data-action="close-menu">' +
-      '<div class="account-menu" role="menu" aria-label="Cuenta">';
-    html +=
-      '<div class="menu-head"><div class="menu-user">' + esc(session.username) + "</div>" +
-      '<div class="menu-role">Rol: ' + esc(session.role) + "</div></div>";
-    if (account.isAdmin(session)) {
-      html +=
-        '<button type="button" class="menu-item" role="menuitem" data-action="open-admin">Panel de administración</button>';
-    }
-    html += '<div class="menu-sep"></div>';
-    html += '<button type="button" class="menu-item" role="menuitem" data-action="open-survey">Encuesta de opinión</button>';
-    html += '<div class="menu-sep"></div>';
-    html += '<button type="button" class="menu-item menu-item-danger" role="menuitem" data-action="logout">Cerrar sesión</button>';
-    html += "</div></div>";
-    return html;
-  }
-
-  function confirmHtml() {
-    if (!App.confirmOpen) {
-      return "";
-    }
-    return (
-      '<div class="confirm-overlay"><div class="confirm-card" role="dialog" aria-modal="true" ' +
-      'aria-label="Borrar historial">' +
-      '<h2 class="confirm-title">¿Borrar tu historial?</h2>' +
-      '<p class="confirm-text">Se elimina de tu cuenta. No se puede deshacer.</p>' +
-      '<div class="confirm-actions">' +
-      '<button type="button" class="btn btn-ghost" data-action="cancel-clear">No</button>' +
-      '<button type="button" class="btn btn-danger" data-action="confirm-clear-yes">Sí, borrar</button>' +
-      "</div></div></div>"
-    );
-  }
-
-  function contentHtml(state) {
-    switch (App.view) {
-      case "onboarding":
-        return viewOnboarding();
-      case "login":
-        return viewLogin();
-      case "register":
-        return viewRegister();
-      case "history":
-        return viewHistory(state);
-      case "detail":
-        return viewDetail(state);
-      case "survey":
-        return viewSurvey();
-      case "surveyResult":
-        return viewSurveyResult();
-      default:
-        return viewHome(state);
-    }
+  function show(view) {
+    App.view = view;
+    App.tab = view === "history" ? "history" : "home";
   }
 
   function render() {
     if (!App.initialized || !root || !App.state) {
       return;
     }
-    root.innerHTML =
-      headerHtml(App.state) +
-      '<main class="app-content" id="content">' + contentHtml(App.state) + "</main>" +
-      footerHtml(App.state) +
-      menuHtml(App.state) +
-      confirmHtml();
+    root.innerHTML = Sereno.popupViews.page(App, App.state);
   }
 
   /* ---------------- survey flow ---------------- */
@@ -663,127 +94,40 @@
     render();
   }
 
-  /* ---------------- actions ---------------- */
+  /* ---------------- account flow ---------------- */
 
-  function handleAction(action, target) {
-    switch (action) {
-      case "onboarding-next":
-        App.onboardingStep = onboarding.next(App.onboardingStep);
+  /* After a successful sign-in or sign-up the popup returns to a clean home. */
+  function enterHome() {
+    App.loginError = false;
+    App.registerError = false;
+    show("home");
+    App.historyFilter = history.ALL;
+    saveUi();
+    render();
+  }
+
+  function submitLogin(username, password) {
+    Sereno.accountService.login(store, username, password, new Date()).then(function (result) {
+      if (!result.ok) {
+        App.loginError = true;
         render();
-        break;
-      case "onboarding-back":
-        App.onboardingStep = onboarding.back(App.onboardingStep);
-        render();
-        break;
-      case "onboarding-start":
-        Sereno.onboardingService.complete(store).then(function () {
-          App.view = "home";
-          App.tab = "home";
-          saveUi();
-          render();
-        });
-        break;
-      case "go-login":
-        App.loginError = false;
-        App.view = "login";
-        render();
-        break;
-      case "go-register":
-        App.registerError = false;
-        App.view = "register";
-        render();
-        break;
-      case "toggle-menu":
-        App.menuOpen = !App.menuOpen;
-        render();
-        break;
-      case "close-menu":
-        if (App.menuOpen) {
-          App.menuOpen = false;
-          render();
-        }
-        break;
-      case "logout":
-        Sereno.accountService.logout(store).then(function () {
-          App.menuOpen = false;
-          App.view = "home";
-          App.tab = "home";
-          App.historyFilter = "todas";
-          App.detailId = null;
-          saveUi();
-          render();
-        });
-        break;
-      case "open-admin":
-        App.menuOpen = false;
-        render();
-        browser.openPage("app/admin/admin.html");
-        break;
-      case "open-privacy":
-        browser.openPage("app/privacy/privacy.html");
-        break;
-      case "open-survey":
-        App.menuOpen = false;
-        resetSurveyDraftFromState();
-        App.view = "survey";
-        render();
-        break;
-      case "answer":
-        selectAnswer(Number(target.getAttribute("data-value")));
-        break;
-      case "survey-back":
-        if (App.surveyIndex > 0) {
-          App.surveyIndex -= 1;
-          render();
-        }
-        break;
-      case "survey-next":
-        nextSurveyQuestion();
-        break;
-      case "survey-close":
-        App.view = "home";
-        App.tab = "home";
-        render();
-        break;
-      case "tab": {
-        var tab = target.getAttribute("data-tab") === "history" ? "history" : "home";
-        App.tab = tab;
-        App.view = tab;
-        saveUi();
-        render();
-        break;
+        return;
       }
-      case "filter":
-        App.historyFilter = target.getAttribute("data-filter") || "todas";
+      enterHome();
+    });
+  }
+
+  function submitRegister(username, password) {
+    Sereno.accountService.register(store, username, password, new Date()).then(function (result) {
+      if (!result.ok) {
+        App.registerError = true;
         render();
-        break;
-      case "open-detail":
-        App.detailId = target.getAttribute("data-id");
-        App.view = "detail";
-        render();
-        break;
-      case "back-history":
-        App.view = "history";
-        App.tab = "history";
-        render();
-        break;
-      case "confirm-clear":
-        App.confirmOpen = true;
-        render();
-        break;
-      case "cancel-clear":
-        App.confirmOpen = false;
-        render();
-        break;
-      case "confirm-clear-yes":
-        clearHistoryNow();
-        break;
-      case "dismiss-notice":
-        Sereno.protectionService.dismissModelNotice(store);
-        break;
-      default:
-        break;
-    }
+        return;
+      }
+      App.surveyIndex = 0;
+      App.surveyAnswers = [];
+      enterHome();
+    });
   }
 
   function clearHistoryNow() {
@@ -793,10 +137,133 @@
     }
     Sereno.historyService.clear(store, session.username).then(function () {
       App.confirmOpen = false;
-      App.view = "history";
-      App.tab = "history";
+      show("history");
       render();
     });
+  }
+
+  /* ---------------- actions ---------------- */
+
+  /* Command table: data-action name -> handler(target). */
+  var ACTIONS = {
+    "onboarding-next": function () {
+      App.onboardingStep = onboarding.next(App.onboardingStep);
+      render();
+    },
+    "onboarding-back": function () {
+      App.onboardingStep = onboarding.back(App.onboardingStep);
+      render();
+    },
+    "onboarding-start": function () {
+      Sereno.onboardingService.complete(store).then(function () {
+        show("home");
+        saveUi();
+        render();
+      });
+    },
+    "go-login": function () {
+      App.loginError = false;
+      App.view = "login";
+      render();
+    },
+    "go-register": function () {
+      App.registerError = false;
+      App.view = "register";
+      render();
+    },
+    "toggle-menu": function () {
+      App.menuOpen = !App.menuOpen;
+      render();
+    },
+    "close-menu": function () {
+      if (App.menuOpen) {
+        App.menuOpen = false;
+        render();
+      }
+    },
+    logout: function () {
+      Sereno.accountService.logout(store).then(function () {
+        App.menuOpen = false;
+        show("home");
+        App.historyFilter = history.ALL;
+        App.detailId = null;
+        saveUi();
+        render();
+      });
+    },
+    "open-admin": function () {
+      App.menuOpen = false;
+      render();
+      Sereno.browser.openPage("app/admin/admin.html");
+    },
+    "open-privacy": function () {
+      Sereno.browser.openPage("app/privacy/privacy.html");
+    },
+    "open-survey": function () {
+      App.menuOpen = false;
+      resetSurveyDraftFromState();
+      App.view = "survey";
+      render();
+    },
+    answer: function (target) {
+      selectAnswer(Number(target.getAttribute("data-value")));
+    },
+    "survey-back": function () {
+      if (App.surveyIndex > 0) {
+        App.surveyIndex -= 1;
+        render();
+      }
+    },
+    "survey-next": nextSurveyQuestion,
+    "survey-close": function () {
+      show("home");
+      render();
+    },
+    tab: function (target) {
+      show(target.getAttribute("data-tab") === "history" ? "history" : "home");
+      saveUi();
+      render();
+    },
+    filter: function (target) {
+      App.historyFilter = target.getAttribute("data-filter") || history.ALL;
+      render();
+    },
+    "open-detail": function (target) {
+      App.detailId = target.getAttribute("data-id");
+      App.view = "detail";
+      render();
+    },
+    "back-history": function () {
+      show("history");
+      render();
+    },
+    "confirm-clear": function () {
+      App.confirmOpen = true;
+      render();
+    },
+    "cancel-clear": function () {
+      App.confirmOpen = false;
+      render();
+    },
+    "confirm-clear-yes": clearHistoryNow,
+    "dismiss-notice": function () {
+      Sereno.protectionService.dismissModelNotice(store);
+    }
+  };
+
+  function onClick(event) {
+    var target = event.target;
+    if (!target || typeof target.closest !== "function") {
+      return;
+    }
+    var actionTarget = target.closest("[data-action]");
+    if (!actionTarget || !root.contains(actionTarget)) {
+      return;
+    }
+    var handler = ACTIONS[actionTarget.getAttribute("data-action")];
+    if (handler) {
+      handler(actionTarget);
+    }
   }
 
   function onSubmit(event) {
@@ -808,63 +275,13 @@
     event.preventDefault();
     var usernameInput = form.querySelector('[name="username"]');
     var passwordInput = form.querySelector('[name="password"]');
-    var username = usernameInput ? usernameInput.value.trim() : "";
-    var password = passwordInput ? passwordInput.value : "";
-    App.draftUsername = username;
-    App.draftPassword = password;
+    App.draftUsername = usernameInput ? usernameInput.value.trim() : "";
+    App.draftPassword = passwordInput ? passwordInput.value : "";
     if (kind === "login") {
-      submitLogin(username, password);
+      submitLogin(App.draftUsername, App.draftPassword);
     } else if (kind === "register") {
-      submitRegister(username, password);
+      submitRegister(App.draftUsername, App.draftPassword);
     }
-  }
-
-  function submitLogin(username, password) {
-    Sereno.accountService.login(store, username, password, new Date()).then(function (result) {
-      if (!result.ok) {
-        App.loginError = true;
-        render();
-        return;
-      }
-      App.loginError = false;
-      App.registerError = false;
-      App.view = "home";
-      App.tab = "home";
-      App.historyFilter = "todas";
-      saveUi();
-      render();
-    });
-  }
-
-  function submitRegister(username, password) {
-    Sereno.accountService.register(store, username, password, new Date()).then(function (result) {
-      if (!result.ok) {
-        App.registerError = true;
-        render();
-        return;
-      }
-      App.registerError = false;
-      App.loginError = false;
-      App.view = "home";
-      App.tab = "home";
-      App.historyFilter = "todas";
-      App.surveyIndex = 0;
-      App.surveyAnswers = [];
-      saveUi();
-      render();
-    });
-  }
-
-  function onClick(event) {
-    var target = event.target;
-    if (!target || typeof target.closest !== "function") {
-      return;
-    }
-    var actionTarget = target.closest("[data-action]");
-    if (!actionTarget || !root.contains(actionTarget)) {
-      return;
-    }
-    handleAction(actionTarget.getAttribute("data-action"), actionTarget);
   }
 
   function onKeydown(event) {
@@ -906,9 +323,8 @@
         App.view = "onboarding";
         App.onboardingStep = 1;
       } else {
-        var tabAvailable = state.session && !account.isAdmin(state.session) && App.tab === "history";
-        App.view = tabAvailable ? "history" : "home";
-        App.tab = App.view;
+        var historyTab = state.session && !account.isAdmin(state.session) && App.tab === "history";
+        show(historyTab ? "history" : "home");
       }
       render();
     });

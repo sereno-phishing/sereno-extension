@@ -54,96 +54,10 @@
     </div>
   </aside>
 
-  <!-- Warning verdict (HU-05 / HU-20). -->
-  <div class="demo-overlay" id="warning-overlay" hidden>
-    <section class="verdict-modal" role="dialog" aria-modal="true" aria-labelledby="warning-title">
-      <header class="verdict-band verdict-band-warn">
-        <img class="verdict-icon" src="../../assets/icons/alert-warn-44.svg" width="44" height="44" alt="">
-        <h2 class="verdict-title verdict-title-warn" id="warning-title">Este sitio puede ser phishing</h2>
-      </header>
-      <div class="verdict-body">
-        <div class="verdict-domain-row">
-          <span class="verdict-domain">paypal-secure-login.com</span>
-          <span class="verdict-pill verdict-pill-warn"><img src="../../assets/icons/alert-warn-14.svg" width="14" height="14" alt="">Riesgo alto</span>
-        </div>
-        <p class="verdict-text">El dominio imita a un sitio de pagos conocido. Si ingresas tus datos aquí, podrían robarlos.</p>
-        <div class="verdict-details" id="warning-details" hidden>
-          <div class="verdict-detail-row">
-            <span class="verdict-detail-label">Nivel de riesgo</span>
-            <span class="verdict-detail-value">Alto</span>
-          </div>
-          <div class="verdict-detail-row">
-            <span class="verdict-detail-label">Score del modelo</span>
-            <span class="verdict-score">
-              <span class="verdict-score-track"><span class="verdict-score-fill verdict-score-fill-warn score-92"></span></span>
-              <span class="verdict-detail-value">0.92</span>
-            </span>
-          </div>
-          <div class="verdict-detail-row">
-            <span class="verdict-detail-label">Fecha de clasificación</span>
-            <span class="verdict-detail-value" id="warning-stamp">—</span>
-          </div>
-          <div class="verdict-detail-row">
-            <span class="verdict-detail-label">Fuente del veredicto</span>
-            <span class="verdict-source">Modelo</span>
-          </div>
-        </div>
-        <div class="verdict-actions">
-          <button type="button" class="verdict-btn verdict-btn-dark" data-action="volver">Volver</button>
-          <button type="button" class="verdict-btn verdict-btn-ghost" data-action="continuar">Continuar bajo riesgo</button>
-        </div>
-      </div>
-      <footer class="verdict-foot">
-        <span class="verdict-brand"><img class="verdict-logo" src="../../assets/logo.png" alt="">Protegido por Sereno</span>
-        <button type="button" class="verdict-toggle" data-action="toggle-detail" data-detail="warning" aria-expanded="false" aria-controls="warning-details">Ver detalle</button>
-      </footer>
-    </section>
-  </div>
-
-  <!-- Block verdict (HU-22). -->
-  <div class="demo-overlay" id="block-overlay" hidden>
-    <section class="verdict-modal" role="dialog" aria-modal="true" aria-labelledby="block-title">
-      <header class="verdict-band verdict-band-bad">
-        <img class="verdict-icon" src="../../assets/icons/alert-bad-44.svg" width="44" height="44" alt="">
-        <h2 class="verdict-title verdict-title-bad" id="block-title">Sitio bloqueado</h2>
-      </header>
-      <div class="verdict-body">
-        <div class="verdict-domain-row">
-          <span class="verdict-domain">pago-servicios-linea.net</span>
-          <span class="verdict-pill verdict-pill-bad"><img src="../../assets/icons/alert-bad-14.svg" width="14" height="14" alt="">Riesgo alto</span>
-        </div>
-        <p class="verdict-text">Este dominio está clasificado como phishing y la política no permite continuar. Tus datos no se enviaron.</p>
-        <div class="verdict-details" id="block-details" hidden>
-          <div class="verdict-detail-row">
-            <span class="verdict-detail-label">Nivel de riesgo</span>
-            <span class="verdict-detail-value">Alto</span>
-          </div>
-          <div class="verdict-detail-row">
-            <span class="verdict-detail-label">Score del modelo</span>
-            <span class="verdict-score">
-              <span class="verdict-score-track"><span class="verdict-score-fill verdict-score-fill-bad score-97"></span></span>
-              <span class="verdict-detail-value">0.97</span>
-            </span>
-          </div>
-          <div class="verdict-detail-row">
-            <span class="verdict-detail-label">Fecha de clasificación</span>
-            <span class="verdict-detail-value" id="block-stamp">—</span>
-          </div>
-          <div class="verdict-detail-row">
-            <span class="verdict-detail-label">Fuente del veredicto</span>
-            <span class="verdict-source">Caché</span>
-          </div>
-        </div>
-        <div class="verdict-actions">
-          <button type="button" class="verdict-btn verdict-btn-danger" data-action="volver">Volver a un sitio seguro</button>
-        </div>
-      </div>
-      <footer class="verdict-foot">
-        <span class="verdict-brand"><img class="verdict-logo" src="../../assets/logo.png" alt="">Protegido por Sereno</span>
-        <button type="button" class="verdict-toggle" data-action="toggle-detail" data-detail="block" aria-expanded="false" aria-controls="block-details">Ver detalle</button>
-      </footer>
-    </section>
-  </div>
+  <!-- Verdict modals (HU-05 / HU-20 warning, HU-22 block), rendered by
+       demo-store/ui/verdict-modal.js from the scenario data. -->
+  <div data-verdict-modal="advertencia" hidden></div>
+  <div data-verdict-modal="bloqueo" hidden></div>
 
   <!-- Demo control panel: runs the four scenarios against the shared store. -->
   <aside class="demo-panel" id="demo-panel" aria-label="Simulador de demo">
@@ -172,11 +86,14 @@
   <script src="../../platform/browser.js"></script>
   <script src="../../time/domain/time.js"></script>
   <script src="../../verdict/domain/verdict.js"></script>
+  <script src="../../ui/atoms.js"></script>
+  <script src="../../verdict/ui/verdict-ui.js"></script>
   <script src="../../history/domain/history.js"></script>
   <script src="../../history/application/history-service.js"></script>
   <script src="../../protection/domain/protection.js"></script>
   <script src="../../protection/application/protection-service.js"></script>
   <script src="../../demo-store/domain/scenarios.js"></script>
+  <script src="../../demo-store/ui/verdict-modal.js"></script>
   <script src="store-page.js"></script>
 </body>
 </html>
