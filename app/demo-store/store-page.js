@@ -206,31 +206,11 @@
     }
   };
 
-  function onClick(event) {
-    var target = event.target;
-    if (!target || typeof target.closest !== "function") {
-      return;
-    }
-    var scenarioButton = target.closest("[data-scenario]");
-    if (scenarioButton) {
-      runScenario(scenarioButton.getAttribute("data-scenario"));
-      return;
-    }
-    var actionButton = target.closest("[data-action]");
-    var handler = actionButton && ACTIONS[actionButton.getAttribute("data-action")];
-    if (handler) {
-      handler(actionButton);
-    }
-  }
-
   function init() {
     mountModals();
-    document.addEventListener("click", onClick);
+    Sereno.ui.delegateClicks(document, "data-scenario", runScenario);
+    Sereno.ui.delegateActions(document, ACTIONS);
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
+  Sereno.ui.onReady(init);
 })();

@@ -145,21 +145,6 @@
     }
   };
 
-  function onClick(event) {
-    var target = event.target;
-    if (!target || typeof target.closest !== "function") {
-      return;
-    }
-    var actionTarget = target.closest("[data-action]");
-    if (!actionTarget || !root.contains(actionTarget)) {
-      return;
-    }
-    var handler = ACTIONS[actionTarget.getAttribute("data-action")];
-    if (handler) {
-      handler(actionTarget);
-    }
-  }
-
   function init() {
     if (App.initialized) {
       return;
@@ -169,7 +154,7 @@
       return;
     }
     App.initialized = true;
-    root.addEventListener("click", onClick);
+    Sereno.ui.delegateActions(root, ACTIONS);
     store.subscribe(function (state) {
       App.state = state;
       render();
@@ -181,9 +166,5 @@
     });
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
+  Sereno.ui.onReady(init);
 })();

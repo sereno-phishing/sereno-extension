@@ -251,21 +251,6 @@
     }
   };
 
-  function onClick(event) {
-    var target = event.target;
-    if (!target || typeof target.closest !== "function") {
-      return;
-    }
-    var actionTarget = target.closest("[data-action]");
-    if (!actionTarget || !root.contains(actionTarget)) {
-      return;
-    }
-    var handler = ACTIONS[actionTarget.getAttribute("data-action")];
-    if (handler) {
-      handler(actionTarget);
-    }
-  }
-
   function onSubmit(event) {
     var form = event.target;
     var kind = form && form.getAttribute ? form.getAttribute("data-form") : null;
@@ -309,7 +294,7 @@
     }
     App.initialized = true;
     restoreUi();
-    root.addEventListener("click", onClick);
+    Sereno.ui.delegateActions(root, ACTIONS);
     root.addEventListener("submit", onSubmit);
     document.addEventListener("keydown", onKeydown);
     store.subscribe(function (state) {
@@ -330,9 +315,5 @@
     });
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
+  Sereno.ui.onReady(init);
 })();
