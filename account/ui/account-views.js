@@ -13,6 +13,7 @@
   function credentialsForm(options) {
     return (
       '<section class="view view-form">' +
+      '<button type="button" class="back-link" data-action="auth-back">← Volver al inicio</button>' +
       '<h1 class="view-title">' + ui.esc(options.title) + "</h1>" +
       '<p class="view-sub">' + ui.esc(options.sub) + "</p>" +
       '<form class="form" data-form="' + options.kind + '" novalidate>' +

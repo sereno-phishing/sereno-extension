@@ -45,9 +45,11 @@
     );
   }
 
-  function tabs(homeActive, large) {
+  function tabs(homeActive, slide) {
+    var active = homeActive ? "home" : "history";
     return (
-      '<div class="' + ui.classes(["tabs", large && "tabs-lg"]) + '" role="tablist">' +
+      '<div class="tabs tabs-lg" role="tablist" data-active-tab="' + active + '"' +
+      (slide === active ? ' data-tab-slide="' + active + '"' : "") + '>' +
       tab("home", "Inicio", homeActive) + tab("history", "Historial", !homeActive) + "</div>"
     );
   }
@@ -65,12 +67,12 @@
     return Sereno.protection.isNoticeVisible(state) ? protectionUi.modelNotice() : "";
   }
 
-  function home(state) {
+  function home(state, model) {
     var session = state.session;
     var admin = account.isAdmin(session);
     var parts = [];
     if (session && !admin) {
-      parts.push(tabs(true, true));
+      parts.push(tabs(true, model.tabSlide));
     }
     parts.push(protectionUi.protectionCard());
     if (!session) {
@@ -105,7 +107,7 @@
       case "register":
         return accountUi.registerView({ error: model.registerError, username: model.draftUsername, password: model.draftPassword });
       case "history":
-        return historyUi.listView({ tabsHtml: tabs(false, false), entries: userEntries(state), filter: model.historyFilter });
+        return historyUi.listView({ tabsHtml: tabs(false, model.tabSlide), entries: userEntries(state), filter: model.historyFilter });
       case "detail":
         return historyUi.detailView(history.findById(userEntries(state), model.detailId));
       case "survey":
@@ -113,7 +115,7 @@
       case "surveyResult":
         return surveyUi.resultView(survey.score(model.surveyAnswers));
       default:
-        return home(state);
+        return home(state, model);
     }
   }
 

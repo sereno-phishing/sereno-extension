@@ -23,6 +23,7 @@
     var progress = Math.round(((model.index + 1) / total) * 100);
     return (
       '<section class="view view-survey">' +
+      '<button type="button" class="back-link" data-action="survey-close">← Volver al inicio</button>' +
       '<div class="survey-meta">Pregunta ' + (model.index + 1) + " de " + total + "</div>" +
       '<div class="progress-track"><div class="progress-fill" style="width:' + progress + '%"></div></div>' +
       '<h2 class="survey-question">' + ui.esc(survey.QUESTIONS[model.index]) + "</h2>" +

@@ -8,6 +8,34 @@ const assert = require("node:assert/strict");
 const { load } = require("./load");
 
 const { ui, verdictUi } = load("verdict/domain/verdict.js", "ui/atoms.js", "ui/molecules.js", "verdict/ui/verdict-ui.js");
+const { accountUi } = load("account/domain/account.js", "account/ui/account-views.js");
+const { surveyUi } = load("survey/domain/sus.js", "survey/ui/survey-views.js");
+
+test("every survey question has a home exit separate from previous-question navigation", () => {
+  for (let index = 0; index < 10; index += 1) {
+    for (const selected of [null, 3]) {
+      const html = surveyUi.questionView({ index, selected });
+      const exit = '<button type="button" class="back-link" data-action="survey-close">← Volver al inicio</button>';
+      assert.equal(html.split(exit).length - 1, 1);
+      assert.ok(html.indexOf(exit) < html.indexOf('class="survey-meta"'));
+      assert.match(html, new RegExp(`data-action="survey-back"${index === 0 ? " disabled" : ""}>Atrás</button>`));
+      assert.match(html, new RegExp(`data-action="survey-next"${selected ? "" : " disabled"}>${index === 9 ? "Finalizar" : "Siguiente"}</button>`));
+    }
+  }
+});
+
+for (const kind of ["login", "register"]) {
+  test(`${kind} form has a non-submit home button before its heading and fields`, () => {
+    for (const error of [false, true]) {
+      const html = accountUi[`${kind}View`]({ error, username: "draft", password: "draft" });
+      const back = '<button type="button" class="back-link" data-action="auth-back">← Volver al inicio</button>';
+      assert.equal(html.split(back).length - 1, 1);
+      assert.ok(html.indexOf(back) < html.indexOf('<h1'));
+      assert.ok(html.indexOf(back) < html.indexOf('<form'));
+      assert.match(html, new RegExp(`data-form="${kind}"`));
+    }
+  });
+}
 
 test("esc neutralizes HTML-significant characters", () => {
   assert.equal(ui.esc(`<a href="x">'&'</a>`), "&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;");

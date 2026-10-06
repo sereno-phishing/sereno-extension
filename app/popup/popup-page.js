@@ -21,6 +21,7 @@
     view: "home",
     onboardingStep: 1,
     tab: "home",
+    tabSlide: null,
     historyFilter: history.ALL,
     detailId: null,
     surveyIndex: 0,
@@ -58,6 +59,8 @@
       return;
     }
     root.innerHTML = Sereno.popupViews.page(App, App.state);
+    // Each render replaces the tabs, so animate only the requested tab change.
+    App.tabSlide = null;
   }
 
   /* ---------------- survey flow ---------------- */
@@ -171,6 +174,12 @@
       App.view = "register";
       render();
     },
+    "auth-back": function () {
+      App.loginError = false;
+      App.registerError = false;
+      show("home");
+      render();
+    },
     "toggle-menu": function () {
       App.menuOpen = !App.menuOpen;
       render();
@@ -220,7 +229,9 @@
       render();
     },
     tab: function (target) {
-      show(target.getAttribute("data-tab") === "history" ? "history" : "home");
+      var nextTab = target.getAttribute("data-tab") === "history" ? "history" : "home";
+      App.tabSlide = App.view === App.tab && App.tab !== nextTab ? nextTab : null;
+      show(nextTab);
       saveUi();
       render();
     },
