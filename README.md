@@ -42,7 +42,7 @@ encuesta SUS). No hay servidor, no hay modelo real y no se envía nada a interne
    - `admin.sereno` — rol **administrador**: tarjeta de administración y acceso al panel.
 3. **Abre la tienda de demo** desde el panel de administración (botón
    **Abrir tienda de demo**, abajo a la izquierda) o directamente en
-   `chrome-extension://<ID>/demo/tienda.html`, reemplazando `<ID>` por el ID de
+   `chrome-extension://<ID>/app/demo-store/store.html`, reemplazando `<ID>` por el ID de
    la extensión que muestra `chrome://extensions`.
 4. **Prueba los 4 escenarios** del simulador (esquina inferior izquierda):
    - **Sitio seguro**: badge verde `✓` y tooltip «Sereno: sitio seguro».
@@ -77,7 +77,7 @@ a cargar la extensión en `chrome://extensions` (se restauran los datos semilla)
 | Detalle del veredicto | HU-20 | Popup → detalle del historial y «Ver detalle» del aviso |
 | Política por dominio | HU-21 | Panel de administración → Política por dominio |
 | Bloqueo | HU-22 | Modal rojo de la tienda de demo |
-| Política de privacidad | HU-23 | `privacidad.html`, enlace del pie del popup |
+| Política de privacidad | HU-23 | `app/privacy/privacy.html`, enlace del pie del popup |
 | Estado de la protección | HU-24 | Popup → tarjeta «Protección activa» y estado del sitio |
 | Evaluación pendiente | HU-25 | Toast de la tienda de demo y estado «Evaluando…» |
 | Versión del modelo | HU-27 | Pie del popup y aviso «Modelo actualizado» |
@@ -87,39 +87,73 @@ a cargar la extensión en `chrome://extensions` (se restauran los datos semilla)
 
 ## Estructura del proyecto
 
+Las carpetas de primer nivel nombran el negocio (arquitectura que «grita» el
+dominio). Cada dominio se divide en `domain/` (reglas puras), `application/`
+(casos de uso que reciben el store como puerto) y `ui/` (vistas
+presentacionales que reciben datos y devuelven HTML). Las páginas viven en
+`app/`, y los bordes técnicos en `platform/` y `ui/`.
+
 ```
 sereno-extension/
-├── manifest.json           # MV3: popup, options_page, iconos y permisos
-├── popup.html/.css/.js     # Popup: onboarding, inicio, historial, detalle, cuenta, SUS
-├── options.html/.css/.js   # Panel de administración: métricas, dominios y caché
-├── privacidad.html/.css    # Política de privacidad (página estática)
-├── demo/
-│   ├── tienda.html         # Tienda simulada + avisos en página (HU-04/05/22/25)
-│   ├── tienda.css          # Esqueleto gris y estilos de los overlays
-│   └── tienda.js           # Simulador: escenarios, badge por pestaña e historial
-├── shared/
-│   ├── tokens.css          # Design tokens y componentes compartidos
-│   ├── data.js             # Datos semilla: usuarios, historial, dominios, métricas, SUS
-│   └── store.js            # Estado + chrome.storage.local (con fallback para pruebas)
-├── assets/
-│   └── logo.png            # Logo usado por el popup, el panel y los avisos
-└── icons/                  # icon16, icon32, icon48, icon128
+├── manifest.json                 # MV3: popup, options_page, iconos y permisos
+├── app/                          # Raíces de composición: una carpeta por página
+│   ├── popup/                    # popup.html/.css, popup-views.js (plantilla), popup-page.js (contenedor)
+│   ├── admin/                    # admin.html/.css, admin-views.js (plantilla), admin-page.js (contenedor)
+│   ├── demo-store/               # store.html/.css, store-page.js (contenedor del simulador)
+│   └── privacy/                  # privacy.html/.css (página estática)
+├── verdict/                      # Catálogo de estados, nivel de riesgo, fuente; pills y badge
+├── account/                      # Usuarios, login, registro, roles; formularios y menú de cuenta
+├── history/                      # Historial: deduplicación 60 s, tope 200, filtros; lista y detalle
+├── survey/                       # Encuesta SUS: preguntas y puntaje; vistas de la encuesta
+├── onboarding/                   # Recorrido de 3 pasos
+├── protection/                   # Sitio actual, versión del modelo y aviso; tarjetas del inicio
+├── administration/               # Política por dominio y caché (reglas, casos de uso, secciones del panel)
+├── demo-store/                   # Escenarios del simulador y modal de veredicto en página
+├── time/                         # Fechas y sellos de tiempo (funciones puras)
+├── platform/                     # Bordes técnicos
+│   ├── storage.js                # Puerto de almacenamiento: chrome.storage, localStorage o memoria
+│   ├── state-store.js            # Store reactivo compartido entre páginas (cola, sync externo)
+│   ├── browser.js                # Abrir páginas de la extensión y pintar el badge por pestaña
+│   ├── preferences.js            # Preferencias de UI del popup (pestaña recordada)
+│   └── seed.js                   # Datos semilla: usuarios, historial, dominios, caché, métricas
+├── ui/                           # Sistema de diseño
+│   ├── tokens.css                # Design tokens y clases base
+│   ├── atoms.js                  # Átomos: esc, imagen/ícono, botón, chip, pill, input, banner
+│   ├── molecules.js              # Moléculas: campo con etiqueta, ítem de leyenda, tarjeta con tabla
+│   └── dom.js                    # Arranque de página y delegación de clics (data-action)
+├── tests/                        # Pruebas con node:test sobre los dominios, casos de uso y átomos
+├── assets/                       # Logo, íconos SVG y fuente Inter
+└── icons/                        # icon16, icon32, icon48, icon128
 ```
 
 ## Notas técnicas
 
 - **Manifest V3** sin service worker a propósito: el prototipo no intercepta
   navegación real; la tienda de demo simula la operación.
+- **Scripts clásicos, sin compilación**: cada archivo es una IIFE que se
+  registra en un único espacio de nombres `globalThis.Sereno` (por ejemplo
+  `Sereno.history` o `Sereno.verdictUi`). Cada página los carga con etiquetas
+  `<script>` en orden: plataforma, dominios, casos de uso, átomos, vistas y por
+  último el contenedor. Funciona igual dentro de la extensión y abriendo las
+  páginas con `file://`.
+- **Regla de dependencias**: los archivos `*/domain/*` son puros (sin `window`,
+  `document`, `chrome` ni `localStorage`); los casos de uso reciben el store como
+  parámetro; solo `platform/` toca `chrome.*` y `localStorage`; las vistas
+  reciben datos y devuelven HTML, sin acceso al store ni eventos; los
+  contenedores (`app/*/*-page.js`) tienen el estado de la página, la delegación
+  de eventos y la suscripción al store.
 - **Persistencia**: `chrome.storage.local` bajo la clave `sereno.state.v1`. El
-  store también acepta `localStorage` o memoria para poder probarse con un
-  arnés de Node.
+  store también acepta `localStorage` o memoria para poder probarse en Node.
 - **Permisos**: solo `storage` y `tabs`. El badge por pestaña se pinta con
   `chrome.action.setBadgeText` / `setBadgeBackgroundColor` usando el `tabId` de
   `chrome.tabs.getCurrent()`.
 - **CSP**: scripts clásicos externos, sin `onclick` en el HTML, sin CDNs, sin
   fuentes ni imágenes remotas.
-- **Datos simulados**: usuarios, historial, reglas por dominio, caché, métricas y
-  encuesta viven en `shared/data.js`. El botón **Abrir tienda de demo** del panel
-  de administración abre `demo/tienda.html`.
+- **Datos simulados**: usuarios, historial, reglas por dominio, caché y métricas
+  viven en `platform/seed.js`; ningún archivo de dominio depende de ellos. El
+  botón **Abrir tienda de demo** del panel de administración abre
+  `app/demo-store/store.html`.
 - **Estado compartido**: la tienda de demo escribe `currentSite` e historial en el
   mismo store que lee el popup, por eso los tres frentes quedan sincronizados.
+- **Pruebas**: `node --test` desde la raíz (Node 18 o superior, sin
+  dependencias).
