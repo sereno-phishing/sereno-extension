@@ -82,7 +82,7 @@ T2:
 T3:
 - RED: tests written first (`tests/account.test.js`, `tests/account-service.test.js`, `tests/providers.test.js` contract); `node --test` = 138 tests, 113 pass, 25 fail (first failures: `mock: login stores the sanitized user and the token, never the password`, then the remote equivalents and the provider auth contract).
 - GREEN: `node --test` = 141 pass, 0 fail (119 baseline, two obsolete plain-text tests removed from `use-cases.test.js`, 22+ new). `rg -n "password" account/domain` shows only parameter names of `validateCredentials` and comments; no comparison.
-- Commit: pending
+- Commit: 576e70f
 
 ## Next step
 
