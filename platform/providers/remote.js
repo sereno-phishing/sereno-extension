@@ -5,10 +5,10 @@
    with credentials: "include"; 2xx bodies are exactly the port results without
    "ok", which this adapter adds):
      POST   /v1/verdict              { url }                            -> { domain, status, score, source, latencyMs }
-     POST   /v1/auth/login           { username, password }             -> { user }       401 { error: "invalid" }
-     POST   /v1/auth/register        { username, password }             -> {}             409 { error: "duplicate" }
+     POST   /v1/auth/login           { username, password }             -> { user, token }  401 { error: "invalid" }
+     POST   /v1/auth/register        { username, password }             -> { user, token }  409 { error: "duplicate" }, 400 { error: "invalid" }
      POST   /v1/auth/logout          {}                                 -> {}
-     GET    /v1/auth/session                                            -> { session }    (null when signed out)
+     GET    /v1/auth/session                                            -> { session }      (null when signed out)
      GET    /v1/history                                                 -> { entries }
      DELETE /v1/history                                                 -> {}
      GET    /v1/domains                                                 -> { domains }

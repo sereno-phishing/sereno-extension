@@ -12,6 +12,8 @@
   var onboarding = Sereno.onboarding;
   var preferences = Sereno.preferences;
   var store = Sereno.stateStore.open();
+  // The composition root: auth goes through its port, never to an adapter.
+  var services = Sereno.services;
 
   var UI_KEY = "sereno.ui.v1";
 
@@ -29,7 +31,9 @@
     menuOpen: false,
     confirmOpen: false,
     loginError: false,
+    loginErrorCode: null,
     registerError: false,
+    registerErrorCode: null,
     draftUsername: "",
     draftPassword: ""
   };
@@ -101,18 +105,27 @@
 
   /* After a successful sign-in or sign-up the popup returns to a clean home. */
   function enterHome() {
-    App.loginError = false;
-    App.registerError = false;
+    clearAuthErrors();
     show("home");
     App.historyFilter = history.ALL;
     saveUi();
     render();
   }
 
+  function clearAuthErrors() {
+    App.loginError = false;
+    App.loginErrorCode = null;
+    App.registerError = false;
+    App.registerErrorCode = null;
+  }
+
+  /* Kept as promise callbacks like the rest of the container: it is the
+     style of every handler here and the popup tests rely on its timing. */
   function submitLogin(username, password) {
-    Sereno.accountService.login(store, username, password, new Date()).then(function (result) {
+    Sereno.accountService.login(services, store, username, password, new Date()).then(function (result) {
       if (!result.ok) {
         App.loginError = true;
+        App.loginErrorCode = result.error || null;
         render();
         return;
       }
@@ -121,9 +134,10 @@
   }
 
   function submitRegister(username, password) {
-    Sereno.accountService.register(store, username, password, new Date()).then(function (result) {
+    Sereno.accountService.register(services, store, username, password, new Date()).then(function (result) {
       if (!result.ok) {
         App.registerError = true;
+        App.registerErrorCode = result.error || null;
         render();
         return;
       }
@@ -165,18 +179,17 @@
       });
     },
     "go-login": function () {
-      App.loginError = false;
+      clearAuthErrors();
       App.view = "login";
       render();
     },
     "go-register": function () {
-      App.registerError = false;
+      clearAuthErrors();
       App.view = "register";
       render();
     },
     "auth-back": function () {
-      App.loginError = false;
-      App.registerError = false;
+      clearAuthErrors();
       show("home");
       render();
     },
@@ -191,7 +204,7 @@
       }
     },
     logout: function () {
-      Sereno.accountService.logout(store).then(function () {
+      Sereno.accountService.logout(services, store).then(function () {
         App.menuOpen = false;
         show("home");
         App.historyFilter = history.ALL;

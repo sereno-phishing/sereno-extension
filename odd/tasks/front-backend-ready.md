@@ -44,7 +44,7 @@ Out: the backend itself, ML, real persistence, metrics aggregation (HU-02, 06-12
 
 - [x] T1 Provider ports, config switch, mock + remote adapters, composition root `Sereno.services`, architecture guard test (tests first)
 - [x] T2 Async verdict service with timeout, offline and degraded states (HU-25/26)
-- [ ] T3 Auth provider port: session token, remove plain-text compare (HU-13/14/15)
+- [x] T3 Auth provider port: session token, remove plain-text compare (HU-13/14/15)
 - [ ] T4 Data providers for history, policy, cache, metrics, model version, survey (HU-17-21, 27-29, 32)
 - [ ] T5 Service worker: navigation to verdict, real-tab badge, history write (HU-04/05/22/25)
 - [ ] T6 Content script: in-page modal for warn/block/pending/degraded (HU-05/22/25)
@@ -63,6 +63,8 @@ T1 done: provider ports, config switch, mock and remote adapters, composition ro
 
 T2 done: `verdict/domain/outcome.js` (Outcome model, fail-open rules), `verdict/application/verdict-service.js` (`evaluate(services, url, opts)`, own deadline, onPending, optional store publish) and a degraded protection level and card. Not yet wired into any page: script tags and the popup container passing the level come in T5-T7.
 
+T3 done: `account/domain/account.js` is password-free (format validation, session `{username, role, loginAt, token}`, error messages); `Sereno.accountService` is async (`login/register/logout/currentSession(services, store, ...)`) and goes through `services.auth`; the mock adapter is the only place that checks the seed password and issues opaque tokens. The popup uses `Sereno.services`, loads the provider scripts, `outcome.js` and `verdict-service.js`, and passes `Sereno.protection.levelOf(state)` to `protectionCard()`. The admin page reads no session, so it is unchanged. Account views show offline/timeout/server messages.
+
 ## Verification evidence
 
 Baseline: `node --test` = 66 pass, 0 fail (before changes).
@@ -77,6 +79,11 @@ T2:
 - GREEN: `node --test` = 119 pass, 0 fail (89 baseline + 30 new). Mock failures are injected by wrapping the verdict port (mock.js has no failure seam); remote failures use a fake fetch.
 - Commit: 54aa970
 
+T3:
+- RED: tests written first (`tests/account.test.js`, `tests/account-service.test.js`, `tests/providers.test.js` contract); `node --test` = 138 tests, 113 pass, 25 fail (first failures: `mock: login stores the sanitized user and the token, never the password`, then the remote equivalents and the provider auth contract).
+- GREEN: `node --test` = 141 pass, 0 fail (119 baseline, two obsolete plain-text tests removed from `use-cases.test.js`, 22+ new). `rg -n "password" account/domain` shows only parameter names of `validateCredentials` and comments; no comparison.
+- Commit: pending
+
 ## Next step
 
-Launch the writer for T3 (auth provider port: session token, remove plain-text compare).
+Launch the writer for T4 (data providers for history, policy, cache, metrics, model version, survey).

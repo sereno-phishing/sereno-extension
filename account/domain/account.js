@@ -1,11 +1,25 @@
-/* Account: users, credentials check, registration and roles. Classic script
-   that registers Sereno.account. Pure: callers pass the user list and the
-   current stamp; nothing here reads storage or the clock. */
+/* Account: roles, session shape, credential FORMAT rules and error messages.
+   Classic script that registers Sereno.account. Pure and password-free: the
+   domain never compares or stores a password, the auth provider (the backend)
+   verifies credentials. Callers pass the current stamp; nothing here reads
+   storage or the clock. */
 
 (function (Sereno) {
   "use strict";
 
   var ROLES = { USER: "usuario", ADMIN: "administrador" };
+
+  /* Every failure an account use case can report. */
+  var ERRORS = ["invalid", "duplicate", "timeout", "offline", "server"];
+
+  var MESSAGES = {
+    invalid: "Usuario o contraseña incorrectos.",
+    duplicate: "El usuario ya existe.",
+    timeout: "El servidor tardó demasiado en responder. Inténtalo de nuevo.",
+    offline: "Sin conexión. Revisa tu red e inténtalo de nuevo.",
+    server: "El servidor no está disponible. Inténtalo más tarde."
+  };
+  var REGISTER_INVALID = "Ingresa un usuario y una contraseña válidos.";
 
   function findUser(users, username) {
     var found = null;
@@ -17,30 +31,42 @@
     return found;
   }
 
+  /* Whitelist copy: whatever else a record carries never leaves through here. */
   function publicUser(user) {
     return { username: user.username, role: user.role, createdAt: user.createdAt };
   }
 
-  function openSession(user, stamp) {
-    return { username: user.username, role: user.role, loginAt: stamp };
+  /* The stored session: sanitized user plus the opaque token the provider issued. */
+  function openSession(user, token, stamp) {
+    return {
+      username: user.username,
+      role: user.role,
+      loginAt: stamp,
+      token: typeof token === "string" && token ? token : null
+    };
   }
 
-  /* -> { ok: true, user } or { ok: false, error: "invalid" } */
-  function authenticate(users, username, password) {
-    var user = findUser(users, username);
-    if (!user || user.password !== password) {
-      return { ok: false, error: "invalid" };
-    }
-    return { ok: true, user: user };
+  /* A new account always gets the plain user role. */
+  function newUser(username, stamp) {
+    return { username: username, role: ROLES.USER, createdAt: stamp };
   }
 
-  /* New accounts always get the plain user role.
-     -> { ok: true, user } or { ok: false, error: "duplicate" } */
-  function createUser(users, username, password, stamp) {
-    if (findUser(users, username)) {
-      return { ok: false, error: "duplicate" };
+  /* Format only (non-empty strings); the provider decides if they are right.
+     -> { ok: true } or { ok: false, error: "invalid" } */
+  function validateCredentials(username, password) {
+    var validName = typeof username === "string" && username.trim().length > 0;
+    var validPassword = typeof password === "string" && password.length > 0;
+    return validName && validPassword ? { ok: true } : { ok: false, error: "invalid" };
+  }
+
+  /* Spanish text for an error code; unknown codes read as a server problem.
+     kind: "login" (default) or "register". */
+  function errorMessage(error, kind) {
+    var code = ERRORS.indexOf(error) >= 0 ? error : "server";
+    if (code === "invalid" && kind === "register") {
+      return REGISTER_INVALID;
     }
-    return { ok: true, user: { username: username, password: password, role: ROLES.USER, createdAt: stamp } };
+    return MESSAGES[code];
   }
 
   function isAdmin(session) {
@@ -68,11 +94,13 @@
 
   Sereno.account = {
     ROLES: ROLES,
+    ERRORS: ERRORS,
     findUser: findUser,
     publicUser: publicUser,
     openSession: openSession,
-    authenticate: authenticate,
-    createUser: createUser,
+    newUser: newUser,
+    validateCredentials: validateCredentials,
+    errorMessage: errorMessage,
     isAdmin: isAdmin,
     roleTitle: roleTitle,
     initials: initials

@@ -34,32 +34,11 @@ function openStore() {
   });
 }
 
-test("login opens a session only for valid credentials", async () => {
-  const store = openStore();
-  assert.deepEqual(await Sereno.accountService.login(store, "andres.torres", "bad", NOW), { ok: false, error: "invalid" });
-  assert.equal((await store.get()).session, null);
-  const result = await Sereno.accountService.login(store, "admin.sereno", "sereno123", NOW);
-  assert.deepEqual(result, { ok: true, user: { username: "admin.sereno", role: "administrador", createdAt: "2026-09-01T10:00:00" } });
-  assert.deepEqual((await store.get()).session, { username: "admin.sereno", role: "administrador", loginAt: "2026-09-21T11:30" });
-  await Sereno.accountService.logout(store);
-  assert.equal((await store.get()).session, null);
-});
-
-test("register refuses duplicates and signs the new user in", async () => {
-  const store = openStore();
-  assert.deepEqual(await Sereno.accountService.register(store, "andres.torres", "x", NOW), { ok: false, error: "duplicate" });
-  assert.deepEqual(await Sereno.accountService.register(store, "nuevo", "abc", NOW), { ok: true });
-  const state = await store.get();
-  assert.equal(state.users.length, 3);
-  assert.deepEqual(state.users[2], { username: "nuevo", password: "abc", role: "usuario", createdAt: "2026-09-21T11:30" });
-  assert.equal(state.session.username, "nuevo");
-});
-
 test("recordVisit appends for the signed-in user and deduplicates", async () => {
   const store = openStore();
   const visit = { domain: "paypal-secure-login.com", status: "advertencia", score: 0.92, source: "modelo", latencyMs: 186, ts: "2026-09-21T11:30" };
   assert.equal(await Sereno.historyService.recordVisit(store, visit, NOW), undefined);
-  await Sereno.accountService.login(store, "andres.torres", "sereno123", NOW);
+  await store.set({ session: { username: "andres.torres", role: "usuario", loginAt: "2026-09-21T11:30", token: "t" } });
   await Sereno.historyService.recordVisit(store, visit, NOW);
   await Sereno.historyService.recordVisit(store, visit, NOW);
   const list = (await store.get()).history["andres.torres"];

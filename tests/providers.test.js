@@ -70,7 +70,7 @@ function fakeBackend(mock) {
       },
       "POST /v1/auth/register": async () => {
         const out = await mock.auth.register(body.username, body.password);
-        return out.ok ? reply(201, out) : reply(409, out);
+        return out.ok ? reply(201, out) : reply(out.error === "invalid" ? 400 : 409, out);
       },
       "POST /v1/auth/logout": () => mock.auth.logout(),
       "GET /v1/auth/session": () => mock.auth.session(),
@@ -136,9 +136,20 @@ Object.keys(ADAPTERS).forEach((name) => {
     const login = await auth.login("admin.sereno", "sereno123");
     assert.equal(login.ok, true);
     assert.equal(login.user.role, "administrador");
-    assert.equal((await auth.session()).session.username, "admin.sereno");
+    assert.equal(typeof login.token, "string");
+    assert.ok(login.token.length > 0);
+    assert.equal("password" in login.user, false);
+    const active = (await auth.session()).session;
+    assert.equal(active.username, "admin.sereno");
+    assert.equal(active.token, login.token);
     assert.deepEqual(await auth.register("andres.torres", "x"), { ok: false, error: "duplicate" });
-    assert.equal((await auth.register("nuevo.usuario", "x")).ok, true);
+    assert.deepEqual(await auth.register("", "x"), { ok: false, error: "invalid" });
+    const created = await auth.register("nuevo.usuario", "x");
+    assert.equal(created.ok, true);
+    assert.equal(created.user.username, "nuevo.usuario");
+    assert.equal(created.user.role, "usuario");
+    assert.equal(typeof created.token, "string");
+    assert.equal("password" in created.user, false);
     assert.equal((await auth.session()).session.username, "nuevo.usuario");
     assert.equal((await auth.logout()).ok, true);
     assert.equal((await auth.session()).session, null);

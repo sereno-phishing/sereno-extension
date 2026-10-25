@@ -67,6 +67,11 @@
     return Sereno.protection.isNoticeVisible(state) ? protectionUi.modelNotice() : "";
   }
 
+  /* "degraded" when the verdict backend is down (HU-26), otherwise "active". */
+  function protectionLevel(state) {
+    return typeof Sereno.protection.levelOf === "function" ? Sereno.protection.levelOf(state) : "active";
+  }
+
   function home(state, model) {
     var session = state.session;
     var admin = account.isAdmin(session);
@@ -74,7 +79,7 @@
     if (session && !admin) {
       parts.push(tabs(true, model.tabSlide));
     }
-    parts.push(protectionUi.protectionCard());
+    parts.push(protectionUi.protectionCard(protectionLevel(state)));
     if (!session) {
       parts.push(
         protectionUi.siteCard(state.currentSite),
@@ -103,9 +108,9 @@
       case "onboarding":
         return onboardingUi.view(model.onboardingStep);
       case "login":
-        return accountUi.loginView({ error: model.loginError, username: model.draftUsername, password: model.draftPassword });
+        return accountUi.loginView({ error: model.loginError, errorCode: model.loginErrorCode, username: model.draftUsername, password: model.draftPassword });
       case "register":
-        return accountUi.registerView({ error: model.registerError, username: model.draftUsername, password: model.draftPassword });
+        return accountUi.registerView({ error: model.registerError, errorCode: model.registerErrorCode, username: model.draftUsername, password: model.draftPassword });
       case "history":
         return historyUi.listView({ tabsHtml: tabs(false, model.tabSlide), entries: userEntries(state), filter: model.historyFilter });
       case "detail":

@@ -6,40 +6,61 @@ const { load } = require("./load");
 
 const { account } = load("account/domain/account.js");
 
-const USERS = [
-  { username: "andres.torres", password: "sereno123", role: "usuario", createdAt: "2026-09-01T10:00:00" },
-  { username: "admin.sereno", password: "sereno123", role: "administrador", createdAt: "2026-09-01T10:00:00" }
-];
+const ADMIN = { username: "admin.sereno", role: "administrador", createdAt: "2026-09-01T10:00:00" };
+const USER = { username: "andres.torres", role: "usuario", createdAt: "2026-09-01T10:00:00" };
 
-test("authenticate accepts only the exact username and password", () => {
-  assert.equal(account.authenticate(USERS, "andres.torres", "sereno123").ok, true);
-  assert.equal(account.authenticate(USERS, "andres.torres", "sereno123").user.role, "usuario");
-  assert.deepEqual(account.authenticate(USERS, "andres.torres", "nope"), { ok: false, error: "invalid" });
-  assert.deepEqual(account.authenticate(USERS, "Andres.Torres", "sereno123"), { ok: false, error: "invalid" });
-  assert.deepEqual(account.authenticate(USERS, "ghost", "sereno123"), { ok: false, error: "invalid" });
-});
-
-test("createUser rejects duplicates and always assigns the user role", () => {
-  assert.deepEqual(account.createUser(USERS, "admin.sereno", "x", "2026-09-21T10:00"), { ok: false, error: "duplicate" });
-  assert.deepEqual(account.createUser(USERS, "nuevo", "abc", "2026-09-21T10:00"), {
-    ok: true,
-    user: { username: "nuevo", password: "abc", role: "usuario", createdAt: "2026-09-21T10:00" }
+test("the domain handles no passwords: no credential comparison, no stored secret", () => {
+  assert.equal(account.authenticate, undefined);
+  assert.equal(account.createUser, undefined);
+  assert.deepEqual(account.newUser("nuevo", "2026-09-21T10:00"), {
+    username: "nuevo",
+    role: "usuario",
+    createdAt: "2026-09-21T10:00"
   });
 });
 
-test("session, public user and roles", () => {
-  assert.deepEqual(account.openSession(USERS[1], "2026-09-21T10:00"), {
+test("validateCredentials checks only the format of username and password", () => {
+  assert.deepEqual(account.validateCredentials("andres.torres", "x"), { ok: true });
+  assert.deepEqual(account.validateCredentials("", "x"), { ok: false, error: "invalid" });
+  assert.deepEqual(account.validateCredentials("   ", "x"), { ok: false, error: "invalid" });
+  assert.deepEqual(account.validateCredentials("andres.torres", ""), { ok: false, error: "invalid" });
+  assert.deepEqual(account.validateCredentials(undefined, undefined), { ok: false, error: "invalid" });
+  assert.deepEqual(account.validateCredentials(42, "x"), { ok: false, error: "invalid" });
+});
+
+test("session carries the sanitized user and the opaque token", () => {
+  assert.deepEqual(account.openSession(ADMIN, "tok-1", "2026-09-21T10:00"), {
     username: "admin.sereno",
     role: "administrador",
-    loginAt: "2026-09-21T10:00"
+    loginAt: "2026-09-21T10:00",
+    token: "tok-1"
   });
-  assert.deepEqual(account.publicUser(USERS[0]), { username: "andres.torres", role: "usuario", createdAt: "2026-09-01T10:00:00" });
+  const leaky = Object.assign({ password: "secret" }, USER);
+  assert.deepEqual(account.publicUser(leaky), USER);
+  assert.equal("password" in account.openSession(leaky, "t", "s"), false);
+  assert.equal(account.openSession(USER, undefined, "s").token, null);
+});
+
+test("roles and lookup", () => {
   assert.equal(account.isAdmin({ role: "administrador" }), true);
   assert.equal(account.isAdmin({ role: "usuario" }), false);
   assert.equal(account.isAdmin(null), false);
   assert.equal(account.roleTitle("administrador"), "Administrador");
   assert.equal(account.roleTitle("usuario"), "usuario");
-  assert.equal(account.findUser(USERS, "ghost"), null);
+  assert.equal(account.findUser([USER, ADMIN], "ghost"), null);
+  assert.equal(account.findUser([USER, ADMIN], "admin.sereno"), ADMIN);
+});
+
+test("error codes map to Spanish messages and unknown codes fall back to server", () => {
+  assert.deepEqual(account.ERRORS, ["invalid", "duplicate", "timeout", "offline", "server"]);
+  assert.equal(account.errorMessage("invalid", "login"), "Usuario o contraseña incorrectos.");
+  assert.equal(account.errorMessage("invalid", "register"), "Ingresa un usuario y una contraseña válidos.");
+  assert.equal(account.errorMessage("duplicate", "register"), "El usuario ya existe.");
+  assert.match(account.errorMessage("timeout", "login"), /tard/);
+  assert.match(account.errorMessage("offline", "login"), /conexión/);
+  assert.match(account.errorMessage("server", "login"), /servidor/);
+  assert.equal(account.errorMessage("weird", "login"), account.errorMessage("server", "login"));
+  assert.equal(account.errorMessage(undefined), account.errorMessage("server"));
 });
 
 test("initials use the first two name parts", () => {

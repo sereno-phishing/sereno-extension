@@ -35,13 +35,14 @@
     return Object.assign({ label: "Contraseña", name: "password", type: "password" }, options);
   }
 
-  /* model: { error, username, password } — the draft is shown again only after an error. */
+  /* model: { error, errorCode?, username, password } — the draft is shown again only after an error.
+     errorCode is one of Sereno.account.ERRORS and picks the message; "invalid" when absent. */
   function loginView(model) {
     return credentialsForm({
       kind: "login",
       title: "Inicia sesión",
       sub: "Accede a tu historial de sitios evaluados.",
-      error: model.error ? "Usuario o contraseña incorrectos." : "",
+      error: model.error ? account.errorMessage(model.errorCode || "invalid", "login") : "",
       fields: [
         usernameField({ value: model.error ? model.username : "" }),
         passwordField({ hasError: model.error, value: model.error ? model.password : "" })
@@ -53,17 +54,19 @@
     });
   }
 
-  /* model: { error, username, password } — error means the username is taken. */
+  /* model: { error, errorCode?, username, password } — error without errorCode means the username is taken.
+     Only "duplicate" marks the username field; other codes (offline, timeout, server, invalid) show the banner. */
   function registerView(model) {
+    var taken = model.error && (!model.errorCode || model.errorCode === "duplicate");
     return credentialsForm({
       kind: "register",
       title: "Crea tu cuenta",
       sub: "Guarda tu historial y úsalo en otros dispositivos.",
-      error: model.error ? "El usuario ya existe." : "",
+      error: model.error ? account.errorMessage(model.errorCode || "duplicate", "register") : "",
       fields: [
         usernameField({
-          hasError: model.error,
-          help: model.error ? "Elige otro nombre de usuario." : "",
+          hasError: taken,
+          help: taken ? "Elige otro nombre de usuario." : "",
           helpIsError: true,
           value: model.error ? model.username : ""
         }),

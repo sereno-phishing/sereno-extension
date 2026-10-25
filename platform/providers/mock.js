@@ -46,6 +46,7 @@
         return new Date();
       };
     var store = settings.store || null;
+    var tokenCounter = 0;
 
     function getStore() {
       if (!store) {
@@ -68,22 +69,62 @@
       return { ok: true, domain: domain, status: found.status, score: found.score, source: found.source, latencyMs: found.latencyMs };
     }
 
+    /* The mock plays the backend: it is the only place that checks a
+       password (against the seed users) and the only one that issues tokens. */
+    function issueToken() {
+      tokenCounter += 1;
+      return "mock-" + now().getTime().toString(36) + "-" + tokenCounter.toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+    }
+
     async function login(username, password) {
-      return Sereno.accountService.login(getStore(), username, password, now());
+      var valid = Sereno.account.validateCredentials(username, password);
+      if (!valid.ok) {
+        return valid;
+      }
+      return getStore().transact(function (state) {
+        var user = Sereno.account.findUser(state.users, username);
+        if (!user || user.password !== password) {
+          return { result: { ok: false, error: "invalid" } };
+        }
+        var token = issueToken();
+        return {
+          patch: { session: Sereno.account.openSession(user, token, Sereno.time.stamp(now())) },
+          result: { ok: true, user: Sereno.account.publicUser(user), token: token }
+        };
+      });
     }
 
     async function register(username, password) {
-      return Sereno.accountService.register(getStore(), username, password, now());
+      var valid = Sereno.account.validateCredentials(username, password);
+      if (!valid.ok) {
+        return valid;
+      }
+      return getStore().transact(function (state) {
+        if (Sereno.account.findUser(state.users, username)) {
+          return { result: { ok: false, error: "duplicate" } };
+        }
+        var stamp = Sereno.time.stamp(now());
+        var created = Sereno.account.newUser(username, stamp);
+        var token = issueToken();
+        return {
+          patch: {
+            users: state.users.concat([Object.assign({ password: password }, created)]),
+            session: Sereno.account.openSession(created, token, stamp)
+          },
+          result: { ok: true, user: Sereno.account.publicUser(created), token: token }
+        };
+      });
     }
 
     async function logout() {
-      await Sereno.accountService.logout(getStore());
+      await getStore().set({ session: null });
       return { ok: true };
     }
 
     async function session() {
-      var state = await getStore().get();
-      return { ok: true, session: state.session ? clone(state.session) : null };
+      return getStore().transact(function (state) {
+        return { result: { ok: true, session: state.session ? clone(state.session) : null } };
+      });
     }
 
     async function listHistory() {
