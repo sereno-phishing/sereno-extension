@@ -75,7 +75,7 @@ T1:
 T2:
 - RED: tests written first (`tests/verdict-outcome.test.js`, `tests/verdict-service.test.js`, `tests/degraded-protection.test.js`); `node --test` = 3 test files failing to load (`verdict/domain/outcome.js`, `verdict/application/verdict-service.js` missing; protection helpers undefined).
 - GREEN: `node --test` = 119 pass, 0 fail (89 baseline + 30 new). Mock failures are injected by wrapping the verdict port (mock.js has no failure seam); remote failures use a fake fetch.
-- Commit: COMMIT_HASH
+- Commit: 54aa970
 
 ## Next step
 
