@@ -8,6 +8,7 @@
   var ui = Sereno.ui;
   var verdictUi = Sereno.verdictUi;
   var protection = Sereno.protection;
+  var outcomes = Sereno.verdictOutcome;
 
   /* Toolbar icon states and the dot colour of each. */
   var ICON_STATES = [
@@ -16,7 +17,18 @@
     { color: "amber", label: "Sin conexión" }
   ];
 
-  function protectionCard() {
+  /* level: "active" (default) or "degraded" (HU-26); reason: optional
+     outcome reason that explains the degraded state. */
+  function protectionCard(level, reason) {
+    if (level === "degraded") {
+      var notice = outcomes.notice(outcomes.degraded(reason));
+      return (
+        '<div class="protection-card is-degraded">' + ui.art("warn", "36") +
+        '<div class="protection-text"><div class="protection-title">' + ui.esc(notice.title) + "</div>" +
+        '<div class="protection-sub">' + ui.esc(reason ? notice.text : "Algunas comprobaciones no están disponibles.") + "</div></div>" +
+        "</div>"
+      );
+    }
     return (
       '<div class="protection-card">' + ui.art("ok", "36") +
       '<div class="protection-text"><div class="protection-title">Protección activa</div>' +

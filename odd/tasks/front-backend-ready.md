@@ -43,7 +43,7 @@ Out: the backend itself, ML, real persistence, metrics aggregation (HU-02, 06-12
 ## Tasks
 
 - [x] T1 Provider ports, config switch, mock + remote adapters, composition root `Sereno.services`, architecture guard test (tests first)
-- [ ] T2 Async verdict service with timeout, offline and degraded states (HU-25/26)
+- [x] T2 Async verdict service with timeout, offline and degraded states (HU-25/26)
 - [ ] T3 Auth provider port: session token, remove plain-text compare (HU-13/14/15)
 - [ ] T4 Data providers for history, policy, cache, metrics, model version, survey (HU-17-21, 27-29, 32)
 - [ ] T5 Service worker: navigation to verdict, real-tab badge, history write (HU-04/05/22/25)
@@ -61,6 +61,8 @@ Out: the backend itself, ML, real persistence, metrics aggregation (HU-02, 06-12
 
 T1 done: provider ports, config switch, mock and remote adapters, composition root `Sereno.services`, architecture guard. Not yet wired into any page (T2-T4).
 
+T2 done: `verdict/domain/outcome.js` (Outcome model, fail-open rules), `verdict/application/verdict-service.js` (`evaluate(services, url, opts)`, own deadline, onPending, optional store publish) and a degraded protection level and card. Not yet wired into any page: script tags and the popup container passing the level come in T5-T7.
+
 ## Verification evidence
 
 Baseline: `node --test` = 66 pass, 0 fail (before changes).
@@ -70,6 +72,11 @@ T1:
 - GREEN: `node --test` = 89 pass, 0 fail (66 baseline + 23 new).
 - Commit: 6b206b0
 
+T2:
+- RED: tests written first (`tests/verdict-outcome.test.js`, `tests/verdict-service.test.js`, `tests/degraded-protection.test.js`); `node --test` = 3 test files failing to load (`verdict/domain/outcome.js`, `verdict/application/verdict-service.js` missing; protection helpers undefined).
+- GREEN: `node --test` = 119 pass, 0 fail (89 baseline + 30 new). Mock failures are injected by wrapping the verdict port (mock.js has no failure seam); remote failures use a fake fetch.
+- Commit: COMMIT_HASH
+
 ## Next step
 
-Launch the writer for T2 (async verdict service with timeout, offline and degraded states on top of `Sereno.services.verdict`).
+Launch the writer for T3 (auth provider port: session token, remove plain-text compare).
