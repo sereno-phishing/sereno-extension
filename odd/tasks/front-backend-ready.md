@@ -68,7 +68,7 @@ Baseline: `node --test` = 66 pass, 0 fail (before changes).
 T1:
 - RED: with only the tests written, `node --test` = 68 pass, 1 fail (`tests/providers.test.js` could not load, `platform/providers/*` missing). `tests/architecture.test.js` passed trivially (no violations existed yet); its detection was checked by adding a temporary file with `fetch(`, which failed the test, then removing it.
 - GREEN: `node --test` = 89 pass, 0 fail (66 baseline + 23 new).
-- Commit: ec241c3
+- Commit: 6b206b0
 
 ## Next step
 
