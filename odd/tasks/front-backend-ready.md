@@ -47,7 +47,7 @@ Out: the backend itself, ML, real persistence, metrics aggregation (HU-02, 06-12
 - [x] T3 Auth provider port: session token, remove plain-text compare (HU-13/14/15)
 - [x] T4 Data providers for history, policy, cache, metrics, model version, survey (HU-17-21, 27-29, 32)
 - [x] T5 Service worker: navigation to verdict, real-tab badge, history write (HU-04/05/22/25)
-- [ ] T6 Content script: in-page modal for warn/block/pending/degraded (HU-05/22/25)
+- [x] T6 Content script: in-page modal for warn/block/pending/degraded (HU-05/22/25)
 - [ ] T7 UI states and a11y: degraded banner, errors, focus trap, ARIA, reduced motion
 - [ ] T8 Manifest cleanup (name, permissions, host_permissions, CSP, min Chrome) and README provider guide
 
@@ -69,6 +69,8 @@ T4 done: history, survey, model version, domain policy, cache and metrics go thr
 
 T5 done: `background/service-worker.js` (classic MV3 worker: `importScripts` of platform, providers, domains, verdict and the navigation use case; registers `tabs.onUpdated/onActivated/onRemoved` synchronously; no globals, no timers, no `.then`). `protection/application/navigation-service.js` (`handleNavigation/handleTabActivated/handleTabRemoved/fromTabUpdate`) evaluates through `Sereno.verdictService`, paints the real-tab badge (safe, warning, block, pending `…`, degraded `?`), publishes `currentSite`/`protectionLevel` only for the active tab, keeps one record per tab in `chrome.storage.session` (a newer navigation on the tab invalidates an older result; the same url is not evaluated twice) and messages the tab. `platform/browser.js` gained `setBadge`, `notifyTab`, `getActiveTabId` and tab-record helpers; `setTabBadge` is unchanged for extension pages. Manifest declares the worker; permissions unchanged (`storage`, `tabs`). The worker imports no script that touches `window`/`document` (verified by loading them in Node) and ignores whether the provider is mock or remote. Not done on purpose: content script, host_permissions (T6), manifest cleanup (T8); README still says the prototype has no worker (T8). History write stays the backend's job through `verdict.evaluate`.
 
+T6 done: real pages show the same verdict UI as the demo store. `demo-store/ui/verdict-modal.js` now builds one `card()` with two shells: `render` (demo overlay, markup unchanged) and `renderDialog` (native `<dialog>`: `showModal()` gives inert background, focus trap and focus return; warning `closedby="closerequest"`, block `closedby="none"` and the `cancel` event is prevented). `verdict/ui/page-overlay.js` (`Sereno.pageOverlay`) is pure: outcome to plan (`modal`, `toast`, `notice`, `none`), `decide(current, outcome, acknowledged)` (keep, render or clear: equal outcome is a no-op, a dismissed one is not reopened, a new one replaces) and `escCloses`/`backTarget`. `content/content-script.js` is the container: registers the listener at load, asks `sereno:get-outcome`, draws inside a closed shadow root appended to `<html>` with `<link>` stylesheets (`ui/tokens.css`, `ui/verdict-modal.css`, `content/content.css`); it never references services, providers or the network. Modal CSS moved out of `app/demo-store/store.css` into `ui/verdict-modal.css` (shared); `ui/tokens.css` variables also apply to `:host`; `Sereno.ui.setAssetRoot` points icons at the extension URL. `platform/browser.js` gained `onMessage`, `sendMessage` and `assetUrl`. The worker (`navigation-service.js` `handleMessage`, wired in `service-worker.js` with `chrome.runtime.onMessage`) answers `sereno:get-outcome`, `sereno:continue` (warning only, same origin as the tab record, stored as `continued: [origin]` in the per-tab record, kept across navigations of the tab; refused for a block) and `sereno:detail` (opens `app/popup/popup.html` in a tab: it is the only page that shows the verdict facts of the current site, so no new page was created). The outcome message gets `acknowledged: true` when the user already continued on that origin. Manifest: `content_scripts` (http/https, `document_idle`, top frame only) and `web_accessible_resources` limited to the stylesheets, logo and icons for http/https pages. Not exercised in real Chrome.
+
 ## Contracts
 
 Tab message for the content script (T6), sent with `chrome.tabs.sendMessage`:
@@ -83,6 +85,8 @@ outcome = { kind: "verdict", verdict: { domain, status, score, source, latencyMs
 - A `pending` message may come first when the wait is over 300 ms; the final outcome always follows.
 - The final outcome is sent again when the tab reports `complete` for the same url (a content script injected at `document_idle` misses the first one), so T6 must treat an equal outcome as idempotent and render the modal once.
 - Only `verdict` with status `bloqueo` blocks (`Sereno.verdictOutcome.blocksNavigation`); `degraded` never blocks (fail-open) but must show the degraded notice (`Sereno.verdictOutcome.notice`).
+- Optional `acknowledged: true` on the same message (T6): the user already continued past a warning on this origin in this tab, so the receiver renders nothing for that warning. It is never set for a block.
+- Requests from the content script to the worker (`chrome.runtime.sendMessage`): `{type:"sereno:get-outcome"}` replies `{ok, outcome|null, acknowledged?}`; `{type:"sereno:continue", url}` replies `{ok}` or `{ok:false, error}` (`blocked`, `origin_mismatch`, `not_continuable`, `no_outcome`, `storage`, `no_tab`); `{type:"sereno:detail", url}` replies `{ok}`.
 - The message is not sent on tab activation; the popup state (`currentSite`, `protectionLevel`) and the badge are refreshed instead.
 - Per-tab record in `chrome.storage.session`, key `sereno.tab.<tabId>`: `{ token, url, startedAt, outcome|null }`.
 
@@ -117,6 +121,23 @@ T5:
 - `tests/architecture.test.js` still passes (background/ and protection/ have no network or adapter references).
 - Commit: 6ca8a82
 
+T6:
+- RED: tests written first (`tests/verdict-modal.test.js`, `tests/content-overlay.test.js`, `tests/content-script.test.js`, `tests/content-browser.test.js`, `tests/manifest.test.js`, plus new cases in `tests/navigation-service.test.js` and `tests/service-worker.test.js`); `node --test` = 235 tests, 206 pass, 29 fail (first failures: `onMessage subscribes once...` in `content-browser.test.js`, then `tests/content-overlay.test.js` and `tests/content-script.test.js` could not load, then the manifest `content_scripts` tests and `setAssetRoot is not a function`).
+- GREEN: `node --test` = 261 pass, 0 fail (204 baseline + 57 new).
+- `rg -n "services|fetch\(" content` = no hits; `tests/architecture.test.js` passes; every file in `content_scripts.js`, `web_accessible_resources` and the three stylesheets exists (also enforced by `tests/manifest.test.js`).
+- Nothing was exercised in real Chrome: the shadow-root `<link>` stylesheets, the native dialog behaviour, the page CSP interaction and the focus return are covered only by fake-DOM tests and must be checked by hand.
+- Commits: 6f944aa (view, container, CSS, browser port), 5e046f4 (worker actions, manifest)
+
+T8 must review (found in T6):
+- Manifest `name`/`description`, CSP, `minimum_chrome_version` (native `<dialog closedby>` is progressive; `showModal()` needs no minimum, `chrome.storage.session` needs 102).
+- Host access: `content_scripts.matches` is `http://*/*`, `https://*/*`; decide whether `host_permissions` is needed (the worker only uses `tabs`) and justify the broad match for the store listing.
+- `web_accessible_resources` exposes stylesheets, logo and icons to every http/https page (pages can fingerprint the extension); consider `use_dynamic_url`.
+- In real Chrome verify that a strict page CSP (`style-src`) does not block the extension `<link>` inside the shadow root; if it does, fall back to a `content_scripts.css` entry or a constructed stylesheet.
+- `@font-face` does not apply inside a shadow root, so the modal uses the system sans-serif font on real pages; load Inter in the page document or accept the fallback.
+- SPA navigation (`pushState`) is not seen by the worker (`tabs.onUpdated` only reports loading/complete), so a client-side route change is not re-evaluated.
+- README "Notas técnicas" still says the prototype has no service worker and lists only `storage` and `tabs`.
+- The modal and `demo-overlay` demo variants still differ in a11y (the demo store overlay keeps the old div markup, no inert/focus trap): T7.
+
 ## Next step
 
-Launch the writer for T6 (content script: in-page modal for warn/block/pending/degraded, consuming the `sereno:outcome` message under "Contracts"; adds `content_scripts`/`host_permissions` to the manifest and must be idempotent per outcome).
+Launch the writer for T7 (UI states and a11y: degraded banner in the popup, error states, focus trap and ARIA for the demo overlay and the remaining views, reduced motion). The T8 review list is under "T8 must review" in the verification evidence.
