@@ -44,7 +44,9 @@
     if (!App.initialized || !root || !App.state) {
       return;
     }
+    var restoreFocus = Sereno.ui.captureFocus(root);
     root.innerHTML = Sereno.adminViews.page(App, App.state);
+    restoreFocus();
   }
 
   /* A notice that hides itself after NOTICE_MS; showing it again restarts the timer. */
@@ -77,6 +79,7 @@
     var domain = domainPolicy.normalizeDomain(input ? input.value : "");
     if (!domain && input) {
       input.classList.add("has-error");
+      input.setAttribute("aria-invalid", "true");
     }
     return domain;
   }

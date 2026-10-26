@@ -46,7 +46,7 @@
   /* Shown instead of the panel when nobody, or a non-admin user, is signed in. */
   function accessGate() {
     return (
-      '<main class="access-gate"><div class="card access-gate-card">' + ui.logo("access-gate-logo", "Sereno") +
+      '<main class="access-gate" id="main" tabindex="-1"><div class="card access-gate-card">' + ui.logo("access-gate-logo", "Sereno") +
       '<h1 class="access-gate-title">Panel de administración</h1>' +
       '<p class="access-gate-text">Inicia sesión con una cuenta de administrador desde el popup de Sereno ' +
       "para ver este panel.</p></div></main>"
@@ -94,7 +94,10 @@
     if (!account.isAdmin(state.session)) {
       return accessGate();
     }
-    return sidebar(model.section, state.session) + '<main class="options-content">' + section(model) + "</main>";
+    return (
+      '<a class="skip-link" href="#main">Saltar al contenido</a>' + sidebar(model.section, state.session) +
+      '<main class="options-content" id="main" tabindex="-1">' + section(model) + "</main>"
+    );
   }
 
   Sereno.adminViews = {

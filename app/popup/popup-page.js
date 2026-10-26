@@ -67,6 +67,14 @@
     }
   }
 
+  /* Moves focus to the first element that matches, after a render. */
+  function focusFirst(selector) {
+    var node = root.querySelector(selector);
+    if (node) {
+      node.focus();
+    }
+  }
+
   function show(view) {
     App.view = view;
     App.tab = view === "history" ? "history" : "home";
@@ -76,7 +84,9 @@
     if (!App.initialized || !root || !App.state) {
       return;
     }
+    var restoreFocus = Sereno.ui.captureFocus(root);
     root.innerHTML = Sereno.popupViews.page(App, App.state);
+    restoreFocus();
     if (typeof root.removeAttribute === "function") {
       root.removeAttribute("aria-busy");
     }
@@ -312,6 +322,7 @@
     "toggle-menu": function () {
       App.menuOpen = !App.menuOpen;
       render();
+      focusFirst(App.menuOpen ? ".menu-item" : '[data-action="toggle-menu"]');
     },
     "close-menu": function () {
       if (App.menuOpen) {
@@ -388,10 +399,12 @@
     "confirm-clear": function () {
       App.confirmOpen = true;
       render();
+      focusFirst('[data-action="cancel-clear"]');
     },
     "cancel-clear": function () {
       App.confirmOpen = false;
       render();
+      focusFirst('[data-action="confirm-clear"]');
     },
     "confirm-clear-yes": clearHistoryNow,
     "retry-session": function () {
@@ -420,16 +433,43 @@
     }
   }
 
+  /* Arrow keys, Home and End move between the elements of a roving group
+     (tabs, menu items); returns the element to focus or null. */
+  function rovingTarget(event, group, orientation) {
+    var items = Array.prototype.slice.call(root.querySelectorAll(group));
+    var index = items.indexOf(event.target);
+    var next = index < 0 ? -1 : Sereno.ui.rovingIndex(items.length, index, event.key, orientation);
+    return next < 0 ? null : items[next];
+  }
+
   function onKeydown(event) {
-    if (event.key !== "Escape") {
+    if (event.key === "Tab" && App.confirmOpen) {
+      Sereno.ui.trapTab(event, root.querySelector(".confirm-card"));
       return;
     }
-    if (App.confirmOpen) {
-      App.confirmOpen = false;
-      render();
-    } else if (App.menuOpen) {
-      App.menuOpen = false;
-      render();
+    if (event.key === "Escape") {
+      if (App.confirmOpen) {
+        App.confirmOpen = false;
+        render();
+        focusFirst('[data-action="confirm-clear"]');
+      } else if (App.menuOpen) {
+        App.menuOpen = false;
+        render();
+        focusFirst('[data-action="toggle-menu"]');
+      }
+      return;
+    }
+    var tabTarget = rovingTarget(event, '[role="tab"]', "horizontal");
+    if (tabTarget) {
+      event.preventDefault();
+      ACTIONS.tab(tabTarget);
+      focusFirst('[role="tab"][data-tab="' + tabTarget.getAttribute("data-tab") + '"]');
+      return;
+    }
+    var menuTarget = rovingTarget(event, ".menu-item", "vertical");
+    if (menuTarget) {
+      event.preventDefault();
+      menuTarget.focus();
     }
   }
 

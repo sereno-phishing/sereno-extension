@@ -21,7 +21,7 @@
         <span class="sk-nav"></span>
       </nav>
     </header>
-    <main class="store-main">
+    <div class="store-main">
       <section class="store-hero">
         <div class="store-hero-main">
           <span class="sk-hero-title"></span>
@@ -39,7 +39,7 @@
         <article class="store-product"></article>
         <article class="store-product"></article>
       </section>
-    </main>
+    </div>
   </div>
 
   <!-- Safe-site tooltip (HU-04). Shown transiently by the simulator. -->
@@ -60,7 +60,10 @@
   <div data-verdict-modal="advertencia" hidden></div>
   <div data-verdict-modal="bloqueo" hidden></div>
 
-  <!-- Demo control panel: runs the four scenarios against the shared store. -->
+  <!-- Demo control panel: runs the four scenarios against the shared store.
+       The simulated page above is decorative, so the panel is the main content. -->
+  <main id="main">
+  <h1 class="sr-only">Tienda de demo de Sereno</h1>
   <aside class="demo-panel" id="demo-panel" aria-label="Simulador de demo">
     <p class="demo-panel-title">Simulador de demo</p>
     <p class="demo-panel-sub">Así se ve Sereno en una tienda real.</p>
@@ -80,6 +83,7 @@
     </div>
     <p class="demo-panel-hint">Cuentas demo: andres.torres · admin.sereno / sereno123</p>
   </aside>
+  </main>
 
   <script src="../../platform/storage.js"></script>
   <script src="../../platform/seed.js"></script>

@@ -47,7 +47,7 @@
       '<button type="button" class="history-item" data-action="open-detail" data-id="' + ui.esc(entry.id) + '">' +
       '<span><span class="history-domain">' + ui.esc(entry.domain) + "</span>" +
       '<span class="history-date">' + ui.esc(listDate(entry.ts)) + "</span></span>" +
-      '<span class="history-right">' + verdictUi.pill(entry.status, "sm") + '<span class="chevron">›</span></span>' +
+      '<span class="history-right">' + verdictUi.pill(entry.status, "sm") + '<span class="chevron" aria-hidden="true">›</span></span>' +
       "</button>"
     );
   }
@@ -88,10 +88,12 @@
       body = '<div class="history-list">' + filtered.map(historyItem).join("") + "</div>";
     }
     return (
-      '<section class="view view-history">' + model.tabsHtml + filterChips(model.filter) + body +
+      '<section class="view view-history"><h1 class="sr-only">Historial</h1>' + model.tabsHtml +
+      '<div class="tab-panel" role="tabpanel" id="tabpanel-history" aria-labelledby="tab-history">' +
+      filterChips(model.filter) + body +
       '<div class="flex-spacer"></div>' +
       (model.entries.length ? ui.button({ label: "Borrar historial", variant: "ghost", cls: "history-delete", action: "confirm-clear" }) : "") +
-      "</section>"
+      "</div></section>"
     );
   }
 
@@ -105,12 +107,12 @@
 
   function detailView(entry) {
     if (!entry) {
-      return '<section class="view view-detail">' + NO_MATCH + "</section>";
+      return '<section class="view view-detail"><h1 class="sr-only">Detalle del sitio</h1>' + NO_MATCH + "</section>";
     }
     var status = verdict.status(entry.status);
     var score = Number(entry.score) || 0;
     return (
-      '<section class="view view-detail">' +
+      '<section class="view view-detail"><h1 class="sr-only">Detalle de ' + ui.esc(entry.domain) + "</h1>" +
       '<div class="status-card status-card-' + status.id + '">' +
       '<div class="status-head">' + verdictUi.badge(entry.status, "32") +
       '<span class="status-title status-title-' + status.id + '">' + ui.esc(status.title) + "</span></div>" +
@@ -119,7 +121,7 @@
       detailRow(FACTS.risk, detailValue(verdict.riskLevel(entry))) +
       detailRow(
         FACTS.score,
-        '<span class="detail-score"><span class="score-track"><span class="score-fill score-fill-' + status.id +
+        '<span class="detail-score"><span class="score-track" aria-hidden="true"><span class="score-fill score-fill-' + status.id +
           '" style="width:' + verdict.scorePercent(score) + '%"></span></span>' + detailValue(score.toFixed(2)) + "</span>"
       ) +
       detailRow(FACTS.date, detailValue(time.formatDateTime(entry.ts))) +
@@ -133,9 +135,9 @@
 
   function clearConfirm() {
     return (
-      '<div class="confirm-overlay"><div class="confirm-card" role="dialog" aria-modal="true" aria-label="Borrar historial">' +
-      '<h2 class="confirm-title">¿Borrar tu historial?</h2>' +
-      '<p class="confirm-text">Se elimina de tu cuenta. No se puede deshacer.</p>' +
+      '<div class="confirm-overlay"><div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">' +
+      '<h2 class="confirm-title" id="confirm-title">¿Borrar tu historial?</h2>' +
+      '<p class="confirm-text" id="confirm-text">Se elimina de tu cuenta. No se puede deshacer.</p>' +
       '<div class="confirm-actions">' +
       ui.button({ label: "No", variant: "ghost", action: "cancel-clear" }) +
       ui.button({ label: "Sí, borrar", variant: "danger", action: "confirm-clear-yes" }) +

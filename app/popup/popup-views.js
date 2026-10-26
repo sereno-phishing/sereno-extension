@@ -17,6 +17,7 @@
   var protectionUi = Sereno.protectionUi;
 
   function header(model, state) {
+    var inert = model.confirmOpen ? " inert" : "";
     var left =
       model.view === "detail"
         ? '<button type="button" class="back-link" data-action="back-history">←  Historial</button>'
@@ -25,30 +26,36 @@
     if (model.view === "onboarding") {
       slot = onboardingUi.stepCounter(model.onboardingStep);
     } else if (state.session) {
-      slot = accountUi.accountButton(state.session);
+      slot = accountUi.accountButton(state.session, model.menuOpen);
     }
-    return '<header class="app-header">' + left + '<div class="header-slot">' + slot + "</div></header>";
+    return '<header class="app-header"' + inert + ">" + left + '<div class="header-slot">' + slot + "</div></header>";
   }
 
   function footer(state, model) {
     return (
-      '<footer class="app-footer">' +
+      '<footer class="app-footer"' + (model.confirmOpen ? " inert" : "") + ">" +
       '<button type="button" class="footer-link" data-action="open-privacy">Política de privacidad</button>' +
       protectionUi.modelVersionLabel(state, model.modelVersion) + "</footer>"
     );
   }
 
+  /* Tabs follow the ARIA tab pattern: the active one is the only tab stop, the
+     arrow keys move between them (popup container). Only the selected tab
+     points at its panel (tabpanel-<id>, drawn by the view of that tab): the
+     other panel is not in the page. */
   function tab(id, label, active) {
     return (
       '<button type="button" role="tab" data-action="tab" data-tab="' + id + '" class="' + (active ? "active" : "") +
-      '" aria-selected="' + active + '">' + label + "</button>"
+      '" aria-selected="' + active + '" id="tab-' + id + '"' + (active ? ' aria-controls="tabpanel-' + id + '"' : "") +
+      ' tabindex="' + (active ? "0" : "-1") + '">' +
+      label + "</button>"
     );
   }
 
   function tabs(homeActive, slide) {
     var active = homeActive ? "home" : "history";
     return (
-      '<div class="tabs tabs-lg" role="tablist" data-active-tab="' + active + '"' +
+      '<div class="tabs tabs-lg" role="tablist" aria-label="Secciones" data-active-tab="' + active + '"' +
       (slide === active ? ' data-tab-slide="' + active + '"' : "") + '>' +
       tab("home", "Inicio", homeActive) + tab("history", "Historial", !homeActive) + "</div>"
     );
@@ -76,13 +83,14 @@
   function home(state, model) {
     var session = state.session;
     var admin = account.isAdmin(session);
-    var parts = [];
+    var parts = ['<h1 class="sr-only">Sereno</h1>'];
     if (session && !admin) {
       parts.push(tabs(true, model.tabSlide));
     }
-    parts.push(protectionUi.protectionCard(protectionLevel(state)));
+    var card = protectionUi.protectionCard(protectionLevel(state));
     if (!session) {
       parts.push(
+        card,
         protectionUi.siteCard(state.currentSite, protectionLevel(state)),
         protectionUi.iconLegend(),
         '<div class="flex-spacer"></div>',
@@ -93,9 +101,11 @@
           "</div>"
       );
     } else if (admin) {
-      parts.push(adminEntryCard(), noticeIfVisible(state, model));
+      parts.push(card, adminEntryCard(), noticeIfVisible(state, model));
     } else {
-      parts.push(noticeIfVisible(state, model));
+      parts.push(
+        '<div class="tab-panel" role="tabpanel" id="tabpanel-home" aria-labelledby="tab-home">' + card + noticeIfVisible(state, model) + "</div>"
+      );
     }
     return '<section class="' + ui.classes(["view", "view-home", admin && "view-home-admin"]) + '">' + parts.join("") + "</section>";
   }
@@ -149,7 +159,7 @@
     return (
       header(model, state) +
       sessionNotice(model, state) +
-      '<main class="app-content" id="content">' + content(model, state) + "</main>" +
+      '<main class="app-content" id="content"' + (model.confirmOpen ? " inert" : "") + ">" + content(model, state) + "</main>" +
       footer(state, model) +
       (model.menuOpen && state.session ? accountUi.accountMenu(state.session) : "") +
       (model.confirmOpen ? historyUi.clearConfirm() : "")

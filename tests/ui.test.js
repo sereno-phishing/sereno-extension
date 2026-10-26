@@ -69,13 +69,13 @@ test("input atom omits empty value and placeholder", () => {
 
 test("field molecule renders label, input and help", () => {
   const html = ui.field({ label: "Usuario", name: "username", type: "text", hasError: true, help: "Elige otro.", helpIsError: true });
-  assert.match(html, /^<label class="field"><span class="field-label">Usuario<\/span><input class="input has-error"/);
-  assert.match(html, /<span class="field-help field-help-error">Elige otro\.<\/span><\/label>$/);
+  assert.match(html, /^<label class="field"><span class="field-label" id="field-username-label">Usuario<\/span><input class="input has-error"/);
+  assert.match(html, /<span class="field-help field-help-error" id="field-username-help">Elige otro\.<\/span><\/label>$/);
 });
 
 test("verdict pills and toolbar badge follow the status tone", () => {
   assert.match(verdictUi.pill("advertencia", "sm"), /^<span class="pill pill-sm pill-warn"><img class="art art-12" src="\.\.\/\.\.\/assets\/icons\/warn\.svg" alt="">/);
-  assert.match(verdictUi.pill("evaluando", "md"), /pill-neutral"><span class="art-glyph art-14">◔<\/span><span>Evaluando…<\/span>/);
+  assert.match(verdictUi.pill("evaluando", "md"), /pill-neutral"><span class="art-glyph art-14" aria-hidden="true">◔<\/span><span>Evaluando…<\/span>/);
   assert.equal(verdictUi.adminPill("bloqueo"), '<span class="pill pill-bloqueo"><img class="pill-img" src="../../assets/icons/admin-pill-bad.svg" alt="">Bloqueado</span>');
   assert.deepEqual(verdictUi.toolbarBadge("seguro"), { text: "✓", color: "#16A34A" });
   assert.deepEqual(verdictUi.toolbarBadge("pendiente"), { text: "…", color: "#6B7280" });

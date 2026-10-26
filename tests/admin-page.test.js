@@ -35,6 +35,7 @@ async function adminHarness(administrationService, session) {
     },
     browser: { openPage: () => {} },
     ui: {
+      captureFocus: () => () => {},
       delegateActions: (_root, handlers) => { actions = handlers; },
       onReady: (init) => init()
     }

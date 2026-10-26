@@ -43,7 +43,7 @@
 
   function stepWhat() {
     return (
-      '<div class="illustration"><span class="illust-logo-wrap">' +
+      '<div class="illustration" aria-hidden="true"><span class="illust-logo-wrap">' +
       ui.logo("illust-logo", "") + ui.icon("ok", "illust-badge") + "</span></div>" +
       title("Revisamos el sitio antes de que pagues") +
       body("Si el enlace es seguro, sigues navegando. Si parece phishing, te avisamos antes de que ingreses tus datos.")
@@ -52,7 +52,7 @@
 
   function stepPermission() {
     return (
-      '<div class="illustration">' + ui.logo("illust-logo", "") + "</div>" +
+      '<div class="illustration" aria-hidden="true">' + ui.logo("illust-logo", "") + "</div>" +
       title("Qué permiso necesitamos") +
       body("Solo leemos la dirección de la pestaña actual para evaluarla.") +
       '<div class="check-list">' + PERMISSION_CHECKS.map(checkItem).join("") + "</div>"
@@ -61,7 +61,7 @@
 
   function stepAlerts() {
     return (
-      '<div class="illustration"><div class="illust-circles">' +
+      '<div class="illustration" aria-hidden="true"><div class="illust-circles">' +
       verdict.VERDICTS.map(function (id) {
         return verdictUi.badge(id, "40");
       }).join("") +
@@ -73,7 +73,7 @@
   }
 
   function progressDots(step) {
-    var html = '<div class="dots">';
+    var html = '<div class="dots" aria-hidden="true">';
     for (var index = 1; index <= onboarding.STEP_COUNT; index += 1) {
       html += '<span class="' + ui.classes(["dot-step", index === step && "active"]) + '"></span>';
     }
@@ -102,7 +102,7 @@
 
   /* Header counter, e.g. "2 de 3". */
   function stepCounter(step) {
-    return '<span class="step-counter">' + step + " de " + onboarding.STEP_COUNT + "</span>";
+    return '<span class="step-counter"><span class="sr-only">Paso </span>' + step + " de " + onboarding.STEP_COUNT + "</span>";
   }
 
   Sereno.onboardingUi = {

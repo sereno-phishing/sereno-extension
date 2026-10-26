@@ -5,18 +5,26 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
+const { load } = require("./load");
+
+const realUi = load("ui/atoms.js", "ui/dom.js").ui;
 
 // Exercise the actual controller without exposing its private App state.
 async function popupHarness(extra = {}) {
   const state = { session: null, accounts: [], survey: { answers: [] }, history: {}, ...(extra.state || {}) };
   const originalState = structuredClone(state);
   const renders = [];
+  const focused = [];
+  const trapped = [];
   const calls = [];
   const listeners = {};
+  const documentListeners = {};
   let actions;
   const root = {
     innerHTML: "",
-    addEventListener: (name, handler) => { listeners[name] = handler; }
+    addEventListener: (name, handler) => { listeners[name] = handler; },
+    querySelector: (selector) => { focused.push(selector); return { focus: () => {} }; },
+    querySelectorAll: () => extra.items || []
   };
   const Sereno = {
     account: { isAdmin: () => false },
@@ -44,20 +52,23 @@ async function popupHarness(extra = {}) {
     },
     popupViews: { page: (model) => { renders.push({ ...model, surveyAnswers: [...model.surveyAnswers] }); return model.view; } },
     ui: {
+      captureFocus: () => () => {},
+      rovingIndex: realUi.rovingIndex,
+      trapTab: (...args) => { trapped.push(args); },
       delegateActions: (_root, handlers) => { actions = handlers; },
       onReady: (init) => init()
     }
   };
   const context = vm.createContext({
     Sereno,
-    document: { getElementById: () => root, addEventListener: () => {} }
+    document: { getElementById: () => root, addEventListener: (name, handler) => { documentListeners[name] = handler; } }
   });
   for (const file of ["platform/providers/errors.js", "survey/domain/sus.js", "survey/application/survey-service.js"]) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, "..", file), "utf8"), context);
   }
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../app/popup/popup-page.js"), "utf8"), context);
   await Promise.resolve();
-  return { actions, listeners, state, originalState, calls, renders, root };
+  return { actions, listeners, documentListeners, focused, trapped, state, originalState, calls, renders, root };
 }
 
 test("tab sliding runs once per real tab change, not on initial render, repeat clicks or redraws", async () => {
@@ -256,4 +267,40 @@ test("retry-session asks again and clears the notice when the backend answers", 
   popup.actions["retry-session"]();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(popup.renders.at(-1).sessionOffline, false);
+});
+
+test("arrow keys on a tab activate the neighbouring tab and move focus to it", async () => {
+  const home = { getAttribute: () => "home" };
+  const history = { getAttribute: () => "history" };
+  const popup = await popupHarness({ items: [home, history] });
+  let prevented = false;
+  popup.documentListeners.keydown({ key: "ArrowRight", target: home, preventDefault: () => { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(popup.renders.at(-1).view, "history");
+  assert.equal(popup.focused.at(-1), '[role="tab"][data-tab="history"]');
+  popup.documentListeners.keydown({ key: "Home", target: history, preventDefault: () => {} });
+  assert.equal(popup.renders.at(-1).view, "home");
+});
+
+test("Escape closes the confirmation and returns focus to the control that opened it", async () => {
+  const popup = await popupHarness();
+  popup.actions["confirm-clear"]();
+  assert.equal(popup.renders.at(-1).confirmOpen, true);
+  assert.equal(popup.focused.at(-1), '[data-action="cancel-clear"]');
+  popup.documentListeners.keydown({ key: "Escape", target: {} });
+  assert.equal(popup.renders.at(-1).confirmOpen, false);
+  assert.equal(popup.focused.at(-1), '[data-action="confirm-clear"]');
+});
+
+test("Tab is trapped inside the open confirmation and the menu returns focus on Escape", async () => {
+  const popup = await popupHarness();
+  popup.actions["confirm-clear"]();
+  popup.documentListeners.keydown({ key: "Tab", target: {} });
+  assert.equal(popup.trapped.length, 1);
+  popup.actions["cancel-clear"]();
+  popup.actions["toggle-menu"]();
+  assert.equal(popup.focused.at(-1), ".menu-item");
+  popup.documentListeners.keydown({ key: "Escape", target: {} });
+  assert.equal(popup.renders.at(-1).menuOpen, false);
+  assert.equal(popup.focused.at(-1), '[data-action="toggle-menu"]');
 });

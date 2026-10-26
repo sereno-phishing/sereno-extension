@@ -37,7 +37,7 @@ test("home and history use the same large tab variant with only selection state 
     assert.match(tablist[0], new RegExp(`data-tab="${active}" class="active" aria-selected="true"`));
     assert.equal((tablist[0].match(/data-action="tab"/g) || []).length, 2);
     assert.doesNotMatch(tablist[0], /data-tab-slide/);
-    return tablist[0].replace(/class="active"/g, 'class=""').replace(/aria-selected="true"/g, 'aria-selected="false"').replace(/data-active-tab="(?:home|history)"/g, 'data-active-tab="selected"');
+    return tablist[0].replace(/class="active"/g, 'class=""').replace(/aria-selected="true"/g, 'aria-selected="false"').replace(/data-active-tab="(?:home|history)"/g, 'data-active-tab="selected"').replace(/ aria-controls="[^"]*"/g, "").replace(/tabindex="-?\d"/g, 'tabindex="x"');
   });
   assert.equal(tablists[0], tablists[1]);
 });

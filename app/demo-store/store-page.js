@@ -96,6 +96,17 @@
     }
   }
 
+  /* The demo overlay is a div, not a native <dialog>, so the page behind it is
+     made inert by hand, focus moves into the card and returns afterwards. */
+  var openKey = null;
+  var opener = null;
+
+  function setBackgroundInert(inert) {
+    Array.prototype.slice.call(document.querySelectorAll("main, .store-page")).forEach(function (node) {
+      node.inert = inert;
+    });
+  }
+
   function openModal(key) {
     var stamp = byId(key + "-stamp");
     if (stamp) {
@@ -104,7 +115,14 @@
     setDetail(key, false);
     var overlay = byId(key + "-overlay");
     if (overlay) {
+      opener = document.activeElement;
       overlay.hidden = false;
+      openKey = key;
+      setBackgroundInert(true);
+      var first = overlay.querySelector(".verdict-btn");
+      if (first) {
+        first.focus();
+      }
     }
   }
 
@@ -115,6 +133,26 @@
         overlay.hidden = true;
       }
     });
+    if (openKey) {
+      openKey = null;
+      setBackgroundInert(false);
+      if (opener && typeof opener.focus === "function") {
+        opener.focus();
+      }
+      opener = null;
+    }
+  }
+
+  /* Tab stays inside the open card; Esc dismisses a warning like "Volver" and never a block. */
+  function onKeydown(event) {
+    if (!openKey) {
+      return;
+    }
+    if (event.key === "Tab") {
+      Sereno.ui.trapTab(event, byId(openKey + "-overlay"));
+    } else if (event.key === "Escape" && verdictModal.isClosable(openKey === "warning" ? "advertencia" : "bloqueo")) {
+      resetToSafe();
+    }
   }
 
   function showFeedback(scenario) {
@@ -207,6 +245,7 @@
     mountModals();
     Sereno.ui.delegateClicks(document, "data-scenario", runScenario);
     Sereno.ui.delegateActions(document, ACTIONS);
+    document.addEventListener("keydown", onKeydown);
   }
 
   Sereno.ui.onReady(init);

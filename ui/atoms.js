@@ -72,13 +72,15 @@
     );
   }
 
-  /* Toggle chip. options: { cls, action, data: [[name, value]], pressed, lead, label } */
+  /* Toggle chip. options: { cls, action, data: [[name, value]], pressed, lead, label, ariaLabel }
+     ariaLabel extends the visible label (it must start with it) for chips that repeat in a table. */
   function chip(options) {
     return (
       '<button type="button" class="' + options.cls + '" data-action="' + options.action + '"' +
       attrs((options.data || []).map(function (pair) {
         return ["data-" + pair[0], pair[1]];
       })) +
+      (options.ariaLabel ? ' aria-label="' + esc(options.ariaLabel) + '"' : "") +
       ' aria-pressed="' + !!options.pressed + '">' + (options.lead || "") + esc(options.label) + "</button>"
     );
   }
@@ -87,8 +89,10 @@
     return '<span class="pill ' + cls + '">' + content + "</span>";
   }
 
-  /* options: { cls, type, name, placeholder, value, min, assist } — assist adds
-     the autocomplete/spellcheck opt-outs used by free-text fields. */
+  /* options: { cls, type, name, placeholder, value, min, assist, autocomplete, id,
+     ariaLabel, labelledBy, invalid, describedBy } — assist adds the spellcheck opt-out and,
+     unless autocomplete names a token, the autocomplete opt-out of free-text fields. The aria
+     options give the input a programmatic name, a validity state and its help or error text. */
   function input(options) {
     var hasValue = options.value !== undefined && options.value !== null && options.value !== "";
     return (
@@ -97,14 +101,22 @@
       ' name="' + options.name + '"' +
       (options.placeholder ? ' placeholder="' + esc(options.placeholder) + '"' : "") +
       (hasValue ? ' value="' + esc(options.value) + '"' : "") +
-      (options.assist ? ' autocomplete="off" spellcheck="false"' : "") + ">"
+      (options.autocomplete
+        ? ' autocomplete="' + esc(options.autocomplete) + '"' + (options.assist ? ' spellcheck="false"' : "")
+        : options.assist ? ' autocomplete="off" spellcheck="false"' : "") +
+      (options.id ? ' id="' + esc(options.id) + '"' : "") +
+      (options.ariaLabel ? ' aria-label="' + esc(options.ariaLabel) + '"' : "") +
+      (options.labelledBy ? ' aria-labelledby="' + esc(options.labelledBy) + '"' : "") +
+      (options.invalid ? ' aria-invalid="true"' : "") +
+      (options.describedBy ? ' aria-describedby="' + esc(options.describedBy) + '"' : "") + ">"
     );
   }
 
-  /* options: { tone: error|success, cls, role, iconHtml, text } */
+  /* options: { tone: error|success, cls, role, id, iconHtml, text } — role is "alert" for failures, "status" otherwise. */
   function banner(options) {
     return (
-      '<div class="' + classes(["banner-" + options.tone, options.cls]) + '" role="' + options.role + '">' +
+      '<div class="' + classes(["banner-" + options.tone, options.cls]) + '" role="' + options.role + '"' +
+      (options.id ? ' id="' + esc(options.id) + '"' : "") + ">" +
       options.iconHtml + "<span>" + esc(options.text) + "</span></div>"
     );
   }
