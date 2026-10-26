@@ -160,7 +160,8 @@ sereno-extension/
 │   ├── demo-store/               # store.html/.css, store-page.js (contenedor del simulador)
 │   └── privacy/                  # privacy.html/.css (página estática)
 ├── background/                   # service-worker.js: escucha las pestañas y delega en navigation-service
-├── content/                      # content-script.js (contenedor del aviso en página) y content.css
+├── content/                      # content-script.js (contenedor del aviso en página), content.css y content-assets.generated.js (estilos e íconos empaquetados; no se edita)
+├── tools/                        # build-content-assets.js: genera content-assets.generated.js (paso de desarrollo)
 ├── verdict/                      # Veredicto y su resultado normalizado (outcome), caso de uso verdict-service, aviso en página, pills y badge
 ├── account/                      # Usuarios, sesión con token, roles; formularios y menú de cuenta
 ├── history/                      # Historial: deduplicación 60 s, tope 200, filtros; lista y detalle
@@ -229,7 +230,8 @@ sereno-extension/
 - **Content script** (`content/content-script.js`, http/https, `document_idle`,
   solo el marco superior). Escucha el mensaje del worker, pide el resultado actual
   al cargar y dibuja el aviso dentro de un shadow root cerrado en `<html>`, con
-  hojas de estilo de la extensión. Muestra un `<dialog>` nativo con `showModal()`
+  estilos e íconos empaquetados en el propio script (ver «Estilos e íconos del
+  aviso en página»). Muestra un `<dialog>` nativo con `showModal()`
   (fondo inerte, foco atrapado y devuelto): la advertencia se puede cerrar y el
   bloqueo no. Un toast cubre «Evaluando…» y una nota cubre la protección
   degradada. No conoce servicios, proveedores ni red.
@@ -260,10 +262,23 @@ sereno-extension/
   'self'` (igual que el valor por defecto de MV3, pero explícito). El HTML no usa
   `onclick`, CDNs, fuentes ni imágenes remotas. No se restringe `connect-src`; si
   quieres endurecerlo, es otro cambio a mano al conectar el backend.
-- **Recursos expuestos.** `web_accessible_resources` lista solo lo que el aviso en
-  página carga (3 hojas de estilo, el logo y 5 íconos), para http/https. Una
-  página puede detectar que Sereno está instalado al pedir esos recursos; no se
-  usó `use_dynamic_url` porque exige Chrome 130 o superior.
+- **Estilos e íconos del aviso en página.** La página nunca pide una URL
+  `chrome-extension://`: el manifest no declara `web_accessible_resources`, así que
+  ningún sitio puede detectar la extensión pidiendo sus archivos. Los estilos
+  (`ui/tokens.css`, `ui/verdict-modal.css`, `content/content.css`) y los íconos que
+  usa el aviso (`assets/icons/alert-*`, `toast-pending-32`, `brand`) viajan dentro de
+  `content/content-assets.generated.js`, que registra `Sereno.contentAssets`. El
+  content script crea una `CSSStyleSheet`, la llena con `replaceSync` y la asigna a
+  `shadow.adoptedStyleSheets` (una hoja construida no depende del `style-src` de la
+  página). Si el navegador no la admite, usa un `<style>` con el mismo texto. Los
+  íconos se dibujan como `<svg>` en línea (`Sereno.ui.setInlineAssets`), no como
+  `<img>`, y el logo del pie del modal es la marca `brand` en SVG. El popup, el
+  panel y la tienda de demo no cambian: siguen cargando sus archivos desde su propia
+  página. **El archivo generado se versiona.** Tras editar `ui/tokens.css`,
+  `ui/verdict-modal.css`, `content/content.css` o un ícono del aviso, ejecuta
+  `node tools/build-content-assets.js` (`--check` solo verifica). Si lo olvidas,
+  `tests/content-assets.test.js` falla. Al generar se descarta `@font-face`, así que
+  la fuente Inter no se aplica en el aviso en página: usa la fuente del sistema.
 - **Versión mínima.** `minimum_chrome_version` es 102: `chrome.storage.session` e
   `inert` la exigen. `<dialog closedby>` es una mejora progresiva y no impone
   versión.
@@ -427,9 +442,13 @@ worker (`chrome://extensions` → «service worker») y revisa:
       pestaña conserva el suyo al cambiar entre ellas.
 - [ ] Modal en una página real: advertencia (se cierra con Esc, «Volver»,
       «Continuar bajo riesgo», «Ver detalle») y bloqueo (sin Esc, sin continuar).
-- [ ] Un sitio con CSP estricta (por ejemplo, con `style-src` restringido): las
-      hojas de estilo de la extensión dentro del shadow root deben cargar. Si no,
-      pasar a `content_scripts.css` o a una hoja construida.
+- [ ] Consola de una página real (por ejemplo, youtube.com) sin el error «Unsafe
+      attempt to load URL chrome-extension://…», y en `http://advertencia.localhost:8080`
+      y `http://bloqueo.localhost:8080` el modal con estilos y con sus íconos.
+- [ ] Un sitio con CSP estricta (por ejemplo, con `style-src` e `img-src`
+      restringidos): el modal conserva estilos (hoja construida) e íconos (SVG en
+      línea). Si falta el estilo, el navegador no admitió la hoja construida y cayó
+      al `<style>`, que esa CSP puede bloquear.
 - [ ] Navegación en una SPA (`pushState`): el worker solo ve `loading` y
       `complete`, así que un cambio de ruta del lado del cliente no se vuelve a
       evaluar. Confirmar el comportamiento y decidir si se usa
@@ -440,9 +459,9 @@ worker (`chrome://extensions` → «service worker») y revisa:
 - [ ] Reinicio del service worker: detenerlo desde `chrome://serviceworker-internals`
       o esperar a que se duerma, navegar y comprobar que el badge, el modal y
       «Continuar bajo riesgo» siguen funcionando con el estado guardado.
-- [ ] La fuente: `@font-face` no aplica dentro de un shadow root, así que el modal
-      usa la fuente sans-serif del sistema en páginas reales. Aceptarlo o cargar
-      Inter en el documento.
+- [ ] La fuente: Inter no se aplica en el aviso en página (el empaquetado descarta
+      `@font-face`), así que el modal usa la fuente sans-serif del sistema.
+      Aceptarlo o cargar Inter en el documento.
 - [ ] Un lector de pantalla recorre el modal, los estados de carga y el popup.
 - [ ] Con backend: cookies de sesión (`Secure`, `SameSite=None`), permiso de host
       en la tarjeta de la extensión, y los cuatro fallos (sin red, tiempo agotado,
