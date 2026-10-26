@@ -42,7 +42,9 @@
     historyLoading: false,
     historyError: null,
     modelVersion: null,
-    surveyError: null
+    surveyError: null,
+    // True while the backend could not confirm the stored session (offline notice).
+    sessionOffline: false
   };
 
   // What the last backend load was for, so a store change reloads only when it matters.
@@ -75,6 +77,9 @@
       return;
     }
     root.innerHTML = Sereno.popupViews.page(App, App.state);
+    if (typeof root.removeAttribute === "function") {
+      root.removeAttribute("aria-busy");
+    }
     // Each render replaces the tabs, so animate only the requested tab change.
     App.tabSlide = null;
   }
@@ -249,6 +254,27 @@
     render();
   }
 
+  /* Asks the backend whether the stored session still holds. Never blocks the
+     first render: offline or failing, the local session stays and a notice
+     with a retry shows. A session the backend dropped sends the user home. */
+  async function refreshSession() {
+    var result = null;
+    try {
+      result = await Sereno.accountService.currentSession(services, store);
+    } catch (error) {
+      result = null;
+    }
+    var unconfirmed = !result || !result.ok || !result.verified;
+    var offline = unconfirmed && !!(App.state && App.state.session);
+    if (result && result.ok && result.verified && !result.session && App.view !== "onboarding") {
+      App.menuOpen = false;
+      App.detailId = null;
+      show("home");
+      render();
+    }
+    setData({ sessionOffline: offline });
+  }
+
   /* ---------------- actions ---------------- */
 
   /* Command table: data-action name -> handler(target). */
@@ -368,6 +394,9 @@
       render();
     },
     "confirm-clear-yes": clearHistoryNow,
+    "retry-session": function () {
+      refreshSession();
+    },
     "dismiss-notice": function () {
       Sereno.protectionService.dismissModelNotice(store);
     }
@@ -436,6 +465,7 @@
         show(historyTab ? "history" : "home");
       }
       render();
+      refreshSession();
     });
   }
 

@@ -46,3 +46,45 @@ test("the degraded card explains the reason when one is known", () => {
   assert.match(protectionUi.protectionCard("degraded", "offline"), /conexión/i);
   assert.doesNotMatch(protectionUi.protectionCard("degraded", "<b>x</b>"), /<b>/);
 });
+
+const fs = require("node:fs");
+const path = require("node:path");
+
+const ROOT = path.join(__dirname, "..");
+const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
+
+test("both protection cards are live regions so a change of level is announced", () => {
+  assert.match(protectionUi.protectionCard("degraded"), /class="protection-card is-degraded" role="status"/);
+  assert.match(protectionUi.protectionCard("active"), /class="protection-card" role="status"/);
+});
+
+test("the degraded card has amber styling built from the design tokens", () => {
+  const css = read("app/popup/popup.css");
+  const block = css.match(/\.protection-card\.is-degraded\s*\{([^}]*)\}/);
+  assert.ok(block, "popup.css styles .protection-card.is-degraded");
+  assert.match(block[1], /background:\s*var\(--amber-bg\)/);
+  assert.match(block[1], /color:\s*var\(--amber-800\)/);
+});
+
+test("the site card marks a pending evaluation as busy and announces it", () => {
+  const html = protectionUi.siteCard({ domain: "tienda.pe", status: "evaluando" });
+  assert.match(html, /class="site-card is-pending"/);
+  assert.match(html, /aria-busy="true"/);
+  assert.match(html, /role="status"/);
+  assert.doesNotMatch(protectionUi.siteCard({ domain: "tienda.pe", status: "seguro" }), /is-pending|aria-busy/);
+});
+
+test("the site card says the site could not be checked when protection is degraded", () => {
+  const html = protectionUi.siteCard({ domain: "tienda.pe", status: "pendiente" }, "degraded");
+  assert.match(html, /class="site-card is-degraded"/);
+  assert.match(html, /site-note/);
+  assert.match(html, /No se pudo comprobar/);
+  assert.doesNotMatch(protectionUi.siteCard({ domain: "tienda.pe", status: "seguro" }, "active"), /is-degraded|site-note/);
+});
+
+test("the popup ships a loading skeleton that the first render replaces", () => {
+  const html = read("app/popup/popup.html");
+  assert.match(html, /<div id="app"[^>]*aria-busy="true"[^>]*>[\s\S]*boot-skeleton[\s\S]*<\/div>\s*<script/);
+  assert.match(html, /Cargando/);
+  assert.match(read("app/popup/popup.css"), /\.boot-skeleton/);
+});

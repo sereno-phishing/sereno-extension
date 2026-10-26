@@ -73,3 +73,12 @@ test("history padding matches home on all sides to keep tabs aligned", () => {
   assert.match(history, /gap: 12px;/);
   assert.doesNotMatch(history, /(?:^|;)\s*(?:padding-inline|padding-block|width):/);
 });
+
+test("the offline session notice is a polite live region with a retry action", () => {
+  const views = popupViews();
+  const state = { session: { username: "user", role: "user" }, history: {} };
+  const html = views.page({ view: "home", sessionOffline: true }, state);
+  assert.match(html, /<div class="session-notice" role="status">/);
+  assert.match(html, /data-action="retry-session"/);
+  assert.doesNotMatch(views.page({ view: "home", sessionOffline: false }, state), /session-notice/);
+});

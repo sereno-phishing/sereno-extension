@@ -9,6 +9,7 @@
   var verdictUi = Sereno.verdictUi;
   var protection = Sereno.protection;
   var outcomes = Sereno.verdictOutcome;
+  var verdict = Sereno.verdict;
 
   /* Toolbar icon states and the dot colour of each. */
   var ICON_STATES = [
@@ -23,26 +24,36 @@
     if (level === "degraded") {
       var notice = outcomes.notice(outcomes.degraded(reason));
       return (
-        '<div class="protection-card is-degraded">' + ui.art("warn", "36") +
+        '<div class="protection-card is-degraded" role="status">' + ui.art("warn", "36") +
         '<div class="protection-text"><div class="protection-title">' + ui.esc(notice.title) + "</div>" +
         '<div class="protection-sub">' + ui.esc(reason ? notice.text : "Algunas comprobaciones no están disponibles.") + "</div></div>" +
         "</div>"
       );
     }
     return (
-      '<div class="protection-card">' + ui.art("ok", "36") +
+      '<div class="protection-card" role="status">' + ui.art("ok", "36") +
       '<div class="protection-text"><div class="protection-title">Protección activa</div>' +
       '<div class="protection-sub">Modo por defecto: Advertencia</div></div>' +
       "</div>"
     );
   }
 
-  function siteCard(site) {
+  /* level: "degraded" when the verdict service is down (HU-26). A status that
+     is still being evaluated is marked busy and announced; a degraded level
+     explains that the site could not be checked. */
+  function siteCard(site, level) {
     var current = site || {};
+    var pending = verdict.status(current.status).tone === "neutral";
+    var degraded = level === "degraded";
+    var live = pending || degraded;
     return (
-      '<div class="site-card"><div class="site-label">Este sitio</div>' +
+      '<div class="' + ui.classes(["site-card", degraded ? "is-degraded" : pending && "is-pending"]) + '"' +
+      (live ? ' role="status"' : "") + (pending && !degraded ? ' aria-busy="true"' : "") + ">" +
+      '<div class="site-label">Este sitio</div>' +
       '<div class="site-row"><div class="site-domain">' + ui.esc(current.domain) + "</div>" +
-      verdictUi.pill(current.status, "md") + "</div></div>"
+      verdictUi.pill(current.status, "md") + "</div>" +
+      (degraded ? '<div class="site-note">No se pudo comprobar este sitio. Evita ingresar datos de pago.</div>' : "") +
+      "</div>"
     );
   }
 

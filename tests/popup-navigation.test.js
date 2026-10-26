@@ -39,7 +39,8 @@ async function popupHarness(extra = {}) {
     protectionService: extra.protectionService || { loadModelVersion: async () => ({ ok: true, version: "1.2" }) },
     accountService: {
       login: () => { calls.push(["login"]); return Promise.resolve({ ok: false }); },
-      register: () => { calls.push(["register"]); return Promise.resolve({ ok: false }); }
+      register: () => { calls.push(["register"]); return Promise.resolve({ ok: false }); },
+      ...(extra.accountService || {})
     },
     popupViews: { page: (model) => { renders.push({ ...model, surveyAnswers: [...model.surveyAnswers] }); return model.view; } },
     ui: {
@@ -206,4 +207,53 @@ test("a failed survey submission keeps the result on screen with a message and c
   await settle();
   assert.equal(popup.renders.at(-1).surveyError, null);
   assert.equal(popup.state.survey.completedAt, "completed");
+});
+
+test("boot renders at once and then refreshes the session through the auth port", async () => {
+  const seen = [];
+  const popup = await popupHarness({
+    state: { session: { username: "ana", role: "user" } },
+    accountService: { currentSession: async (services, store) => { seen.push([services, store]); return { ok: true, session: { username: "ana", role: "user" }, verified: true }; } }
+  });
+  assert.equal(popup.root.innerHTML, "home", "the first view does not wait for the backend");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(seen.length, 1);
+  assert.ok(seen[0][1] && typeof seen[0][1].update === "function", "the store is passed to the service");
+  assert.ok(popup.renders.every((model) => !model.sessionOffline));
+});
+
+test("an unreachable backend keeps the local session and shows a notice instead of blocking", async () => {
+  const popup = await popupHarness({
+    state: { session: { username: "ana", role: "user" } },
+    accountService: { currentSession: async () => ({ ok: true, session: { username: "ana", role: "user" }, verified: false }) }
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(popup.renders.at(-1).sessionOffline, true);
+  assert.equal(popup.state.session.username, "ana");
+  assert.equal(popup.root.innerHTML, "home");
+});
+
+test("a failing session refresh never throws and leaves the popup usable", async () => {
+  for (const currentSession of [async () => { throw new Error("boom"); }, async () => ({ ok: false, error: "server" }), undefined]) {
+    const popup = await popupHarness({
+      state: { session: { username: "ana", role: "user" } },
+      accountService: { currentSession }
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(popup.root.innerHTML, "home");
+  }
+});
+
+test("retry-session asks again and clears the notice when the backend answers", async () => {
+  let answer = { ok: true, session: { username: "ana", role: "user" }, verified: false };
+  const popup = await popupHarness({
+    state: { session: { username: "ana", role: "user" } },
+    accountService: { currentSession: async () => answer }
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(popup.renders.at(-1).sessionOffline, true);
+  answer = { ok: true, session: { username: "ana", role: "user" }, verified: true };
+  popup.actions["retry-session"]();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(popup.renders.at(-1).sessionOffline, false);
 });

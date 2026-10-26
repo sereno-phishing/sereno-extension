@@ -83,7 +83,7 @@
     parts.push(protectionUi.protectionCard(protectionLevel(state)));
     if (!session) {
       parts.push(
-        protectionUi.siteCard(state.currentSite),
+        protectionUi.siteCard(state.currentSite, protectionLevel(state)),
         protectionUi.iconLegend(),
         '<div class="flex-spacer"></div>',
         '<p class="muted-line">Inicia sesión para guardar tu historial.</p>',
@@ -133,9 +133,22 @@
   }
 
   /* model: the popup UI state (view, step, filter, drafts, overlays). */
+  /* Shown when the backend could not confirm the stored session: the local
+     session stays in use and the user can try again. */
+  function sessionNotice(model, state) {
+    if (!model.sessionOffline || !state.session) {
+      return "";
+    }
+    return (
+      '<div class="session-notice" role="status"><span>Sin conexión con el servidor. Usamos tu sesión guardada en este dispositivo.</span>' +
+      '<button type="button" class="link-btn" data-action="retry-session">Reintentar</button></div>'
+    );
+  }
+
   function page(model, state) {
     return (
       header(model, state) +
+      sessionNotice(model, state) +
       '<main class="app-content" id="content">' + content(model, state) + "</main>" +
       footer(state, model) +
       (model.menuOpen && state.session ? accountUi.accountMenu(state.session) : "") +
