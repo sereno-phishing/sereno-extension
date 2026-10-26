@@ -51,6 +51,7 @@ Out: the backend itself, ML, real persistence, metrics aggregation (HU-02, 06-12
 - [x] T7 UI states and a11y: degraded banner, errors, focus trap, ARIA, reduced motion
 - [x] T8 Manifest cleanup (name, permissions, host_permissions, CSP, min Chrome), README provider guide and the end-to-end swap proof
 - [x] T9 Popup fixes from first real-Chrome review (site card for every role, one model version independent of the session)
+- [x] T10 Localhost test hosts for real-page verification (`*.localhost` verdicts in the mock adapter)
 
 ## Route declaration
 
@@ -97,6 +98,8 @@ T9 done: two Sprint 1 inconsistencies found in the first real-Chrome review, bot
 - Model version: removed `MODEL_VERSION`, `UPDATED_MODEL_VERSION` and `modelVersion(state)` from `protection/domain/protection.js`. `isNoticeVisible(state, backendVersion)` is pure and data driven: signed in, a backend version known, and `state.lastSeenModelVersion !== backendVersion`; the legacy `modelNoticeDismissed === true` still hides it. `dismissModelNotice(store, version)` stores `lastSeenModelVersion` and resets the old flag to false. The mock backend reports the constant `Sereno.seed.modelVersion = "1.3"`; the seed starts `lastSeenModelVersion: "1.2"`, so the demo still shows the "v1.3" notice after the first login while the footer says v1.3 everywhere. `getModelVersion() -> {ok, version}`, the remote adapter and the ports are untouched. The popup asks for the version once per user (the key no longer includes the dismissed flag) and passes `App.modelVersion` when dismissing.
 - Known limit: a legacy state saved with `modelNoticeDismissed: true` keeps the notice hidden until that user dismisses again (it cannot be told which version they saw); fresh and new states behave per version.
 - README: sentence about who sees "Este sitio" and the HU-27 row corrected.
+
+T10 done: the fake scenario domains do not resolve, so content scripts never ran on them. The mock adapter now recognizes `seguro|advertencia|bloqueo|pendiente|degradado.localhost` (table `TEST_HOSTS` in `platform/providers/mock.js`, after the `www.` strip; ports ignored). Scenario hosts reuse `Sereno.demoScenarios.SCENARIOS` data with `domain` set to the hostname; `pendiente.localhost` waits `PENDING_HOST_DELAY_MS` (1500 ms, above the 300 ms threshold; injectable as `pendingHostDelayMs`) and resolves safe; `degradado.localhost` returns `errors.failure("server")` (degraded, fail-open, not recorded in history). Remote adapter, ports and contract untouched. README: new subsection "Probar advertencia, bloqueo, pendiente y degradado en páginas reales". Nothing was exercised in real Chrome.
 
 ## Contracts
 
@@ -180,6 +183,12 @@ T9:
 - `rg -n "UPDATED_MODEL_VERSION|modelNoticeDismissed" --glob "!tests/**" .`: remaining hits are the legacy read in `protection/domain/protection.js` and the reset to false in `protection-service.js`, both intentional.
 - Nothing was exercised in real Chrome.
 - Commit: 33d11f6
+
+T10:
+- RED: `tests/mock-test-hosts.test.js` (10 tests) written first; `node --test` = 357 tests, 350 pass, 7 fail (first: `scenario hosts return the scenario verdict with the real hostname as domain`).
+- GREEN: `node --test` = 357 tests, 357 pass, 0 fail (347 baseline + 10 new); `tests/provider-switch.test.js` and `tests/architecture.test.js` pass unchanged.
+- Nothing was exercised in real Chrome.
+- Commits: bc8a154 (mock + tests), README and this document in the following docs commit.
 
 T8 must review (found in T6):
 - Manifest `name`/`description`, CSP, `minimum_chrome_version` (native `<dialog closedby>` is progressive; `showModal()` needs no minimum, `chrome.storage.session` needs 102).

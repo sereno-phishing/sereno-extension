@@ -70,8 +70,8 @@ semilla.
 ### En pestañas reales (proveedor mock)
 
 El service worker evalúa cada navegación http/https con el mismo proveedor. El
-mock solo conoce los dominios de los escenarios; cualquier otro dominio da
-«seguro».
+mock solo conoce los dominios de los escenarios y los hosts de prueba
+`*.localhost`; cualquier otro dominio da «seguro».
 
 | Dominio | Veredicto del mock |
 | --- | --- |
@@ -80,9 +80,34 @@ mock solo conoce los dominios de los escenarios; cualquier otro dominio da
 | `pago-servicios-linea.net` | Bloqueo |
 | cualquier otro | Seguro |
 
-El badge se pinta al empezar la navegación, aunque el dominio no resuelva. El
-aviso en página solo aparece si la página llega a cargar. Esto no se ha probado
-en Chrome real.
+Los dominios de la tabla no resuelven en internet, así que el aviso en página no
+aparece con ellos: el badge se pinta al empezar la navegación, pero la página
+no llega a cargar. Para ver el aviso, usa los hosts `*.localhost` de la
+siguiente sección. Esto no se ha probado en Chrome real.
+
+### Probar advertencia, bloqueo, pendiente y degradado en páginas reales
+
+Chrome resuelve cualquier `*.localhost` a tu propio equipo, así que la página
+carga y el content script puede dibujar el aviso. Con el proveedor `mock` el
+adaptador reconoce estos hosts (el puerto se ignora):
+
+1. En cualquier carpeta, levanta un servidor local: `python -m http.server 8080`.
+2. Abre cada host en una pestaña, con la extensión cargada y recargada:
+
+| URL | Resultado esperado |
+| --- | --- |
+| `http://seguro.localhost:8080` | Badge verde `✓`, sin aviso en página |
+| `http://advertencia.localhost:8080` | Badge ámbar `!` y modal de advertencia (Volver, Ver detalle, Continuar bajo riesgo) |
+| `http://bloqueo.localhost:8080` | Badge rojo `✕` y modal de bloqueo, sin opción de continuar |
+| `http://pendiente.localhost:8080` | Badge `…` y toast «Evaluación pendiente» durante ~1.5 s; después, seguro `✓` |
+| `http://degradado.localhost:8080` | Badge `?` y aviso «Protección degradada»; la página no se bloquea |
+
+Notas:
+
+- Solo funciona con `provider: "mock"`; un backend real ignora estos hosts.
+- La página puede ser un listado o un 404 del servidor: solo importa el host.
+- El popup y el historial muestran el host (por ejemplo `bloqueo.localhost`).
+- Los hosts están definidos en `TEST_HOSTS` de `platform/providers/mock.js`.
 
 ## Mapa de vistas ↔ HU
 
