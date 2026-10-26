@@ -339,3 +339,15 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Reduced motion: the notices stay put until the script hides them. */
+@media (prefers-reduced-motion: reduce) {
+  .demo-tooltip.is-visible,
+  .demo-toast.is-visible {
+    animation: none;
+  }
+
+  .demo-panel {
+    transition: none;
+  }
+}
