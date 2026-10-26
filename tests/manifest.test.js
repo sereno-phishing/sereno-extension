@@ -1,16 +1,22 @@
 "use strict";
 
-/* Manifest sanity for the content script: every referenced file exists, the
-   js list is in dependency order, and only the declared files are exposed. */
+/* Manifest sanity: what Chrome and the store reviewer read. Every referenced
+   file exists, the content script list is in dependency order, only the files
+   the in-page UI really loads are exposed, and host_permissions follow the
+   provider config (the third touch point of a backend hand-off). */
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { load } = require("./load");
 
 const ROOT = path.join(__dirname, "..");
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, "manifest.json"), "utf8"));
 const exists = (file) => fs.existsSync(path.join(ROOT, file));
+
+load("platform/providers/config.js");
+const CONFIG = globalThis.Sereno.providers.config;
 
 test("the manifest is Manifest V3 and still declares the worker", () => {
   assert.equal(manifest.manifest_version, 3);
@@ -50,22 +56,82 @@ test("the content script never loads the provider seam, the services or any page
   });
 });
 
-test("web accessible resources exist, are limited to web pages and cover what the shadow root loads", () => {
+test("web accessible resources are exactly the files the in-page UI loads, for web pages only", () => {
   assert.equal(manifest.web_accessible_resources.length, 1);
   const entry = manifest.web_accessible_resources[0];
   assert.deepEqual(entry.matches, ["http://*/*", "https://*/*"]);
-  entry.resources.forEach((resource) => {
-    const files = resource.includes("*") ? fs.readdirSync(path.join(ROOT, path.dirname(resource))).filter((name) => name.endsWith(path.extname(resource))) : [path.basename(resource)];
-    assert.ok(files.length > 0, resource + " matches files");
-    files.forEach((name) => assert.ok(exists(path.posix.join(path.posix.dirname(resource), name)), resource));
-  });
-  ["ui/tokens.css", "ui/verdict-modal.css", "content/content.css", "assets/logo.png", "assets/icons/*.svg"].forEach((resource) => {
-    assert.ok(entry.resources.includes(resource), resource + " is exposed");
-  });
-  assert.ok(!entry.resources.some((resource) => /\.js$|\*\*|^\*$/.test(resource)), "no scripts and no broad globs");
+
+  const Sereno = load(
+    "time/domain/time.js",
+    "verdict/domain/verdict.js",
+    "verdict/domain/outcome.js",
+    "ui/atoms.js",
+    "verdict/ui/verdict-ui.js",
+    "demo-store/ui/verdict-modal.js",
+    "verdict/ui/page-overlay.js"
+  );
+  Sereno.ui.setAssetRoot("@@/");
+  const verdictOf = (status) => ({ kind: "verdict", verdict: { domain: "a.pe", status, score: 0.9, source: "modelo", latencyMs: 1 } });
+  const html = [verdictOf("advertencia"), verdictOf("bloqueo"), { kind: "pending", reason: "evaluating" }, { kind: "degraded", reason: "offline" }]
+    .map((outcome) => Sereno.pageOverlay.plan(outcome).html)
+    .join("\n");
+  Sereno.ui.setAssetRoot();
+  const images = new Set([...html.matchAll(/@@\/([^"']+)/g)].map((match) => "assets/" + match[1]));
+  const script = fs.readFileSync(path.join(ROOT, "content", "content-script.js"), "utf8");
+  const styles = [...script.matchAll(/"((?:ui|content)\/[a-z-]+\.css)"/g)].map((match) => match[1]);
+
+  assert.ok(images.has("assets/logo.png") && images.has("assets/icons/alert-bad-44.svg"), "the scan sees the images");
+  assert.equal(styles.length, 3);
+  assert.deepEqual([...entry.resources].sort(), [...images, ...styles].sort());
+  entry.resources.forEach((resource) => assert.ok(exists(resource), resource + " exists"));
+  assert.ok(!entry.resources.some((resource) => /\*|\.js$/.test(resource)), "no globs and no scripts");
 });
 
-test("permissions stay as before; the content script is declared, not injected with scripting", () => {
+test("the store listing identity is final: product name, a real description, a release version", () => {
+  assert.equal(manifest.name, "Sereno");
+  assert.equal(manifest.short_name, "Sereno");
+  [manifest.name, manifest.short_name, manifest.description].forEach((text) => {
+    assert.doesNotMatch(text, /prototipo|sprint|demo|sin backend/i, text);
+  });
+  assert.equal(typeof manifest.description, "string");
+  assert.ok(manifest.description.length >= 40 && manifest.description.length <= 132, "description length " + manifest.description.length);
+  assert.match(manifest.version, /^\d+\.\d+\.\d+$/);
+  assert.notEqual(manifest.version, "0.1.0");
+});
+
+test("the minimum Chrome version covers the APIs in use", () => {
+  /* chrome.storage.session and the inert attribute need 102; the service
+     worker, chrome.action and :where() need 88 or less. */
+  assert.equal(manifest.minimum_chrome_version, "102");
+});
+
+test("extension pages get an explicit strict CSP", () => {
+  assert.deepEqual(manifest.content_security_policy, { extension_pages: "script-src 'self'; object-src 'self'" });
+});
+
+test("every icon and page the manifest names is a real file", () => {
+  const icons = Object.values(manifest.icons).concat(Object.values(manifest.action.default_icon));
+  assert.ok(icons.length >= 8);
+  icons.forEach((file) => assert.ok(exists(file), file));
+  assert.ok(exists(manifest.action.default_popup));
+  assert.ok(exists(manifest.options_page));
+});
+
+test("permissions: storage and tabs only, nothing that injects or reads page content", () => {
   assert.deepEqual(manifest.permissions, ["storage", "tabs"]);
-  assert.equal(manifest.host_permissions, undefined);
+  assert.equal(manifest.optional_permissions, undefined);
+  assert.equal(manifest.optional_host_permissions, undefined);
+});
+
+test("host_permissions follow the provider config: empty for the mock, exactly the backend origin for remote", () => {
+  assert.ok(Array.isArray(manifest.host_permissions), "the key is present so the hand-off is a one-line edit");
+  manifest.host_permissions.forEach((pattern) => {
+    assert.match(pattern, /^https:\/\/[a-z0-9.-]+(:\d+)?\/\*$/, "one https origin, no wildcard host: " + pattern);
+  });
+  if (CONFIG.provider === "remote") {
+    assert.ok(CONFIG.baseUrl.startsWith("https://"), "the backend is reached over https");
+    assert.deepEqual(manifest.host_permissions, [new URL(CONFIG.baseUrl).origin + "/*"]);
+  } else {
+    assert.deepEqual(manifest.host_permissions, []);
+  }
 });
