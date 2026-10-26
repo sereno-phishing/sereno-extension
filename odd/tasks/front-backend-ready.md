@@ -50,12 +50,13 @@ Out: the backend itself, ML, real persistence, metrics aggregation (HU-02, 06-12
 - [x] T6 Content script: in-page modal for warn/block/pending/degraded (HU-05/22/25)
 - [x] T7 UI states and a11y: degraded banner, errors, focus trap, ARIA, reduced motion
 - [x] T8 Manifest cleanup (name, permissions, host_permissions, CSP, min Chrome), README provider guide and the end-to-end swap proof
+- [x] T9 Popup fixes from first real-Chrome review (site card for every role, one model version independent of the session)
 
 ## Route declaration
 
 | Task | Route | Trigger evidence |
 |---|---|---|
-| T1-T8 | delegated direct, one writer at a time | each touches 2+ non-trivial files; audit already mapped the code (read-only explorer a77ccabee52997f4e) |
+| T1-T9 | delegated direct, one writer at a time | each touches 2+ non-trivial files; audit already mapped the code (read-only explorer a77ccabee52997f4e) |
 
 ## Progress
 
@@ -90,6 +91,12 @@ T8 done: the front end is closed locally. Nothing was loaded in real Chrome.
 - Comment-only edits to `config.js` (hand-off checklist) and `remote.js` (cross-origin and cookie note).
 - Resolution of "T8 must review": manifest identity, CSP and min Chrome done; host access decided and tested; WAR trimmed to exact files (derived by a test that renders every in-page plan); `use_dynamic_url` not applied (needs Chrome 130, would raise the minimum; the cost is that pages can fingerprint the extension); strict page CSP, `@font-face` in the shadow root, SPA `pushState` navigation, `inert`/focus checks and the screen reader pass remain manual (README checklist); README "Notas técnicas" corrected; the demo overlay stays a div on purpose.
 - Open item `protectionReason` (from T7): not solved. The popup's `protectionCard(level, reason)` already accepts a reason, but the shared state stores only `protectionLevel`, so the popup cannot say why protection is degraded. The fix needs `protection/application/navigation-service.js` (publish the reason), `verdict/domain/outcome.js` or `platform/seed.js` (state shape) and `app/popup/popup-page.js` (pass it); all outside T8's allowed surfaces. Listed in the README HU table.
+
+T9 done: two Sprint 1 inconsistencies found in the first real-Chrome review, both wrong for a backend-ready front end.
+- Site card: `popupViews.home` builds `siteCard` once and shows it signed out (plus icon legend, which stays signed-out only), for a user (inside the `tabpanel-home` wrapper, between the protection card and the model notice) and for admin (between the protection card and the admin card). One `h1`, tabpanel and live regions unchanged.
+- Model version: removed `MODEL_VERSION`, `UPDATED_MODEL_VERSION` and `modelVersion(state)` from `protection/domain/protection.js`. `isNoticeVisible(state, backendVersion)` is pure and data driven: signed in, a backend version known, and `state.lastSeenModelVersion !== backendVersion`; the legacy `modelNoticeDismissed === true` still hides it. `dismissModelNotice(store, version)` stores `lastSeenModelVersion` and resets the old flag to false. The mock backend reports the constant `Sereno.seed.modelVersion = "1.3"`; the seed starts `lastSeenModelVersion: "1.2"`, so the demo still shows the "v1.3" notice after the first login while the footer says v1.3 everywhere. `getModelVersion() -> {ok, version}`, the remote adapter and the ports are untouched. The popup asks for the version once per user (the key no longer includes the dismissed flag) and passes `App.modelVersion` when dismissing.
+- Known limit: a legacy state saved with `modelNoticeDismissed: true` keeps the notice hidden until that user dismisses again (it cannot be told which version they saw); fresh and new states behave per version.
+- README: sentence about who sees "Este sitio" and the HU-27 row corrected.
 
 ## Contracts
 
@@ -165,6 +172,14 @@ T8 (five work units):
 - `manifest.json` parses (`node -e require`) and every referenced file exists: `tests/manifest.test.js` checks content script js, web accessible resources, icons, popup and options page.
 - `rg -n "baseUrl" --glob "*.js" -l` outside tests: `platform/providers/config.js`, `platform/providers/index.js`, `platform/providers/remote.js`; `providers.config` is read outside `config.js` only by `platform/providers/index.js`.
 - Nothing was loaded in real Chrome, against a real backend or with a screen reader.
+
+T9:
+- RED: tests first (`tests/popup-site-card.test.js` 8, `tests/protection-service.test.js` 3, rewritten domain test in `tests/protection.test.js`, 2 container tests in `tests/popup-navigation.test.js`); `node --test` = 347 tests, 335 pass, 12 fail (first failure `dismissing the model notice stores the version the backend reported`).
+- Existing tests changed because session-dependent behavior was removed on purpose: `tests/providers.test.js` (mock model version 1.3 logged out), `tests/data-services.test.js` (label test with `lastSeenModelVersion`, and `loadModelVersion` returns 1.3 before and after login), `tests/popup-tabs.test.js` (stub gained `siteCard`).
+- GREEN: `node --test` = 347 tests, 347 pass, 0 fail (331 baseline + 16 new). `tests/provider-switch.test.js` and `tests/architecture.test.js` pass unchanged (mock == remote).
+- `rg -n "UPDATED_MODEL_VERSION|modelNoticeDismissed" --glob "!tests/**" .`: remaining hits are the legacy read in `protection/domain/protection.js` and the reset to false in `protection-service.js`, both intentional.
+- Nothing was exercised in real Chrome.
+- Commit: 33d11f6
 
 T8 must review (found in T6):
 - Manifest `name`/`description`, CSP, `minimum_chrome_version` (native `<dialog closedby>` is progressive; `showModal()` needs no minimum, `chrome.storage.session` needs 102).
