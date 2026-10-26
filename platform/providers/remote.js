@@ -25,7 +25,17 @@
    HTTP 504 maps to "timeout"; any other failure maps to "server".
    create({ baseUrl, timeoutMs, fetch }) never throws to its callers: a network
    failure resolves "offline"; no answer within timeoutMs aborts the request
-   and resolves "timeout". */
+   and resolves "timeout".
+
+   Requests come from the service worker and the extension pages, whose origin
+   is chrome-extension://<id>, so they are cross-origin to the backend. Either
+   list the backend origin in manifest.json host_permissions (recommended: no
+   CORS needed) or make the backend answer CORS for that origin. Session
+   cookies travel with credentials: "include"; because the extension origin is a
+   different site, the backend will normally need to set them Secure and
+   SameSite=None (browser cookie policy applies; to be confirmed with the real
+   backend).
+   Not exercised against a real backend or in real Chrome. */
 
 (function (Sereno) {
   "use strict";
