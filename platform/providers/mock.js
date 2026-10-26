@@ -4,6 +4,7 @@
    create({ store?, delayMs?, now? })
      store    state store port; defaults to Sereno.stateStore.open() on first use
      delayMs  simulated verdict latency, 0 by default (config.mockDelayMs in the app)
+     pendingHostDelayMs  latency of pendiente.localhost, 1500 ms by default
      now      () -> Date, injectable clock */
 
 (function (Sereno) {
@@ -13,6 +14,26 @@
 
   /* Verdict for domains with no scenario: a plain safe model result. */
   var FALLBACK = { status: "seguro", score: 0.05, source: "modelo", latencyMs: 142 };
+
+  /* Development aid for the mock backend stand-in: Chrome resolves *.localhost
+     to the local machine, so these hosts let every verdict kind run on a real
+     page (service worker, badge, content script) with no backend. A real
+     backend ignores them. Each entry names a scenario of
+     Sereno.demoScenarios.SCENARIOS (no duplicated data) or a special case:
+       scenario  answer with that scenario's verdict
+       slow      answer "seguro" after PENDING_HOST_DELAY_MS
+       fail      answer the normalized "server" failure (degraded, fail-open) */
+  var TEST_HOSTS = {
+    "seguro.localhost": { scenario: "seguro" },
+    "advertencia.localhost": { scenario: "advertencia" },
+    "bloqueo.localhost": { scenario: "bloqueo" },
+    "pendiente.localhost": { scenario: "seguro", slow: true },
+    "degradado.localhost": { fail: "server" }
+  };
+
+  /* Well above Sereno.verdictOutcome.PENDING_AFTER_MS (300 ms) so the
+     "Evaluación pendiente" toast shows; injectable as pendingHostDelayMs. */
+  var PENDING_HOST_DELAY_MS = 1500;
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -40,6 +61,7 @@
   function create(options) {
     var settings = options || {};
     var delayMs = settings.delayMs || 0;
+    var pendingHostDelayMs = settings.pendingHostDelayMs >= 0 ? settings.pendingHostDelayMs : PENDING_HOST_DELAY_MS;
     var now =
       settings.now ||
       function () {
@@ -82,13 +104,24 @@
       await wait(delayMs);
       var domain = domainOf(url);
       var scenarios = Sereno.demoScenarios.SCENARIOS;
+      var testHost = Object.prototype.hasOwnProperty.call(TEST_HOSTS, domain) ? TEST_HOSTS[domain] : null;
       var found = FALLBACK;
-      Object.keys(scenarios).forEach(function (name) {
-        var candidate = scenarios[name];
-        if (candidate.domain === domain && Sereno.verdict.VERDICTS.indexOf(candidate.status) >= 0) {
-          found = candidate;
+      if (testHost) {
+        if (testHost.fail) {
+          return Sereno.providers.errors.failure(testHost.fail);
         }
-      });
+        if (testHost.slow) {
+          await wait(pendingHostDelayMs);
+        }
+        found = scenarios[testHost.scenario];
+      } else {
+        Object.keys(scenarios).forEach(function (name) {
+          var candidate = scenarios[name];
+          if (candidate.domain === domain && Sereno.verdict.VERDICTS.indexOf(candidate.status) >= 0) {
+            found = candidate;
+          }
+        });
+      }
       var verdict = { ok: true, domain: domain, status: found.status, score: found.score, source: found.source, latencyMs: found.latencyMs };
       await recordVisit(verdict);
       return verdict;
@@ -234,5 +267,5 @@
     };
   }
 
-  Sereno.providers.mock = { create: create };
+  Sereno.providers.mock = { create: create, TEST_HOSTS: TEST_HOSTS, PENDING_HOST_DELAY_MS: PENDING_HOST_DELAY_MS };
 })(globalThis.Sereno = globalThis.Sereno || {});
