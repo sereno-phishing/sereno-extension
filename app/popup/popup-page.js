@@ -12,7 +12,8 @@
   var onboarding = Sereno.onboarding;
   var preferences = Sereno.preferences;
   var store = Sereno.stateStore.open();
-  // The composition root: auth goes through its port, never to an adapter.
+  // The composition root: auth, history, survey and model version go through
+  // its ports, never to an adapter.
   var services = Sereno.services;
 
   var UI_KEY = "sereno.ui.v1";
@@ -35,8 +36,19 @@
     registerError: false,
     registerErrorCode: null,
     draftUsername: "",
-    draftPassword: ""
+    draftPassword: "",
+    // Backend-owned data, as the data port returned it.
+    historyEntries: [],
+    historyLoading: false,
+    historyError: null,
+    modelVersion: null,
+    surveyError: null
   };
+
+  // What the last backend load was for, so a store change reloads only when it matters.
+  var loaded = { user: null, modelKey: null };
+  var historyRun = 0;
+  var modelRun = 0;
 
   var root = null;
 
@@ -74,8 +86,18 @@
     App.surveyIndex = 0;
   }
 
-  function persistSurvey(completed) {
-    Sereno.surveyService.saveAnswers(store, App.surveyAnswers, completed, new Date());
+  /* Sends the finished survey to the backend; a failure keeps the score on
+     screen with a message and a retry. */
+  async function submitSurvey() {
+    var hadError = !!App.surveyError;
+    App.surveyError = null;
+    var result = await Sereno.surveyService.submit(services, store, App.surveyAnswers, new Date());
+    if (!result.ok) {
+      App.surveyError = result.message;
+    }
+    if (!result.ok || hadError) {
+      render();
+    }
   }
 
   function selectAnswer(value) {
@@ -83,7 +105,7 @@
       return;
     }
     App.surveyAnswers[App.surveyIndex] = value;
-    persistSurvey(false);
+    Sereno.surveyService.saveDraft(store, App.surveyAnswers);
     render();
   }
 
@@ -93,8 +115,9 @@
     }
     if (survey.isLastQuestion(App.surveyIndex)) {
       App.view = "surveyResult";
-      persistSurvey(true);
+      App.surveyError = null;
       render();
+      submitSurvey();
       return;
     }
     App.surveyIndex += 1;
@@ -119,8 +142,8 @@
     App.registerErrorCode = null;
   }
 
-  /* Kept as promise callbacks like the rest of the container: it is the
-     style of every handler here and the popup tests rely on its timing. */
+  /* Kept as promise callbacks: the popup tests rely on this exact timing
+     (one microtask after the use case settles); an async function adds a tick. */
   function submitLogin(username, password) {
     Sereno.accountService.login(services, store, username, password, new Date()).then(function (result) {
       if (!result.ok) {
@@ -147,16 +170,83 @@
     });
   }
 
-  function clearHistoryNow() {
-    var session = App.state.session;
-    if (!session) {
+  /* ---------------- backend data (history, model version) ---------------- */
+
+  /* Sets fields on the UI model and renders only when something changed. */
+  function setData(patch) {
+    var changed = Object.keys(patch).some(function (name) {
+      return JSON.stringify(patch[name]) !== JSON.stringify(App[name]);
+    });
+    Object.assign(App, patch);
+    if (changed) {
+      render();
+    }
+  }
+
+  /* Loads the signed-in user's history through the port. silent: keep what is
+     on screen while the list refreshes (no loading state). */
+  async function loadHistory(silent) {
+    historyRun += 1;
+    var run = historyRun;
+    var session = App.state && App.state.session;
+    if (!session || account.isAdmin(session)) {
+      setData({ historyEntries: [], historyLoading: false, historyError: null });
       return;
     }
-    Sereno.historyService.clear(store, session.username).then(function () {
-      App.confirmOpen = false;
-      show("history");
-      render();
-    });
+    var showLoading = !silent && !App.historyEntries.length;
+    setData({ historyLoading: showLoading, historyError: silent ? App.historyError : null });
+    var result = await Sereno.historyService.list(services);
+    if (run !== historyRun) {
+      return;
+    }
+    if (result.ok) {
+      setData({ historyEntries: result.entries, historyLoading: false, historyError: null });
+    } else {
+      setData({ historyLoading: false, historyError: result.message });
+    }
+  }
+
+  async function loadModelVersion() {
+    modelRun += 1;
+    var run = modelRun;
+    var result = await Sereno.protectionService.loadModelVersion(services);
+    if (run === modelRun) {
+      setData({ modelVersion: result.ok ? result.version : null });
+    }
+  }
+
+  /* Reloads what depends on who is signed in, and refreshes the history while it is on screen. */
+  function syncBackendData(state) {
+    var session = state.session;
+    var user = session ? session.username : null;
+    var modelKey = user + "|" + !!state.modelNoticeDismissed;
+    if (modelKey !== loaded.modelKey) {
+      loaded.modelKey = modelKey;
+      loadModelVersion();
+    }
+    if (user !== loaded.user) {
+      loaded.user = user;
+      App.historyEntries = [];
+      loadHistory(false);
+    } else if (App.view === "history" || App.view === "detail") {
+      loadHistory(true);
+    }
+  }
+
+  async function clearHistoryNow() {
+    if (!App.state.session) {
+      return;
+    }
+    var result = await Sereno.historyService.clear(services);
+    App.confirmOpen = false;
+    if (result.ok) {
+      App.historyEntries = [];
+      App.historyError = null;
+    } else {
+      App.historyError = result.message;
+    }
+    show("history");
+    render();
   }
 
   /* ---------------- actions ---------------- */
@@ -237,7 +327,9 @@
       }
     },
     "survey-next": nextSurveyQuestion,
+    "survey-retry": submitSurvey,
     "survey-close": function () {
+      App.surveyError = null;
       show("home");
       render();
     },
@@ -247,6 +339,12 @@
       show(nextTab);
       saveUi();
       render();
+      if (nextTab === "history") {
+        loadHistory(true);
+      }
+    },
+    "retry-history": function () {
+      loadHistory(false);
     },
     filter: function (target) {
       App.historyFilter = target.getAttribute("data-filter") || history.ALL;
@@ -323,10 +421,12 @@
     document.addEventListener("keydown", onKeydown);
     store.subscribe(function (state) {
       App.state = state;
+      syncBackendData(state);
       render();
     });
     store.ready().then(function (state) {
       App.state = state;
+      syncBackendData(state);
       App.surveyAnswers = survey.draftAnswers(state.survey && state.survey.answers);
       if (!onboarding.isDone(state)) {
         App.view = "onboarding";

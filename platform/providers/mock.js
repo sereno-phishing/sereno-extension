@@ -55,6 +55,29 @@
       return store;
     }
 
+    function newHistoryId() {
+      return "h-" + now().getTime().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+
+    /* The backend records what it evaluates in the signed-in user's history;
+       anonymous visits are not kept. A failed write never fails the verdict. */
+    async function recordVisit(verdict) {
+      try {
+        await getStore().transact(function (state) {
+          var username = state.session ? state.session.username : null;
+          if (!username) {
+            return { result: null };
+          }
+          var record = Sereno.history.createRecord(verdict, newHistoryId(), Sereno.time.stamp(now()));
+          var byUser = Object.assign({}, state.history);
+          byUser[username] = Sereno.history.append(Sereno.history.entriesOf(state.history, username), record);
+          return { patch: { history: byUser }, result: null };
+        });
+      } catch (error) {
+        /* the history is a side effect of the verdict */
+      }
+    }
+
     async function evaluate(url) {
       await wait(delayMs);
       var domain = domainOf(url);
@@ -66,7 +89,9 @@
           found = candidate;
         }
       });
-      return { ok: true, domain: domain, status: found.status, score: found.score, source: found.source, latencyMs: found.latencyMs };
+      var verdict = { ok: true, domain: domain, status: found.status, score: found.score, source: found.source, latencyMs: found.latencyMs };
+      await recordVisit(verdict);
+      return verdict;
     }
 
     /* The mock plays the backend: it is the only place that checks a
@@ -134,10 +159,14 @@
     }
 
     async function deleteHistory() {
-      var state = await getStore().get();
-      if (state.session) {
-        await Sereno.historyService.clear(getStore(), state.session.username);
-      }
+      await getStore().transact(function (state) {
+        if (!state.session) {
+          return { result: null };
+        }
+        var byUser = Object.assign({}, state.history);
+        byUser[state.session.username] = [];
+        return { patch: { history: byUser }, result: null };
+      });
       return { ok: true };
     }
 
@@ -176,7 +205,10 @@
     }
 
     async function submitSurvey(answers) {
-      await Sereno.surveyService.saveAnswers(getStore(), answers, true, now());
+      var stamp = Sereno.time.stamp(now());
+      await getStore().update(function (state) {
+        return { survey: Object.assign({}, state.survey, { answers: answers.slice(), completedAt: stamp }) };
+      });
       return { ok: true };
     }
 

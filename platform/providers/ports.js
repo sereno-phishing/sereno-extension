@@ -12,12 +12,15 @@
      evaluate(url)            -> { ok, domain, status, score, source, latencyMs }
                                  status: "seguro" | "advertencia" | "bloqueo"
                                  source: "cache" | "modelo"
+                                 The backend also records the visit in the signed-in
+                                 user's history; clients never write history.
 
    auth port
-     login(username, password)    -> { ok, user: { username, role, createdAt } }
-     register(username, password) -> { ok }   (signs the new user in)
+     login(username, password)    -> { ok, user: { username, role, createdAt }, token }
+     register(username, password) -> { ok, user: { username, role, createdAt }, token }   (signs the new user in)
      logout()                     -> { ok }
-     session()                    -> { ok, session: { username, role, loginAt } | null }
+     session()                    -> { ok, session: { username, role, loginAt, token? } | null }
+     The token is opaque; the backend verifies credentials, clients never do.
 
    data port (history is scoped to the signed-in user)
      listHistory()                     -> { ok, entries: [{ id, domain, status, score, source, ts, latencyMs }] }

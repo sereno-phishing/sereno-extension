@@ -34,34 +34,8 @@ function openStore() {
   });
 }
 
-test("recordVisit appends for the signed-in user and deduplicates", async () => {
-  const store = openStore();
-  const visit = { domain: "paypal-secure-login.com", status: "advertencia", score: 0.92, source: "modelo", latencyMs: 186, ts: "2026-09-21T11:30" };
-  assert.equal(await Sereno.historyService.recordVisit(store, visit, NOW), undefined);
-  await store.set({ session: { username: "andres.torres", role: "usuario", loginAt: "2026-09-21T11:30", token: "t" } });
-  await Sereno.historyService.recordVisit(store, visit, NOW);
-  await Sereno.historyService.recordVisit(store, visit, NOW);
-  const list = (await store.get()).history["andres.torres"];
-  assert.equal(list.length, 7);
-  assert.equal(list[0].domain, "paypal-secure-login.com");
-  assert.match(list[0].id, /^h-/);
-  await Sereno.historyService.clear(store, "andres.torres");
-  assert.deepEqual((await store.get()).history["andres.torres"], []);
-});
-
-test("append stamps visits without a timestamp with the current time", async () => {
-  const store = openStore();
-  await Sereno.historyService.append(store, "ana", { domain: "a.pe", status: "seguro", score: 0.1 }, NOW);
-  assert.equal((await store.get()).history.ana[0].ts, "2026-09-21T11:30");
-});
-
-test("survey answers are saved and stamped only on completion", async () => {
-  const store = openStore();
-  await Sereno.surveyService.saveAnswers(store, [4, null], false, NOW);
-  assert.deepEqual((await store.get()).survey, { answers: [4, null], completedAt: null });
-  await Sereno.surveyService.saveAnswers(store, [4, 2], true, NOW);
-  assert.deepEqual((await store.get()).survey, { answers: [4, 2], completedAt: "2026-09-21T11:30" });
-});
+/* History, survey and model version now go through the data port: see
+   tests/data-services.test.js. */
 
 test("administration: add domain, save policies, TTL and invalidation", async () => {
   const store = openStore();

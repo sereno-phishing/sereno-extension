@@ -59,11 +59,28 @@
 
   var NO_MATCH = '<p class="filter-empty">No hay sitios con este resultado.</p>';
 
-  /* model: { tabsHtml, entries, filter } */
+  var LOADING_STATE =
+    '<div class="empty-state" role="status"><span class="empty-circle"></span>' +
+    '<p class="empty-title">Cargando tu historial...</p></div>';
+
+  /* Error text from the data port plus the retry action. */
+  function errorNotice(message) {
+    return (
+      ui.banner({ tone: "error", role: "alert", iconHtml: ui.art("bad", "16"), text: message }) +
+      ui.button({ label: "Reintentar", variant: "ghost", action: "retry-history" })
+    );
+  }
+
+  /* model: { tabsHtml, entries, filter, loading?, error? }
+     loading: the list has not arrived yet; error: Spanish text of the failure. */
   function listView(model) {
     var filtered = history.filter(model.entries, model.filter);
     var body;
-    if (!model.entries.length) {
+    if (model.error) {
+      body = errorNotice(model.error) + (model.entries.length ? '<div class="history-list">' + filtered.map(historyItem).join("") + "</div>" : "");
+    } else if (model.loading && !model.entries.length) {
+      body = LOADING_STATE;
+    } else if (!model.entries.length) {
       body = EMPTY_STATE;
     } else if (!filtered.length) {
       body = NO_MATCH;

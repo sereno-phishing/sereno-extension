@@ -57,21 +57,22 @@
     );
   }
 
-  function modelNotice() {
+  function modelNotice(version) {
     return (
       '<button type="button" class="notice-card" data-action="dismiss-notice">' + ui.art("brand", "28") +
       '<span class="notice-body">' +
-      '<span class="notice-title">Modelo actualizado a v' + protection.UPDATED_MODEL_VERSION + "</span>" +
+      '<span class="notice-title">Modelo actualizado a v' + ui.esc(version) + "</span>" +
       '<span class="notice-text">Se actualizó en el servidor. No tienes que reinstalar nada.</span>' +
       "</span></button>"
     );
   }
 
-  /* state: the shared state; the label highlights a freshly updated model. */
-  function modelVersionLabel(state) {
+  /* state: the shared state; version: what the backend reported (null while
+     unknown, then only "Modelo" shows). The label highlights a fresh update. */
+  function modelVersionLabel(state, version) {
     return (
-      '<span class="' + ui.classes(["footer-model", protection.isNoticeVisible(state) && "is-updated"]) + '">Modelo v' +
-      protection.modelVersion(state) + "</span>"
+      '<span class="' + ui.classes(["footer-model", version && protection.isNoticeVisible(state) && "is-updated"]) + '">Modelo' +
+      (version ? " v" + ui.esc(version) : "") + "</span>"
     );
   }
 

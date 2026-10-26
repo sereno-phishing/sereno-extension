@@ -7,8 +7,8 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 // Exercise the actual controller without exposing its private App state.
-async function popupHarness() {
-  const state = { session: null, accounts: [], survey: { answers: [] }, history: {} };
+async function popupHarness(extra = {}) {
+  const state = { session: null, accounts: [], survey: { answers: [] }, history: {}, ...(extra.state || {}) };
   const originalState = structuredClone(state);
   const renders = [];
   const calls = [];
@@ -34,6 +34,9 @@ async function popupHarness() {
       }
     }) },
     time: { stamp: () => { calls.push(["completedAt"]); return "completed"; } },
+    services: extra.services || {},
+    historyService: extra.historyService || { list: async () => ({ ok: true, entries: [] }), clear: async () => ({ ok: true }) },
+    protectionService: extra.protectionService || { loadModelVersion: async () => ({ ok: true, version: "1.2" }) },
     accountService: {
       login: () => { calls.push(["login"]); return Promise.resolve({ ok: false }); },
       register: () => { calls.push(["register"]); return Promise.resolve({ ok: false }); }
@@ -48,7 +51,7 @@ async function popupHarness() {
     Sereno,
     document: { getElementById: () => root, addEventListener: () => {} }
   });
-  for (const file of ["survey/domain/sus.js", "survey/application/survey-service.js"]) {
+  for (const file of ["platform/providers/errors.js", "survey/domain/sus.js", "survey/application/survey-service.js"]) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, "..", file), "utf8"), context);
   }
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../app/popup/popup-page.js"), "utf8"), context);
@@ -147,3 +150,60 @@ for (const kind of ["login", "register"]) {
     assert.deepEqual(popup.state, popup.originalState);
   });
 }
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+const USER = { username: "ana", role: "usuario" };
+
+test("a signed-in popup loads history and model version through the ports", async () => {
+  const entries = [{ id: "h-1", domain: "a.pe", status: "seguro", score: 0.1, source: "modelo", ts: "2026-09-21T10:00", latencyMs: 10 }];
+  const popup = await popupHarness({
+    state: { session: USER },
+    historyService: { list: async () => ({ ok: true, entries }), clear: async () => ({ ok: true }) },
+    protectionService: { loadModelVersion: async () => ({ ok: true, version: "2.0" }) }
+  });
+  await settle();
+  const model = popup.renders.at(-1);
+  assert.deepEqual(model.historyEntries, entries);
+  assert.equal(model.historyLoading, false);
+  assert.equal(model.historyError, null);
+  assert.equal(model.modelVersion, "2.0");
+});
+
+test("a failing history load shows its message and retry reloads it", async () => {
+  let fail = true;
+  const popup = await popupHarness({
+    state: { session: USER },
+    historyService: {
+      list: async () => (fail ? { ok: false, error: "offline", message: "Sin conexión." } : { ok: true, entries: [] }),
+      clear: async () => ({ ok: true })
+    }
+  });
+  await settle();
+  assert.equal(popup.renders.at(-1).historyError, "Sin conexión.");
+  fail = false;
+  popup.actions["retry-history"]();
+  await settle();
+  assert.equal(popup.renders.at(-1).historyError, null);
+});
+
+test("a failed survey submission keeps the result on screen with a message and can be retried", async () => {
+  let offline = true;
+  const popup = await popupHarness({
+    services: { data: { submitSurvey: async () => (offline ? { ok: false, error: "offline" } : { ok: true }) } }
+  });
+  popup.actions["open-survey"]();
+  for (let step = 0; step < 10; step += 1) {
+    popup.actions.answer({ getAttribute: () => "3" });
+    popup.actions["survey-next"]();
+  }
+  await settle();
+  const failed = popup.renders.at(-1);
+  assert.equal(failed.view, "surveyResult");
+  assert.match(failed.surveyError, /Sin conexión/);
+  assert.equal(popup.state.survey.completedAt, undefined);
+  offline = false;
+  popup.actions["survey-retry"]();
+  await settle();
+  assert.equal(popup.renders.at(-1).surveyError, null);
+  assert.equal(popup.state.survey.completedAt, "completed");
+});

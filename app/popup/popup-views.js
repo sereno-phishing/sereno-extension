@@ -30,11 +30,11 @@
     return '<header class="app-header">' + left + '<div class="header-slot">' + slot + "</div></header>";
   }
 
-  function footer(state) {
+  function footer(state, model) {
     return (
       '<footer class="app-footer">' +
       '<button type="button" class="footer-link" data-action="open-privacy">Política de privacidad</button>' +
-      protectionUi.modelVersionLabel(state) + "</footer>"
+      protectionUi.modelVersionLabel(state, model.modelVersion) + "</footer>"
     );
   }
 
@@ -63,8 +63,9 @@
     );
   }
 
-  function noticeIfVisible(state) {
-    return Sereno.protection.isNoticeVisible(state) ? protectionUi.modelNotice() : "";
+  /* The notice names the model version the backend reported; without it there is nothing to announce. */
+  function noticeIfVisible(state, model) {
+    return model.modelVersion && Sereno.protection.isNoticeVisible(state) ? protectionUi.modelNotice(model.modelVersion) : "";
   }
 
   /* "degraded" when the verdict backend is down (HU-26), otherwise "active". */
@@ -92,15 +93,16 @@
           "</div>"
       );
     } else if (admin) {
-      parts.push(adminEntryCard(), noticeIfVisible(state));
+      parts.push(adminEntryCard(), noticeIfVisible(state, model));
     } else {
-      parts.push(noticeIfVisible(state));
+      parts.push(noticeIfVisible(state, model));
     }
     return '<section class="' + ui.classes(["view", "view-home", admin && "view-home-admin"]) + '">' + parts.join("") + "</section>";
   }
 
-  function userEntries(state) {
-    return history.entriesOf(state.history, state.session && state.session.username);
+  /* The signed-in user's history as the data port returned it (see the popup container). */
+  function userEntries(model) {
+    return model.historyEntries || [];
   }
 
   function content(model, state) {
@@ -112,13 +114,19 @@
       case "register":
         return accountUi.registerView({ error: model.registerError, errorCode: model.registerErrorCode, username: model.draftUsername, password: model.draftPassword });
       case "history":
-        return historyUi.listView({ tabsHtml: tabs(false, model.tabSlide), entries: userEntries(state), filter: model.historyFilter });
+        return historyUi.listView({
+          tabsHtml: tabs(false, model.tabSlide),
+          entries: userEntries(model),
+          filter: model.historyFilter,
+          loading: model.historyLoading,
+          error: model.historyError
+        });
       case "detail":
-        return historyUi.detailView(history.findById(userEntries(state), model.detailId));
+        return historyUi.detailView(history.findById(userEntries(model), model.detailId));
       case "survey":
         return surveyUi.questionView({ index: model.surveyIndex, selected: model.surveyAnswers[model.surveyIndex] });
       case "surveyResult":
-        return surveyUi.resultView(survey.score(model.surveyAnswers));
+        return surveyUi.resultView(survey.score(model.surveyAnswers), { error: model.surveyError });
       default:
         return home(state, model);
     }
@@ -129,7 +137,7 @@
     return (
       header(model, state) +
       '<main class="app-content" id="content">' + content(model, state) + "</main>" +
-      footer(state) +
+      footer(state, model) +
       (model.menuOpen && state.session ? accountUi.accountMenu(state.session) : "") +
       (model.confirmOpen ? historyUi.clearConfirm() : "")
     );

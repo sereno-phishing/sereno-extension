@@ -45,13 +45,19 @@
     );
   }
 
-  /* result: survey.score() output. */
-  function resultView(result) {
+  /* result: survey.score() output; options.error: Spanish text when the
+     submission failed (the score still shows, the user can retry). */
+  function resultView(result, options) {
+    var error = options && options.error;
     return (
       '<section class="view view-survey-result"><div class="sus-result">' +
       '<div class="sus-score">' + result.score + " / 100</div>" +
       '<div class="sus-band sus-band-' + result.bandId + '">' + ui.esc(result.band) + "</div>" +
       '<p class="sus-note">' + ANONYMOUS + "</p>" +
+      (error
+        ? ui.banner({ tone: "error", role: "alert", iconHtml: ui.art("bad", "16"), text: error }) +
+          ui.button({ label: "Reintentar", variant: "ghost", action: "survey-retry" })
+        : "") +
       ui.button({ label: "Cerrar", variant: "primary", cls: "sus-close", action: "survey-close" }) +
       "</div></section>"
     );
