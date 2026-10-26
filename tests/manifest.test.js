@@ -1,8 +1,8 @@
 "use strict";
 
 /* Manifest sanity: what Chrome and the store reviewer read. Every referenced
-   file exists, the content script list is in dependency order, only the files
-   the in-page UI really loads are exposed, and host_permissions follow the
+   file exists, the content script list is in dependency order, nothing is exposed to
+   web pages, and host_permissions follow the
    provider config (the third touch point of a backend hand-off). */
 
 const test = require("node:test");
@@ -56,35 +56,22 @@ test("the content script never loads the provider seam, the services or any page
   });
 });
 
-test("web accessible resources are exactly the files the in-page UI loads, for web pages only", () => {
-  assert.equal(manifest.web_accessible_resources.length, 1);
-  const entry = manifest.web_accessible_resources[0];
-  assert.deepEqual(entry.matches, ["http://*/*", "https://*/*"]);
+test("nothing is exposed to web pages: no web_accessible_resources, so a page cannot probe or load extension files", () => {
+  assert.equal(manifest.web_accessible_resources, undefined);
+});
 
-  const Sereno = load(
-    "time/domain/time.js",
-    "verdict/domain/verdict.js",
-    "verdict/domain/outcome.js",
-    "ui/atoms.js",
-    "verdict/ui/verdict-ui.js",
-    "demo-store/ui/verdict-modal.js",
-    "verdict/ui/page-overlay.js"
-  );
-  Sereno.ui.setAssetRoot("@@/");
-  const verdictOf = (status) => ({ kind: "verdict", verdict: { domain: "a.pe", status, score: 0.9, source: "modelo", latencyMs: 1 } });
-  const html = [verdictOf("advertencia"), verdictOf("bloqueo"), { kind: "pending", reason: "evaluating" }, { kind: "degraded", reason: "offline" }]
-    .map((outcome) => Sereno.pageOverlay.plan(outcome).html)
-    .join("\n");
-  Sereno.ui.setAssetRoot();
-  const images = new Set([...html.matchAll(/@@\/([^"']+)/g)].map((match) => "assets/" + match[1]));
+test("the generated assets load after the icon atoms and before the container that reads them", () => {
+  const js = manifest.content_scripts[0].js;
+  const generated = js.indexOf("content/content-assets.generated.js");
+  assert.ok(generated >= 0, "the bundle is listed");
+  assert.ok(js.indexOf("ui/atoms.js") < generated);
+  assert.ok(generated < js.indexOf("content/content-script.js"));
+  assert.equal(manifest.content_scripts[0].css, undefined, "styles come from the bundle, not from the manifest");
+});
+
+test("the content script and the views it loads never name an extension URL or the stylesheet files", () => {
   const script = fs.readFileSync(path.join(ROOT, "content", "content-script.js"), "utf8");
-  const styles = [...script.matchAll(/"((?:ui|content)\/[a-z-]+\.css)"/g)].map((match) => match[1]);
-
-  assert.ok(images.has("assets/logo.png") && images.has("assets/icons/alert-bad-44.svg"), "the scan sees the images");
-  assert.equal(styles.length, 3);
-  assert.deepEqual([...entry.resources].sort(), [...images, ...styles].sort());
-  entry.resources.forEach((resource) => assert.ok(exists(resource), resource + " exists"));
-  assert.ok(!entry.resources.some((resource) => /\*|\.js$/.test(resource)), "no globs and no scripts");
+  assert.doesNotMatch(script.replace(/\/\*[\s\S]*?\*\//g, ""), /assetUrl|chrome-extension|\.css"|createElement\("link"\)|getURL/);
 });
 
 test("the store listing identity is final: product name, a real description, a release version", () => {
