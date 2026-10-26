@@ -11,6 +11,8 @@
   var scenarios = Sereno.demoScenarios;
   var verdictModal = Sereno.verdictModal;
   var store = Sereno.stateStore.open();
+  // The composition root: the provider evaluates the sites and keeps the history.
+  var services = Sereno.services;
 
   var EVAL_MS = 700;
   var TOOLTIP_MS = 3000;
@@ -94,6 +96,17 @@
     }
   }
 
+  /* The demo overlay is a div, not a native <dialog>, so the page behind it is
+     made inert by hand, focus moves into the card and returns afterwards. */
+  var openKey = null;
+  var opener = null;
+
+  function setBackgroundInert(inert) {
+    Array.prototype.slice.call(document.querySelectorAll("main, .store-page")).forEach(function (node) {
+      node.inert = inert;
+    });
+  }
+
   function openModal(key) {
     var stamp = byId(key + "-stamp");
     if (stamp) {
@@ -102,7 +115,14 @@
     setDetail(key, false);
     var overlay = byId(key + "-overlay");
     if (overlay) {
+      opener = document.activeElement;
       overlay.hidden = false;
+      openKey = key;
+      setBackgroundInert(true);
+      var first = overlay.querySelector(".verdict-btn");
+      if (first) {
+        first.focus();
+      }
     }
   }
 
@@ -113,6 +133,26 @@
         overlay.hidden = true;
       }
     });
+    if (openKey) {
+      openKey = null;
+      setBackgroundInert(false);
+      if (opener && typeof opener.focus === "function") {
+        opener.focus();
+      }
+      opener = null;
+    }
+  }
+
+  /* Tab stays inside the open card; Esc dismisses a warning like "Volver" and never a block. */
+  function onKeydown(event) {
+    if (!openKey) {
+      return;
+    }
+    if (event.key === "Tab") {
+      Sereno.ui.trapTab(event, byId(openKey + "-overlay"));
+    } else if (event.key === "Escape" && verdictModal.isClosable(openKey === "warning" ? "advertencia" : "bloqueo")) {
+      resetToSafe();
+    }
   }
 
   function showFeedback(scenario) {
@@ -138,42 +178,37 @@
 
   /* ---------------- scenario runner ---------------- */
 
-  function runScenario(name) {
+  /* A recorded scenario is evaluated through the verdict port, which also
+     records the visit in the signed-in user's history (so popup and admin
+     stay in sync); a pending one has no verdict and just waits. The scenario
+     data drives the screen either way. */
+  async function runScenario(name) {
     var scenario = scenarios.find(name);
     if (!scenario) {
-      return Promise.resolve(false);
+      return false;
     }
     var token = runToken + 1;
     runToken = token;
     hideFeedback();
 
-    return Sereno.protectionService.showSite(store, Sereno.protection.evaluatingSite(scenario.domain, nowStamp()))
-      .then(function () {
-        return wait(EVAL_MS);
-      })
-      .then(function () {
-        if (token !== runToken) {
-          return false;
-        }
-        return Sereno.protectionService.showSite(store, scenarios.siteOf(scenario, nowStamp()))
-          .then(function () {
-            return applyBadge(scenario);
-          })
-          .then(function () {
-            showFeedback(scenario);
-            if (!scenarios.isRecorded(scenario)) {
-              return undefined;
-            }
-            return Sereno.historyService.recordVisit(store, scenarios.visitOf(scenario, nowStamp()), new Date());
-          })
-          .then(function () {
-            return true;
-          });
-      })
-      .catch(function () {
-        /* prototype: a storage hiccup must not break the demo */
+    try {
+      await Sereno.protectionService.showSite(store, Sereno.protection.evaluatingSite(scenario.domain, nowStamp()));
+      if (scenarios.isRecorded(scenario)) {
+        await services.verdict.evaluate("https://" + scenario.domain + "/");
+      } else {
+        await wait(EVAL_MS);
+      }
+      if (token !== runToken) {
         return false;
-      });
+      }
+      await Sereno.protectionService.showSite(store, scenarios.siteOf(scenario, nowStamp()));
+      await applyBadge(scenario);
+      showFeedback(scenario);
+      return true;
+    } catch (error) {
+      /* prototype: a storage hiccup must not break the demo */
+      return false;
+    }
   }
 
   /* Volver / Volver a un sitio seguro: close the verdict and reset the
@@ -210,6 +245,7 @@
     mountModals();
     Sereno.ui.delegateClicks(document, "data-scenario", runScenario);
     Sereno.ui.delegateActions(document, ACTIONS);
+    document.addEventListener("keydown", onKeydown);
   }
 
   Sereno.ui.onReady(init);

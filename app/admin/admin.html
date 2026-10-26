@@ -7,11 +7,19 @@
   <link rel="stylesheet" href="admin.css">
 </head>
 <body>
-  <div id="app" class="options-shell" aria-live="polite"></div>
+  <div id="app" class="options-shell">
+    <div class="card panel-status" role="status">Cargando el panel...</div>
+  </div>
   <script src="../../platform/storage.js"></script>
   <script src="../../platform/seed.js"></script>
   <script src="../../platform/state-store.js"></script>
   <script src="../../platform/browser.js"></script>
+  <script src="../../platform/providers/config.js"></script>
+  <script src="../../platform/providers/ports.js"></script>
+  <script src="../../platform/providers/errors.js"></script>
+  <script src="../../platform/providers/mock.js"></script>
+  <script src="../../platform/providers/remote.js"></script>
+  <script src="../../platform/providers/index.js"></script>
   <script src="../../time/domain/time.js"></script>
   <script src="../../verdict/domain/verdict.js"></script>
   <script src="../../account/domain/account.js"></script>

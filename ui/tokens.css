@@ -10,15 +10,16 @@
   src: url("../assets/fonts/inter-latin-wght-normal.woff2") format("woff2");
 }
 
-:root {
+:root,
+:host {
   --indigo-600: #4F46E5;
   --indigo-700: #4338CA;
   --indigo-100: #E0E7FF;
   --indigo-50: #EEF2FF;
 
   --ink: #0F172A;
-  --muted: #64748B;
-  --subtle: #94A3B8;
+  --muted: #5B6A80;
+  --subtle: #606F85;
   --line: #E2E8F0;
   --bg: #FFFFFF;
   --page: #F7F8FA;
@@ -60,6 +61,14 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* One visible focus ring for every interactive element. Components that
+   draw their own ring (verdict modal, content script) keep it; none may
+   remove the outline without replacing it. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--indigo-600);
+  outline-offset: 2px;
 }
 
 /* ---------- Buttons ---------- */
@@ -164,12 +173,12 @@
 }
 
 .chip-seguro {
-  background: var(--green-600);
+  background: var(--green-700);
   color: #FFFFFF;
 }
 
 .chip-advertencia {
-  background: var(--amber-600);
+  background: var(--amber-700);
   color: #FFFFFF;
 }
 
@@ -235,11 +244,10 @@
 }
 
 .input::placeholder {
-  color: #9CA3AF;
+  color: var(--subtle);
 }
 
 .input:focus {
-  outline: none;
   border-color: var(--indigo-600);
   box-shadow: 0 0 0 3px var(--indigo-100);
 }
@@ -375,4 +383,49 @@
 .footnote {
   font-size: 11px;
   color: var(--muted);
+}
+
+/* ---------- Accessibility helpers ---------- */
+
+/* Text for assistive technology only (names of tables, steps, headings). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Skip link: off screen until it receives keyboard focus. */
+.skip-link {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--dark);
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+/* A tab panel adds semantics, not a box: its children stay items of the view. */
+.tab-panel {
+  display: contents;
+}
+
+/* Regions focused by a skip link or a script do not need a ring of their own. */
+[tabindex="-1"]:focus {
+  outline: none;
 }

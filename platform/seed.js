@@ -40,7 +40,7 @@
       { domain: "banco-verifica-cuenta.com", policy: "bloqueo", updatedAt: "2026-09-19" }
     ],
     survey: { answers: [], completedAt: null },
-    modelNoticeDismissed: false,
+    lastSeenModelVersion: "1.2",
     cache: {
       ttlPhishingDays: 7,
       ttlLegitHours: 24,
@@ -134,6 +134,8 @@
 
   Sereno.seed = {
     defaultState: DEFAULT_STATE,
+    /* The model version the mock backend reports, the same for everyone. */
+    modelVersion: "1.3",
     metrics: METRICS
   };
 })(globalThis.Sereno = globalThis.Sereno || {});

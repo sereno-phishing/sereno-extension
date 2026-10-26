@@ -1,0 +1,166 @@
+/* Platform · remote adapter: implements the verdict, auth and data ports over
+   HTTP+JSON. Classic script that registers Sereno.providers.remote.
+
+   BACKEND CONTRACT (all paths under config.baseUrl, JSON bodies, cookies sent
+   with credentials: "include"; 2xx bodies are exactly the port results without
+   "ok", which this adapter adds):
+     POST   /v1/verdict              { url }                            -> { domain, status, score, source, latencyMs }
+                                     (also records the visit in the signed-in user's history)
+     POST   /v1/auth/login           { username, password }             -> { user, token }  401 { error: "invalid" }
+     POST   /v1/auth/register        { username, password }             -> { user, token }  409 { error: "duplicate" }, 400 { error: "invalid" }
+     POST   /v1/auth/logout          {}                                 -> {}
+     GET    /v1/auth/session                                            -> { session }      (null when signed out)
+     GET    /v1/history                                                 -> { entries }
+     DELETE /v1/history                                                 -> {}
+     GET    /v1/domains                                                 -> { domains }
+     PUT    /v1/domains              { domains }                        -> {}
+     GET    /v1/cache                                                   -> { cache }
+     PUT    /v1/cache/ttl            { ttlPhishingDays, ttlLegitHours } -> { cache }
+     POST   /v1/cache/invalidations  { domain }                         -> { cache }
+     GET    /v1/metrics                                                 -> { metrics }
+     GET    /v1/model                                                   -> { version }
+     POST   /v1/survey               { answers }                        -> {}
+   Errors: a non-2xx body { error } with a known code is passed through
+   ("invalid", "duplicate", "cache_down", "timeout", "offline", "server");
+   HTTP 504 maps to "timeout"; any other failure maps to "server".
+   create({ baseUrl, timeoutMs, fetch }) never throws to its callers: a network
+   failure resolves "offline"; no answer within timeoutMs aborts the request
+   and resolves "timeout".
+
+   Requests come from the service worker and the extension pages, whose origin
+   is chrome-extension://<id>, so they are cross-origin to the backend. Either
+   list the backend origin in manifest.json host_permissions (recommended: no
+   CORS needed) or make the backend answer CORS for that origin. Session
+   cookies travel with credentials: "include"; because the extension origin is a
+   different site, the backend will normally need to set them Secure and
+   SameSite=None (browser cookie policy applies; to be confirmed with the real
+   backend).
+   Not exercised against a real backend or in real Chrome. */
+
+(function (Sereno) {
+  "use strict";
+
+  Sereno.providers = Sereno.providers || {};
+
+  var KNOWN_ERRORS = ["invalid", "duplicate", "cache_down", "timeout", "offline", "server"];
+  var DEFAULT_TIMEOUT_MS = 4000;
+
+  function failure(error) {
+    return { ok: false, error: error };
+  }
+
+  function errorOf(status, body) {
+    if (status === 504) {
+      return "timeout";
+    }
+    var code = body && typeof body === "object" ? body.error : null;
+    return KNOWN_ERRORS.indexOf(code) >= 0 ? code : "server";
+  }
+
+  function create(options) {
+    var settings = options || {};
+    var baseUrl = String(settings.baseUrl || "").replace(/\/+$/, "");
+    var timeoutMs = settings.timeoutMs > 0 ? settings.timeoutMs : DEFAULT_TIMEOUT_MS;
+    var fetchImpl =
+      settings.fetch ||
+      function () {
+        return globalThis.fetch.apply(globalThis, arguments);
+      };
+
+    async function request(method, path, payload) {
+      var controller = new AbortController();
+      var timedOut = false;
+      var timer = setTimeout(function () {
+        timedOut = true;
+        controller.abort();
+      }, timeoutMs);
+      try {
+        var init = {
+          method: method,
+          credentials: "include",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          signal: controller.signal
+        };
+        if (payload !== undefined) {
+          init.body = JSON.stringify(payload);
+        }
+        var response = await fetchImpl(baseUrl + path, init);
+        var body = {};
+        if (response.status !== 204) {
+          try {
+            body = await response.json();
+          } catch (error) {
+            return failure(timedOut ? "timeout" : "server");
+          }
+        }
+        if (!response.ok) {
+          return failure(errorOf(response.status, body));
+        }
+        return Object.assign({ ok: true }, body);
+      } catch (error) {
+        if (timedOut || (error && error.name === "AbortError")) {
+          return failure("timeout");
+        }
+        return failure("offline");
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    return {
+      verdict: {
+        evaluate: function (url) {
+          return request("POST", "/v1/verdict", { url: url });
+        }
+      },
+      auth: {
+        login: function (username, password) {
+          return request("POST", "/v1/auth/login", { username: username, password: password });
+        },
+        register: function (username, password) {
+          return request("POST", "/v1/auth/register", { username: username, password: password });
+        },
+        logout: function () {
+          return request("POST", "/v1/auth/logout", {});
+        },
+        session: function () {
+          return request("GET", "/v1/auth/session");
+        }
+      },
+      data: {
+        listHistory: function () {
+          return request("GET", "/v1/history");
+        },
+        deleteHistory: function () {
+          return request("DELETE", "/v1/history");
+        },
+        getDomainPolicies: function () {
+          return request("GET", "/v1/domains");
+        },
+        putDomainPolicies: function (domains) {
+          return request("PUT", "/v1/domains", { domains: domains });
+        },
+        getCache: function () {
+          return request("GET", "/v1/cache");
+        },
+        setCacheTtl: function (phishingDays, legitHours) {
+          return request("PUT", "/v1/cache/ttl", { ttlPhishingDays: phishingDays, ttlLegitHours: legitHours });
+        },
+        invalidateCache: function (domain) {
+          return request("POST", "/v1/cache/invalidations", { domain: domain });
+        },
+        getMetrics: function () {
+          return request("GET", "/v1/metrics");
+        },
+        getModelVersion: function () {
+          return request("GET", "/v1/model");
+        },
+        submitSurvey: function (answers) {
+          return request("POST", "/v1/survey", { answers: answers });
+        }
+      }
+    };
+  }
+
+  Sereno.providers.remote = { create: create };
+})(globalThis.Sereno = globalThis.Sereno || {});

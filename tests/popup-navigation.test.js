@@ -5,18 +5,26 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
+const { load } = require("./load");
+
+const realUi = load("ui/atoms.js", "ui/dom.js").ui;
 
 // Exercise the actual controller without exposing its private App state.
-async function popupHarness() {
-  const state = { session: null, accounts: [], survey: { answers: [] }, history: {} };
+async function popupHarness(extra = {}) {
+  const state = { session: null, accounts: [], survey: { answers: [] }, history: {}, ...(extra.state || {}) };
   const originalState = structuredClone(state);
   const renders = [];
+  const focused = [];
+  const trapped = [];
   const calls = [];
   const listeners = {};
+  const documentListeners = {};
   let actions;
   const root = {
     innerHTML: "",
-    addEventListener: (name, handler) => { listeners[name] = handler; }
+    addEventListener: (name, handler) => { listeners[name] = handler; },
+    querySelector: (selector) => { focused.push(selector); return { focus: () => {} }; },
+    querySelectorAll: () => extra.items || []
   };
   const Sereno = {
     account: { isAdmin: () => false },
@@ -34,26 +42,33 @@ async function popupHarness() {
       }
     }) },
     time: { stamp: () => { calls.push(["completedAt"]); return "completed"; } },
+    services: extra.services || {},
+    historyService: extra.historyService || { list: async () => ({ ok: true, entries: [] }), clear: async () => ({ ok: true }) },
+    protectionService: extra.protectionService || { loadModelVersion: async () => ({ ok: true, version: "1.2" }) },
     accountService: {
       login: () => { calls.push(["login"]); return Promise.resolve({ ok: false }); },
-      register: () => { calls.push(["register"]); return Promise.resolve({ ok: false }); }
+      register: () => { calls.push(["register"]); return Promise.resolve({ ok: false }); },
+      ...(extra.accountService || {})
     },
     popupViews: { page: (model) => { renders.push({ ...model, surveyAnswers: [...model.surveyAnswers] }); return model.view; } },
     ui: {
+      captureFocus: () => () => {},
+      rovingIndex: realUi.rovingIndex,
+      trapTab: (...args) => { trapped.push(args); },
       delegateActions: (_root, handlers) => { actions = handlers; },
       onReady: (init) => init()
     }
   };
   const context = vm.createContext({
     Sereno,
-    document: { getElementById: () => root, addEventListener: () => {} }
+    document: { getElementById: () => root, addEventListener: (name, handler) => { documentListeners[name] = handler; } }
   });
-  for (const file of ["survey/domain/sus.js", "survey/application/survey-service.js"]) {
+  for (const file of ["platform/providers/errors.js", "survey/domain/sus.js", "survey/application/survey-service.js"]) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, "..", file), "utf8"), context);
   }
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../app/popup/popup-page.js"), "utf8"), context);
   await Promise.resolve();
-  return { actions, listeners, state, originalState, calls, renders, root };
+  return { actions, listeners, documentListeners, focused, trapped, state, originalState, calls, renders, root };
 }
 
 test("tab sliding runs once per real tab change, not on initial render, repeat clicks or redraws", async () => {
@@ -147,3 +162,174 @@ for (const kind of ["login", "register"]) {
     assert.deepEqual(popup.state, popup.originalState);
   });
 }
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+const USER = { username: "ana", role: "usuario" };
+
+test("a signed-in popup loads history and model version through the ports", async () => {
+  const entries = [{ id: "h-1", domain: "a.pe", status: "seguro", score: 0.1, source: "modelo", ts: "2026-09-21T10:00", latencyMs: 10 }];
+  const popup = await popupHarness({
+    state: { session: USER },
+    historyService: { list: async () => ({ ok: true, entries }), clear: async () => ({ ok: true }) },
+    protectionService: { loadModelVersion: async () => ({ ok: true, version: "2.0" }) }
+  });
+  await settle();
+  const model = popup.renders.at(-1);
+  assert.deepEqual(model.historyEntries, entries);
+  assert.equal(model.historyLoading, false);
+  assert.equal(model.historyError, null);
+  assert.equal(model.modelVersion, "2.0");
+});
+
+test("a failing history load shows its message and retry reloads it", async () => {
+  let fail = true;
+  const popup = await popupHarness({
+    state: { session: USER },
+    historyService: {
+      list: async () => (fail ? { ok: false, error: "offline", message: "Sin conexión." } : { ok: true, entries: [] }),
+      clear: async () => ({ ok: true })
+    }
+  });
+  await settle();
+  assert.equal(popup.renders.at(-1).historyError, "Sin conexión.");
+  fail = false;
+  popup.actions["retry-history"]();
+  await settle();
+  assert.equal(popup.renders.at(-1).historyError, null);
+});
+
+test("a failed survey submission keeps the result on screen with a message and can be retried", async () => {
+  let offline = true;
+  const popup = await popupHarness({
+    services: { data: { submitSurvey: async () => (offline ? { ok: false, error: "offline" } : { ok: true }) } }
+  });
+  popup.actions["open-survey"]();
+  for (let step = 0; step < 10; step += 1) {
+    popup.actions.answer({ getAttribute: () => "3" });
+    popup.actions["survey-next"]();
+  }
+  await settle();
+  const failed = popup.renders.at(-1);
+  assert.equal(failed.view, "surveyResult");
+  assert.match(failed.surveyError, /Sin conexión/);
+  assert.equal(popup.state.survey.completedAt, undefined);
+  offline = false;
+  popup.actions["survey-retry"]();
+  await settle();
+  assert.equal(popup.renders.at(-1).surveyError, null);
+  assert.equal(popup.state.survey.completedAt, "completed");
+});
+
+test("boot renders at once and then refreshes the session through the auth port", async () => {
+  const seen = [];
+  const popup = await popupHarness({
+    state: { session: { username: "ana", role: "user" } },
+    accountService: { currentSession: async (services, store) => { seen.push([services, store]); return { ok: true, session: { username: "ana", role: "user" }, verified: true }; } }
+  });
+  assert.equal(popup.root.innerHTML, "home", "the first view does not wait for the backend");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(seen.length, 1);
+  assert.ok(seen[0][1] && typeof seen[0][1].update === "function", "the store is passed to the service");
+  assert.ok(popup.renders.every((model) => !model.sessionOffline));
+});
+
+test("an unreachable backend keeps the local session and shows a notice instead of blocking", async () => {
+  const popup = await popupHarness({
+    state: { session: { username: "ana", role: "user" } },
+    accountService: { currentSession: async () => ({ ok: true, session: { username: "ana", role: "user" }, verified: false }) }
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(popup.renders.at(-1).sessionOffline, true);
+  assert.equal(popup.state.session.username, "ana");
+  assert.equal(popup.root.innerHTML, "home");
+});
+
+test("a failing session refresh never throws and leaves the popup usable", async () => {
+  for (const currentSession of [async () => { throw new Error("boom"); }, async () => ({ ok: false, error: "server" }), undefined]) {
+    const popup = await popupHarness({
+      state: { session: { username: "ana", role: "user" } },
+      accountService: { currentSession }
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(popup.root.innerHTML, "home");
+  }
+});
+
+test("retry-session asks again and clears the notice when the backend answers", async () => {
+  let answer = { ok: true, session: { username: "ana", role: "user" }, verified: false };
+  const popup = await popupHarness({
+    state: { session: { username: "ana", role: "user" } },
+    accountService: { currentSession: async () => answer }
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(popup.renders.at(-1).sessionOffline, true);
+  answer = { ok: true, session: { username: "ana", role: "user" }, verified: true };
+  popup.actions["retry-session"]();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(popup.renders.at(-1).sessionOffline, false);
+});
+
+test("arrow keys on a tab activate the neighbouring tab and move focus to it", async () => {
+  const home = { getAttribute: () => "home" };
+  const history = { getAttribute: () => "history" };
+  const popup = await popupHarness({ items: [home, history] });
+  let prevented = false;
+  popup.documentListeners.keydown({ key: "ArrowRight", target: home, preventDefault: () => { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(popup.renders.at(-1).view, "history");
+  assert.equal(popup.focused.at(-1), '[role="tab"][data-tab="history"]');
+  popup.documentListeners.keydown({ key: "Home", target: history, preventDefault: () => {} });
+  assert.equal(popup.renders.at(-1).view, "home");
+});
+
+test("Escape closes the confirmation and returns focus to the control that opened it", async () => {
+  const popup = await popupHarness();
+  popup.actions["confirm-clear"]();
+  assert.equal(popup.renders.at(-1).confirmOpen, true);
+  assert.equal(popup.focused.at(-1), '[data-action="cancel-clear"]');
+  popup.documentListeners.keydown({ key: "Escape", target: {} });
+  assert.equal(popup.renders.at(-1).confirmOpen, false);
+  assert.equal(popup.focused.at(-1), '[data-action="confirm-clear"]');
+});
+
+test("Tab is trapped inside the open confirmation and the menu returns focus on Escape", async () => {
+  const popup = await popupHarness();
+  popup.actions["confirm-clear"]();
+  popup.documentListeners.keydown({ key: "Tab", target: {} });
+  assert.equal(popup.trapped.length, 1);
+  popup.actions["cancel-clear"]();
+  popup.actions["toggle-menu"]();
+  assert.equal(popup.focused.at(-1), ".menu-item");
+  popup.documentListeners.keydown({ key: "Escape", target: {} });
+  assert.equal(popup.renders.at(-1).menuOpen, false);
+  assert.equal(popup.focused.at(-1), '[data-action="toggle-menu"]');
+});
+
+test("dismissing the model notice stores the version the backend reported", async () => {
+  const dismissed = [];
+  const popup = await popupHarness({
+    state: { session: USER },
+    protectionService: {
+      loadModelVersion: async () => ({ ok: true, version: "2.0" }),
+      dismissModelNotice: (store, version) => { dismissed.push(version); }
+    }
+  });
+  await settle();
+  popup.actions["dismiss-notice"]();
+  assert.deepEqual(dismissed, ["2.0"]);
+});
+
+test("the model version is loaded once per user, not again when the notice is dismissed", async () => {
+  let loads = 0;
+  const popup = await popupHarness({
+    state: { session: USER },
+    protectionService: {
+      loadModelVersion: async () => { loads += 1; return { ok: true, version: "2.0" }; },
+      dismissModelNotice: (store, version) => popup.state && Object.assign(popup.state, { lastSeenModelVersion: version })
+    }
+  });
+  await settle();
+  popup.actions["dismiss-notice"]();
+  await settle();
+  assert.equal(loads, 1);
+});

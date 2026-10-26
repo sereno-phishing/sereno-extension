@@ -49,6 +49,16 @@
     return next.slice(0, CAPACITY);
   }
 
+  /* Applies the dedupe window and the capacity to a list that arrives from
+     outside (newest first), so the rules hold whoever stored it. */
+  function normalize(list) {
+    var result = [];
+    (list || []).slice().reverse().forEach(function (record) {
+      result = append(result, record);
+    });
+    return result;
+  }
+
   /* Filter ids: "todas" or a final verdict status. */
   function filterIds() {
     return [ALL].concat(Sereno.verdict.VERDICTS);
@@ -79,6 +89,7 @@
     entriesOf: entriesOf,
     createRecord: createRecord,
     append: append,
+    normalize: normalize,
     filterIds: filterIds,
     filter: filter,
     findById: findById

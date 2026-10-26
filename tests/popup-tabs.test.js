@@ -19,7 +19,7 @@ function popupViews() {
     history: { entriesOf: () => [] },
     historyUi: { listView: ({ tabsHtml }) => `<section class="view view-history">${tabsHtml}</section>` },
     protection: { isNoticeVisible: () => false },
-    protectionUi: { protectionCard: () => "", modelVersionLabel: () => "" }
+    protectionUi: { protectionCard: () => "", siteCard: () => "", modelVersionLabel: () => "" }
   };
   const context = vm.createContext({ Sereno });
   vm.runInContext(fs.readFileSync(path.join(ROOT, "app/popup/popup-views.js"), "utf8"), context);
@@ -37,7 +37,7 @@ test("home and history use the same large tab variant with only selection state 
     assert.match(tablist[0], new RegExp(`data-tab="${active}" class="active" aria-selected="true"`));
     assert.equal((tablist[0].match(/data-action="tab"/g) || []).length, 2);
     assert.doesNotMatch(tablist[0], /data-tab-slide/);
-    return tablist[0].replace(/class="active"/g, 'class=""').replace(/aria-selected="true"/g, 'aria-selected="false"').replace(/data-active-tab="(?:home|history)"/g, 'data-active-tab="selected"');
+    return tablist[0].replace(/class="active"/g, 'class=""').replace(/aria-selected="true"/g, 'aria-selected="false"').replace(/data-active-tab="(?:home|history)"/g, 'data-active-tab="selected"').replace(/ aria-controls="[^"]*"/g, "").replace(/tabindex="-?\d"/g, 'tabindex="x"');
   });
   assert.equal(tablists[0], tablists[1]);
 });
@@ -72,4 +72,13 @@ test("history padding matches home on all sides to keep tabs aligned", () => {
   assert.equal(historyPadding, homePadding);
   assert.match(history, /gap: 12px;/);
   assert.doesNotMatch(history, /(?:^|;)\s*(?:padding-inline|padding-block|width):/);
+});
+
+test("the offline session notice is a polite live region with a retry action", () => {
+  const views = popupViews();
+  const state = { session: { username: "user", role: "user" }, history: {} };
+  const html = views.page({ view: "home", sessionOffline: true }, state);
+  assert.match(html, /<div class="session-notice" role="status">/);
+  assert.match(html, /data-action="retry-session"/);
+  assert.doesNotMatch(views.page({ view: "home", sessionOffline: false }, state), /session-notice/);
 });

@@ -30,7 +30,7 @@
   function badge(statusId, size) {
     var status = verdict.status(statusId);
     if (status.tone === "neutral") {
-      return '<span class="art-glyph art-' + size + '">' + status.glyph + "</span>";
+      return '<span class="art-glyph art-' + size + '" aria-hidden="true">' + status.glyph + "</span>";
     }
     return ui.art(status.tone, size);
   }

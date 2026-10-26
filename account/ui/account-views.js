@@ -17,7 +17,7 @@
       '<h1 class="view-title">' + ui.esc(options.title) + "</h1>" +
       '<p class="view-sub">' + ui.esc(options.sub) + "</p>" +
       '<form class="form" data-form="' + options.kind + '" novalidate>' +
-      (options.error ? ui.banner({ tone: "error", role: "alert", iconHtml: ui.art("bad", "16"), text: options.error }) : "") +
+      (options.error ? ui.banner({ tone: "error", role: "alert", id: "form-error", iconHtml: ui.art("bad", "16"), text: options.error }) : "") +
       options.fields.map(ui.field).join("") +
       ui.button({ type: "submit", label: options.submitLabel, variant: "primary", block: true }) +
       "</form>" +
@@ -27,24 +27,29 @@
     );
   }
 
+  var FORM_ERROR = "form-error";
+
   function usernameField(options) {
-    return Object.assign({ label: "Usuario", name: "username", type: "text", placeholder: "nombre de usuario" }, options);
+    return Object.assign({ label: "Usuario", name: "username", type: "text", placeholder: "nombre de usuario", autocomplete: "username" }, options);
   }
 
   function passwordField(options) {
     return Object.assign({ label: "Contraseña", name: "password", type: "password" }, options);
   }
 
-  /* model: { error, username, password } — the draft is shown again only after an error. */
+  /* model: { error, errorCode?, username, password } — the draft is shown again only after an error.
+     errorCode is one of Sereno.account.ERRORS and picks the message; "invalid" when absent. */
   function loginView(model) {
+    var wrong = model.error && (model.errorCode || "invalid") === "invalid";
+    var describedBy = model.error ? FORM_ERROR : "";
     return credentialsForm({
       kind: "login",
       title: "Inicia sesión",
       sub: "Accede a tu historial de sitios evaluados.",
-      error: model.error ? "Usuario o contraseña incorrectos." : "",
+      error: model.error ? account.errorMessage(model.errorCode || "invalid", "login") : "",
       fields: [
-        usernameField({ value: model.error ? model.username : "" }),
-        passwordField({ hasError: model.error, value: model.error ? model.password : "" })
+        usernameField({ invalid: wrong, describedBy: describedBy, value: model.error ? model.username : "" }),
+        passwordField({ hasError: model.error, invalid: wrong, describedBy: describedBy, autocomplete: "current-password", value: model.error ? model.password : "" })
       ],
       submitLabel: "Iniciar sesión",
       switchPrompt: "¿No tienes cuenta?",
@@ -53,21 +58,25 @@
     });
   }
 
-  /* model: { error, username, password } — error means the username is taken. */
+  /* model: { error, errorCode?, username, password } — error without errorCode means the username is taken.
+     Only "duplicate" marks the username field; other codes (offline, timeout, server, invalid) show the banner. */
   function registerView(model) {
+    var taken = model.error && (!model.errorCode || model.errorCode === "duplicate");
+    var describedBy = model.error ? FORM_ERROR : "";
     return credentialsForm({
       kind: "register",
       title: "Crea tu cuenta",
       sub: "Guarda tu historial y úsalo en otros dispositivos.",
-      error: model.error ? "El usuario ya existe." : "",
+      error: model.error ? account.errorMessage(model.errorCode || "duplicate", "register") : "",
       fields: [
         usernameField({
-          hasError: model.error,
-          help: model.error ? "Elige otro nombre de usuario." : "",
+          hasError: taken,
+          help: taken ? "Elige otro nombre de usuario." : "",
           helpIsError: true,
+          describedBy: describedBy,
           value: model.error ? model.username : ""
         }),
-        passwordField({ help: "Se guarda cifrada. No pedimos tu correo.", value: model.error ? model.password : "" })
+        passwordField({ help: "Se guarda cifrada. No pedimos tu correo.", autocomplete: "new-password", describedBy: describedBy, value: model.error ? model.password : "" })
       ],
       submitLabel: "Crear cuenta",
       switchPrompt: "¿Ya tienes cuenta?",
@@ -76,13 +85,15 @@
     });
   }
 
-  /* Header button that opens the account menu: "Admin" pill or the user's initials. */
-  function accountButton(session) {
+  /* Header button that opens the account menu: "Admin" pill or the user's initials.
+     open: whether the menu is showing (aria-expanded). */
+  function accountButton(session, open) {
+    var expanded = ' aria-expanded="' + !!open + '"';
     if (account.isAdmin(session)) {
-      return '<button type="button" class="admin-pill" data-action="toggle-menu" aria-haspopup="menu">Admin</button>';
+      return '<button type="button" class="admin-pill" data-action="toggle-menu" aria-haspopup="menu"' + expanded + ">Admin</button>";
     }
     return (
-      '<button type="button" class="avatar" data-action="toggle-menu" aria-haspopup="menu" ' +
+      '<button type="button" class="avatar" data-action="toggle-menu" aria-haspopup="menu"' + expanded + ' ' +
       'aria-label="Cuenta de ' + ui.esc(session.username) + '">' + ui.esc(account.initials(session.username)) + "</button>"
     );
   }

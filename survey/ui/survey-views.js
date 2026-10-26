@@ -25,9 +25,10 @@
       '<section class="view view-survey">' +
       '<button type="button" class="back-link" data-action="survey-close">← Volver al inicio</button>' +
       '<div class="survey-meta">Pregunta ' + (model.index + 1) + " de " + total + "</div>" +
-      '<div class="progress-track"><div class="progress-fill" style="width:' + progress + '%"></div></div>' +
-      '<h2 class="survey-question">' + ui.esc(survey.QUESTIONS[model.index]) + "</h2>" +
-      '<div class="scale">' + survey.SCALE.map(function (value) {
+      '<div class="progress-track" role="progressbar" aria-label="Progreso de la encuesta" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + progress + '"><div class="progress-fill" style="width:' + progress + '%"></div></div>' +
+      '<h1 class="survey-question">' + ui.esc(survey.QUESTIONS[model.index]) + "</h1>" +
+      '<div class="scale" role="group" aria-label="Tu respuesta, de ' + survey.SCALE[0] + " (totalmente en desacuerdo) a " +
+      survey.SCALE[survey.SCALE.length - 1] + ' (totalmente de acuerdo)">' + survey.SCALE.map(function (value) {
         return scaleButton(value, model.selected);
       }).join("") + "</div>" +
       '<div class="scale-labels"><span>Totalmente en desacuerdo</span><span>Totalmente de acuerdo</span></div>' +
@@ -45,13 +46,19 @@
     );
   }
 
-  /* result: survey.score() output. */
-  function resultView(result) {
+  /* result: survey.score() output; options.error: Spanish text when the
+     submission failed (the score still shows, the user can retry). */
+  function resultView(result, options) {
+    var error = options && options.error;
     return (
-      '<section class="view view-survey-result"><div class="sus-result">' +
+      '<section class="view view-survey-result"><h1 class="sr-only">Resultado de la encuesta</h1><div class="sus-result">' +
       '<div class="sus-score">' + result.score + " / 100</div>" +
       '<div class="sus-band sus-band-' + result.bandId + '">' + ui.esc(result.band) + "</div>" +
       '<p class="sus-note">' + ANONYMOUS + "</p>" +
+      (error
+        ? ui.banner({ tone: "error", role: "alert", iconHtml: ui.art("bad", "16"), text: error }) +
+          ui.button({ label: "Reintentar", variant: "ghost", action: "survey-retry" })
+        : "") +
       ui.button({ label: "Cerrar", variant: "primary", cls: "sus-close", action: "survey-close" }) +
       "</div></section>"
     );

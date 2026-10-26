@@ -35,6 +35,26 @@
     return '<div class="card-head"><div class="card-title">' + ui.esc(title) + "</div>" + (extraHtml || "") + "</div>";
   }
 
+  function errorBanner(text) {
+    return ui.banner({ tone: "error", cls: "section-banner", role: "alert", iconHtml: ui.icon("bad", "banner-img"), text: text });
+  }
+
+  /* A section that has no data to show: "loading", "error" (message + retry)
+     or "empty". model: { id, title, state, message } */
+  function statusSection(model) {
+    var body;
+    if (model.state === "loading") {
+      body = '<div class="card panel-status" role="status">Cargando...</div>';
+    } else if (model.state === "error") {
+      body =
+        '<div class="card panel-status">' + errorBanner(model.message) +
+        '<button type="button" class="btn btn-ghost" data-action="retry" data-section="' + ui.esc(model.id) + '">Reintentar</button></div>';
+    } else {
+      body = '<div class="card panel-status">' + ui.esc(model.message) + "</div>";
+    }
+    return '<section class="section section-' + ui.esc(model.id) + '">' + sectionHead(model.title, "") + body + "</section>";
+  }
+
   function successBanner(text) {
     return ui.banner({ tone: "success", cls: "section-banner", role: "status", iconHtml: ui.icon("admin-banner-ok", "banner-img"), text: text });
   }
@@ -47,7 +67,7 @@
       '<div class="stat-label">' + ui.esc(card.label) + "</div>" +
       '<div class="stat-value">' + ui.esc(card.value) + "</div>" +
       '<div class="stat-sub stat-sub-muted">' + ui.esc(card.sub) + "</div>" +
-      '<div class="stat-bars stat-bars-' + card.tone + '">' +
+      '<div class="stat-bars stat-bars-' + card.tone + '" aria-hidden="true">' +
       (card.bars || []).map(function (height) {
         return '<span class="stat-bar" style="height:' + height + 'px"></span>';
       }).join("") +
@@ -81,7 +101,7 @@
   function chartCard(hourly) {
     return (
       '<div class="card chart-card">' + cardHead("Consultas por hora", chartLegend()) +
-      '<div class="chart">' +
+      '<div class="chart" role="img" aria-label="Gráfico de barras de consultas por hora en las últimas 24 horas, por resultado">' +
       (hourly || []).map(function (hour) {
         return '<span class="chart-bar level-' + ui.esc(hour.level) + '" style="height:' + hour.height + 'px"></span>';
       }).join("") +
@@ -94,9 +114,10 @@
     return ui.tableCard({
       headHtml: cardHead(
         "Últimas consultas (hasta 50)",
-        '<button type="button" class="table-link" data-action="toggle-queries">' + (showAll ? "Ver menos" : "Ver todas") + "</button>"
+        '<button type="button" class="table-link" data-action="toggle-queries" aria-expanded="' + !!showAll + '">' + (showAll ? "Ver menos" : "Ver todas") + "</button>"
       ),
       tableCls: "t-queries",
+      caption: "Últimas consultas",
       columns: ["Dominio", "Fecha y hora", "Fuente", "Latencia", "Resultado"],
       rows: visible.map(function (row) {
         return [ui.esc(row.domain), ui.esc(row.stamp), ui.esc(row.source), ui.esc(row.latencyMs + " ms"), verdictUi.adminPill(row.status)];
@@ -107,6 +128,9 @@
   /* model: { metrics, showAllQueries } */
   function metricsSection(model) {
     var metrics = model.metrics;
+    if (!metrics || typeof metrics.analyzed !== "number") {
+      return statusSection({ id: "metricas", title: "Métricas de operación", state: "empty", message: "Todavía no hay métricas para mostrar." });
+    }
     return (
       '<section class="section section-metricas">' +
       sectionHead("Métricas de operación", '<span class="section-ago">Últimas 24 horas</span>') +
@@ -119,7 +143,7 @@
 
   /* ---------------- per-domain policy ---------------- */
 
-  /* options: { policy, active, action, domain? } */
+  /* options: { policy, active, action, domain?, ariaLabel? } */
   function policyChip(options) {
     var policy = domainPolicy.POLICIES[options.policy];
     var colour = verdictUi.toneColor(policy.tone);
@@ -129,15 +153,16 @@
       data: (options.domain !== undefined ? [["domain", options.domain]] : []).concat([["policy", policy.id]]),
       pressed: options.active,
       lead: options.active ? verdictUi.adminDot(policy.tone) : "",
-      label: policy.label
+      label: policy.label,
+      ariaLabel: options.ariaLabel
     });
   }
 
   function addDomainCard(addPolicy) {
     return (
       '<div class="card add-domain">' +
-      ui.input({ cls: "input add-domain-input", type: "text", name: "newDomain", placeholder: "ejemplo-dominio.com", assist: true }) +
-      '<div class="policy-picker">' +
+      ui.input({ cls: "input add-domain-input", type: "text", name: "newDomain", placeholder: "ejemplo-dominio.com", ariaLabel: "Dominio a agregar", assist: true }) +
+      '<div class="policy-picker" role="group" aria-label="Política del dominio nuevo">' +
       domainPolicy.POLICY_IDS.map(function (id) {
         return policyChip({ policy: id, active: addPolicy === id, action: "pick-add-policy" });
       }).join("") +
@@ -148,30 +173,41 @@
   }
 
   function domainsTable(rows) {
+    if (!rows.length) {
+      return '<div class="card panel-status">Todavía no hay dominios en la lista.</div>';
+    }
     return ui.tableCard({
       tableCls: "t-policy",
+      caption: "Dominios con política propia",
       columns: ["Dominio", "Política", "Modificado", ""],
       rows: rows.map(function (row) {
         return [
           ui.esc(row.domain),
-          '<span class="policy-pair">' +
+          '<span class="policy-pair" role="group" aria-label="Política de ' + ui.esc(row.domain) + '">' +
             domainPolicy.POLICY_IDS.map(function (id) {
-              return policyChip({ policy: id, active: row.policy === id, action: "pick-row-policy", domain: row.domain });
+              return policyChip({
+                policy: id,
+                active: row.policy === id,
+                action: "pick-row-policy",
+                domain: row.domain,
+                ariaLabel: domainPolicy.POLICIES[id].label + " para " + row.domain
+              });
             }).join("") +
             "</span>",
           ui.esc(time.formatDay(row.updatedAt)),
-          '<button type="button" class="remove-link" data-action="remove-domain" data-domain="' + ui.esc(row.domain) + '">Quitar</button>'
+          '<button type="button" class="remove-link" data-action="remove-domain" data-domain="' + ui.esc(row.domain) + '" aria-label="Quitar ' + ui.esc(row.domain) + '">Quitar</button>'
         ];
       })
     });
   }
 
-  /* model: { rows, addPolicy, saved } */
+  /* model: { rows, addPolicy, saved, error? } */
   function domainsSection(model) {
     return (
       '<section class="section section-dominios">' +
       describedHead("Política por dominio", "Elige qué pasa cuando un dominio de la lista se detecta como phishing.") +
       (model.saved ? successBanner("Cambios guardados.") : "") +
+      (model.error ? errorBanner(model.error) : "") +
       addDomainCard(model.addPolicy) +
       domainsTable(model.rows) +
       '<div class="note-bar">Si un dominio no está en la lista, se aplica ' + ui.esc(domainPolicy.POLICIES[domainPolicy.DEFAULT_POLICY].label) + ".</div>" +
@@ -183,11 +219,11 @@
 
   /* ---------------- verdict cache ---------------- */
 
-  function ttlField(label, name, value, unit) {
+  function ttlField(label, name, value, unit, id) {
     return (
-      '<div class="ttl-field"><span class="ttl-label">' + ui.esc(label) + "</span>" +
-      ui.input({ cls: "input ttl-input", type: "number", min: 1, name: name, value: value }) +
-      '<span class="ttl-unit">' + ui.esc(unit) + "</span></div>"
+      '<div class="ttl-field"><label class="ttl-label" for="' + id + '">' + ui.esc(label) + "</label>" +
+      ui.input({ cls: "input ttl-input", type: "number", min: 1, name: name, value: value, id: id, describedBy: id + "-unit" }) +
+      '<span class="ttl-unit" id="' + id + '-unit">' + ui.esc(unit) + "</span></div>"
     );
   }
 
@@ -202,8 +238,8 @@
     return cacheCard(
       "Duración de los veredictos (TTL)",
       "Aplica a las nuevas escrituras, sin redesplegar.",
-      ttlField("TTL veredictos phishing", "ttlPhishingDays", cache.ttlPhishingDays, "días") +
-        ttlField("TTL veredictos legítimos", "ttlLegitHours", cache.ttlLegitHours, "horas") +
+      ttlField("TTL veredictos phishing", "ttlPhishingDays", cache.ttlPhishingDays, "días", "ttl-phishing") +
+        ttlField("TTL veredictos legítimos", "ttlLegitHours", cache.ttlLegitHours, "horas", "ttl-legit") +
         ui.button({ label: "Guardar TTL", variant: "ghost", action: "save-ttl" })
     );
   }
@@ -213,16 +249,20 @@
       "Invalidar un dominio",
       "Úsalo cuando un dominio legítimo fue clasificado por error.",
       '<div class="invalidate-row">' +
-        ui.input({ cls: "input", type: "text", name: "invalidateDomain", placeholder: "dominio.com", assist: true }) +
+        ui.input({ cls: "input", type: "text", name: "invalidateDomain", placeholder: "dominio.com", ariaLabel: "Dominio a invalidar", assist: true }) +
         ui.button({ label: "Invalidar", variant: "danger", action: "invalidate-domain" }) +
         "</div>"
     );
   }
 
   function invalidationsCard(cache) {
+    if (!(cache.invalidations || []).length) {
+      return '<div class="card panel-status">No hay invalidaciones recientes.</div>';
+    }
     return ui.tableCard({
       headHtml: cardHead("Invalidaciones recientes"),
       tableCls: "t-cache",
+      caption: "Invalidaciones recientes",
       columns: ["Dominio", "Estado", "Fecha", ""],
       rows: (cache.invalidations || []).map(function (item) {
         return [ui.esc(item.domain), ui.esc(item.status), ui.esc(time.formatAnyDay(item.date)), ""];
@@ -230,13 +270,14 @@
     });
   }
 
-  /* model: { cache, notice } */
+  /* model: { cache, notice, error? } */
   function cacheSection(model) {
     var cache = model.cache || {};
     return (
       '<section class="section section-cache">' +
       describedHead("Caché de veredictos", "Controla cuánto dura cada veredicto guardado y fuerza una nueva evaluación de un dominio.") +
       (model.notice ? successBanner(model.notice) : "") +
+      (model.error ? errorBanner(model.error) : "") +
       '<div class="cache-grid">' + ttlCard(cache) + invalidateCard() + "</div>" +
       invalidationsCard(cache) +
       "</section>"
@@ -244,6 +285,7 @@
   }
 
   Sereno.administrationUi = {
+    statusSection: statusSection,
     metricsSection: metricsSection,
     domainsSection: domainsSection,
     cacheSection: cacheSection
