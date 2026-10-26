@@ -7,8 +7,11 @@
 (function (Sereno) {
   "use strict";
 
-  /* Every page lives two levels below the extension root (app/<surface>/). */
-  var ASSET_ROOT = "../../assets/";
+  /* Every page lives two levels below the extension root (app/<surface>/). A
+     content script runs on foreign pages, so it points the root at the
+     extension with setAssetRoot. */
+  var DEFAULT_ASSET_ROOT = "../../assets/";
+  var assetRoot = DEFAULT_ASSET_ROOT;
 
   function esc(value) {
     return String(value === undefined || value === null ? "" : value)
@@ -20,7 +23,12 @@
   }
 
   function asset(path) {
-    return ASSET_ROOT + path;
+    return assetRoot + path;
+  }
+
+  /* Called without an argument it restores the default relative root. */
+  function setAssetRoot(root) {
+    assetRoot = root || DEFAULT_ASSET_ROOT;
   }
 
   /* Ordered [name, value] pairs -> ' name="value"' string. */
@@ -104,6 +112,7 @@
   Sereno.ui = {
     esc: esc,
     asset: asset,
+    setAssetRoot: setAssetRoot,
     attrs: attrs,
     classes: classes,
     image: image,

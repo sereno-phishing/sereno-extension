@@ -10,7 +10,8 @@
   src: url("../assets/fonts/inter-latin-wght-normal.woff2") format("woff2");
 }
 
-:root {
+:root,
+:host {
   --indigo-600: #4F46E5;
   --indigo-700: #4338CA;
   --indigo-100: #E0E7FF;

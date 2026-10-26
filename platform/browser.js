@@ -75,6 +75,44 @@
     return tab && tab.id !== undefined ? tab.id : null;
   }
 
+  /* Content script side. onMessage passes handler the messages the service
+     worker sends to this tab (never answers them) and ignores any sender that
+     is not this extension. */
+  function onMessage(handler) {
+    var runtime = chromeRef()?.runtime;
+    if (!runtime?.onMessage?.addListener) {
+      return;
+    }
+    runtime.onMessage.addListener(function (message, sender) {
+      if (sender && sender.id !== undefined && runtime.id !== undefined && sender.id !== runtime.id) {
+        return false;
+      }
+      handler(message);
+      return false;
+    });
+  }
+
+  /* Sends a request to the service worker and returns its reply. A worker that
+     is gone (extension reloaded, context invalidated) is not an error: null. */
+  async function sendMessage(message) {
+    var runtime = chromeRef()?.runtime;
+    if (!runtime || typeof runtime.sendMessage !== "function") {
+      return null;
+    }
+    try {
+      var reply = await runtime.sendMessage(message);
+      return reply === undefined ? null : reply;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /* URL of a file of the extension; outside it, the path itself. */
+  function assetUrl(path) {
+    var runtime = chromeRef()?.runtime;
+    return typeof runtime?.getURL === "function" ? runtime.getURL(path) : path;
+  }
+
   /* Per-tab records in chrome.storage.session: they outlive the ephemeral
      service worker but not the browser session. */
   function tabKey(tabId) {
@@ -111,6 +149,9 @@
     setBadge: setBadge,
     notifyTab: notifyTab,
     getActiveTabId: getActiveTabId,
+    onMessage: onMessage,
+    sendMessage: sendMessage,
+    assetUrl: assetUrl,
     loadTabRecord: loadTabRecord,
     saveTabRecord: saveTabRecord,
     removeTabRecord: removeTabRecord
