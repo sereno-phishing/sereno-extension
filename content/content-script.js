@@ -9,8 +9,11 @@
      { type: "sereno:detail", url }          open the Sereno detail page
 
    Isolation: everything is drawn inside a closed shadow root appended to
-   <html>, with the extension stylesheets linked inside it, so page CSS cannot
-   restyle the UI and the UI cannot leak into the page. A warning or block is a
+   <html>, so page CSS cannot restyle the UI and the UI cannot leak into the
+   page. The page is never asked for an extension URL: the styles are a
+   constructable stylesheet adopted by the shadow root and the icons are inline
+   svg, both taken from Sereno.contentAssets (content-assets.generated.js, built
+   by tools/build-content-assets.js). A warning or block is a
    native <dialog> opened with showModal(): the page becomes inert, focus is
    trapped and returned on close. Esc closes a warning; a block ignores it.
 
@@ -22,10 +25,10 @@
   "use strict";
 
   var MESSAGE_TYPE = "sereno:outcome";
-  var STYLES = ["ui/tokens.css", "ui/verdict-modal.css", "content/content.css"];
 
-  /* env = { document, browser, location, history, now }
-     browser: onMessage(handler), sendMessage(message), assetUrl(path) */
+  /* env = { document, browser, location, history, now, CSSStyleSheet }
+     browser: onMessage(handler), sendMessage(message)
+     CSSStyleSheet: the constructor for constructable stylesheets, when there is one. */
   function create(env) {
     var overlay = Sereno.pageOverlay;
     var doc = env.document;
@@ -39,9 +42,27 @@
     var returnFocus = null;
     var savedOverflow = null;
 
-    Sereno.ui.setAssetRoot(browser.assetUrl("assets/"));
+    var assets = Sereno.contentAssets;
+    Sereno.ui.setInlineAssets(assets.icons);
 
     /* ---------------- shadow host ---------------- */
+
+    /* A constructable stylesheet is not subject to the page's style-src policy.
+       Without support (or without adoptedStyleSheets on the shadow root) the
+       same text goes into a <style> element, which a strict style-src may block:
+       a degraded fallback, not the normal path. */
+    function applyStyles(shadow) {
+      var Sheet = env.CSSStyleSheet;
+      if (typeof Sheet === "function" && "adoptedStyleSheets" in shadow) {
+        var sheet = new Sheet();
+        sheet.replaceSync(assets.css);
+        shadow.adoptedStyleSheets = [sheet];
+        return;
+      }
+      var style = doc.createElement("style");
+      style.textContent = assets.css;
+      shadow.appendChild(style);
+    }
 
     function ensureSurface() {
       if (surface) {
@@ -50,12 +71,7 @@
       host = doc.createElement("div");
       host.setAttribute("data-sereno", "");
       var shadow = host.attachShadow({ mode: "closed" });
-      STYLES.forEach(function (file) {
-        var link = doc.createElement("link");
-        link.setAttribute("rel", "stylesheet");
-        link.setAttribute("href", browser.assetUrl(file));
-        shadow.appendChild(link);
-      });
+      applyStyles(shadow);
       surface = doc.createElement("div");
       surface.setAttribute("class", "sereno-surface");
       surface.addEventListener("click", onClick);
@@ -257,7 +273,7 @@
     return { start: start, handleMessage: handleMessage };
   }
 
-  Sereno.contentScript = { MESSAGE_TYPE: MESSAGE_TYPE, STYLES: STYLES, create: create };
+  Sereno.contentScript = { MESSAGE_TYPE: MESSAGE_TYPE, create: create };
 
   if (typeof document !== "undefined" && document.documentElement) {
     Sereno.contentScript.create({
@@ -267,7 +283,8 @@
       history: history,
       now: function () {
         return new Date();
-      }
+      },
+      CSSStyleSheet: typeof CSSStyleSheet === "function" ? CSSStyleSheet : undefined
     }).start();
   }
 })(globalThis.Sereno = globalThis.Sereno || {});

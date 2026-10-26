@@ -49,7 +49,7 @@
   function toastHtml() {
     return (
       '<aside class="sereno-toast" role="status" aria-live="polite">\n' +
-      '<img class="sereno-toast-icon" src="' + ui.asset("icons/toast-pending-32.svg") + '" width="32" height="32" alt="">\n' +
+      ui.sizedIcon("toast-pending-32", "sereno-toast-icon", 32) + "\n" +
       '<div class="sereno-toast-body">\n' +
       '<p class="sereno-toast-title">' + ui.esc(PENDING_COPY.title) + "</p>\n" +
       '<p class="sereno-toast-text">' + ui.esc(PENDING_COPY.text) + "</p>\n" +
@@ -61,7 +61,7 @@
   function noticeHtml(notice) {
     return (
       '<aside class="sereno-notice" role="status" aria-live="polite">\n' +
-      '<img class="sereno-notice-icon" src="' + ui.asset("icons/alert-warn-14.svg") + '" width="16" height="16" alt="">\n' +
+      ui.sizedIcon("alert-warn-14", "sereno-notice-icon", 16) + "\n" +
       '<div class="sereno-notice-body">\n' +
       '<p class="sereno-notice-title">' + ui.esc(notice.title) + "</p>\n" +
       '<p class="sereno-notice-text">' + ui.esc(notice.text) + "</p>\n" +

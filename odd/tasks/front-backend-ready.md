@@ -51,12 +51,14 @@ Out: the backend itself, ML, real persistence, metrics aggregation (HU-02, 06-12
 - [x] T7 UI states and a11y: degraded banner, errors, focus trap, ARIA, reduced motion
 - [x] T8 Manifest cleanup (name, permissions, host_permissions, CSP, min Chrome), README provider guide and the end-to-end swap proof
 - [x] T9 Popup fixes from first real-Chrome review (site card for every role, one model version independent of the session)
+- [x] T10 Localhost test hosts for real-page verification (`*.localhost` verdicts in the mock adapter)
+- [x] T11 In-page UI without web-accessible resources (styles and icons bundled into the content script)
 
 ## Route declaration
 
 | Task | Route | Trigger evidence |
 |---|---|---|
-| T1-T9 | delegated direct, one writer at a time | each touches 2+ non-trivial files; audit already mapped the code (read-only explorer a77ccabee52997f4e) |
+| T1-T11 | delegated direct, one writer at a time | each touches 2+ non-trivial files; audit already mapped the code (read-only explorer a77ccabee52997f4e) |
 
 ## Progress
 
@@ -97,6 +99,8 @@ T9 done: two Sprint 1 inconsistencies found in the first real-Chrome review, bot
 - Model version: removed `MODEL_VERSION`, `UPDATED_MODEL_VERSION` and `modelVersion(state)` from `protection/domain/protection.js`. `isNoticeVisible(state, backendVersion)` is pure and data driven: signed in, a backend version known, and `state.lastSeenModelVersion !== backendVersion`; the legacy `modelNoticeDismissed === true` still hides it. `dismissModelNotice(store, version)` stores `lastSeenModelVersion` and resets the old flag to false. The mock backend reports the constant `Sereno.seed.modelVersion = "1.3"`; the seed starts `lastSeenModelVersion: "1.2"`, so the demo still shows the "v1.3" notice after the first login while the footer says v1.3 everywhere. `getModelVersion() -> {ok, version}`, the remote adapter and the ports are untouched. The popup asks for the version once per user (the key no longer includes the dismissed flag) and passes `App.modelVersion` when dismissing.
 - Known limit: a legacy state saved with `modelNoticeDismissed: true` keeps the notice hidden until that user dismisses again (it cannot be told which version they saw); fresh and new states behave per version.
 - README: sentence about who sees "Este sitio" and the HU-27 row corrected.
+
+T10 done: the fake scenario domains do not resolve, so content scripts never ran on them. The mock adapter now recognizes `seguro|advertencia|bloqueo|pendiente|degradado.localhost` (table `TEST_HOSTS` in `platform/providers/mock.js`, after the `www.` strip; ports ignored). Scenario hosts reuse `Sereno.demoScenarios.SCENARIOS` data with `domain` set to the hostname; `pendiente.localhost` waits `PENDING_HOST_DELAY_MS` (1500 ms, above the 300 ms threshold; injectable as `pendingHostDelayMs`) and resolves safe; `degradado.localhost` returns `errors.failure("server")` (degraded, fail-open, not recorded in history). Remote adapter, ports and contract untouched. README: new subsection "Probar advertencia, bloqueo, pendiente y degradado en páginas reales". Nothing was exercised in real Chrome.
 
 ## Contracts
 
@@ -181,10 +185,26 @@ T9:
 - Nothing was exercised in real Chrome.
 - Commit: 33d11f6
 
+T10:
+- RED: `tests/mock-test-hosts.test.js` (10 tests) written first; `node --test` = 357 tests, 350 pass, 7 fail (first: `scenario hosts return the scenario verdict with the real hostname as domain`).
+- GREEN: `node --test` = 357 tests, 357 pass, 0 fail (347 baseline + 10 new); `tests/provider-switch.test.js` and `tests/architecture.test.js` pass unchanged.
+- Nothing was exercised in real Chrome.
+- Commits: bc8a154 (mock + tests), 6848afe (README); this document was updated in a later docs commit.
+
+T11:
+- Why: in real Chrome 156 on https://www.youtube.com/ the content script logged three times "Unsafe attempt to load URL chrome-extension://<id>/ui/tokens.css (verdict-modal.css, content.css) from frame with URL https://www.youtube.com/" at `ensureSurface` (`doc.documentElement.appendChild(host)`, where the shadow-root `<link>` elements start loading) even though the files were listed in `web_accessible_resources` for http/https. The cause was not proven; the design stops depending on page-context loads of extension URLs.
+- Design: `tools/build-content-assets.js` (plain Node, deterministic, LF, `--check`) writes the committed `content/content-assets.generated.js` (`Sereno.contentAssets = { css, icons }`). The content script builds a `CSSStyleSheet` (`replaceSync`) and sets `shadow.adoptedStyleSheets`; fallback `<style>` when unsupported. `Sereno.ui.setInlineAssets(map)` switches `ui/atoms.js` to inline svg (`icon`, `image`, `logo`, new `sizedIcon`); default `<img>` behavior of popup, admin and demo store is unchanged. `@font-face` is dropped from the bundle (its relative url would resolve against the host page); Inter does not apply in-page. Logo: the PNG becomes the inline `brand` svg (a `data:` image would still be subject to the page `img-src`); no PNG is bundled. `web_accessible_resources` removed from the manifest, which also stops pages from probing for the extension. The bundle is listed after `ui/atoms.js` and before `content/content-script.js`.
+- RED: tests first (`tests/content-assets.test.js` new, `tests/content-script.test.js` and `tests/manifest.test.js` rewritten for the new guarantee); `node --test` = 343 tests, 338 pass, 5 fail (first: `tests\content-assets.test.js` could not load, `tools/build-content-assets.js` missing; then `tests\content-script.test.js`, and three manifest tests: no `web_accessible_resources`, bundle order, no extension URL in the content script).
+- GREEN: `node --test` = 371 tests, 371 pass, 0 fail (357 baseline, minus the replaced WAR derivation test, plus 3 new manifest tests, 4 new content-script tests and 8 in `tests/content-assets.test.js`). `node tools/build-content-assets.js --check` exit 0. `tests/architecture.test.js` and `tests/provider-switch.test.js` pass unchanged.
+- Existing tests changed on purpose: `tests/manifest.test.js` (the WAR derivation test replaced by "no web_accessible_resources", bundle order and "content script names no extension URL"), `tests/content-script.test.js` (the `<link>` stylesheet test replaced by adopted-sheet, `<style>` fallback and "no link, no assetUrl call" tests).
+- `rg -n "chrome-extension://|web_accessible_resources|assetUrl" content manifest.json` = no hits in `content/content-script.js`, `content/content.css` or `manifest.json`.
+- Nothing was exercised in real Chrome. To re-check there: YouTube console free of the three errors; modal styled on `http://advertencia.localhost:8080` and `http://bloqueo.localhost:8080` with icons visible; a strict-CSP site (`style-src`, `img-src`); toast and degraded notice icons.
+- Commits: 2dff18c (generator, bundle, inline asset mode, tests), decbbef (content script, manifest, tests), bb91067 (README); this document in the following docs commit.
+
 T8 must review (found in T6):
 - Manifest `name`/`description`, CSP, `minimum_chrome_version` (native `<dialog closedby>` is progressive; `showModal()` needs no minimum, `chrome.storage.session` needs 102).
 - Host access: `content_scripts.matches` is `http://*/*`, `https://*/*`; decide whether `host_permissions` is needed (the worker only uses `tabs`) and justify the broad match for the store listing.
-- `web_accessible_resources` exposes stylesheets, logo and icons to every http/https page (pages can fingerprint the extension); consider `use_dynamic_url`.
+- `web_accessible_resources` exposes stylesheets, logo and icons to every http/https page (pages can fingerprint the extension); consider `use_dynamic_url`. Resolved in T11: the manifest no longer declares it.
 - In real Chrome verify that a strict page CSP (`style-src`) does not block the extension `<link>` inside the shadow root; if it does, fall back to a `content_scripts.css` entry or a constructed stylesheet.
 - `@font-face` does not apply inside a shadow root, so the modal uses the system sans-serif font on real pages; load Inter in the page document or accept the fallback.
 - SPA navigation (`pushState`) is not seen by the worker (`tabs.onUpdated` only reports loading/complete), so a client-side route change is not re-evaluated.

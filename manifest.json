@@ -18,6 +18,7 @@
         "verdict/domain/verdict.js",
         "verdict/domain/outcome.js",
         "ui/atoms.js",
+        "content/content-assets.generated.js",
         "verdict/ui/verdict-ui.js",
         "demo-store/ui/verdict-modal.js",
         "verdict/ui/page-overlay.js",
@@ -25,22 +26,6 @@
       ],
       "run_at": "document_idle",
       "all_frames": false
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "ui/tokens.css",
-        "ui/verdict-modal.css",
-        "content/content.css",
-        "assets/logo.png",
-        "assets/icons/alert-bad-14.svg",
-        "assets/icons/alert-bad-44.svg",
-        "assets/icons/alert-warn-14.svg",
-        "assets/icons/alert-warn-44.svg",
-        "assets/icons/toast-pending-32.svg"
-      ],
-      "matches": ["http://*/*", "https://*/*"]
     }
   ],
   "options_page": "app/admin/admin.html",

@@ -18,14 +18,29 @@ const Sereno = load(
   "verdict/ui/verdict-ui.js",
   "demo-store/ui/verdict-modal.js",
   "verdict/ui/page-overlay.js",
+  "content/content-assets.generated.js",
   "content/content-script.js"
 );
 
+const ASSETS = Sereno.contentAssets;
 const WARNING = { kind: "verdict", verdict: { domain: "paypal-secure-login.com", status: "advertencia", score: 0.92, source: "modelo", latencyMs: 1 } };
 const BLOCK = { kind: "verdict", verdict: { domain: "pago-servicios-linea.net", status: "bloqueo", score: 0.97, source: "cache", latencyMs: 1 } };
 const SAFE = { kind: "verdict", verdict: { domain: "tienda.pe", status: "seguro", score: 0.04, source: "modelo", latencyMs: 1 } };
 const PENDING = { kind: "pending", reason: "evaluating" };
 const DEGRADED = { kind: "degraded", reason: "timeout" };
+
+/* Stands in for a constructable stylesheet. */
+class FakeSheet {
+  constructor() {
+    this.css = null;
+    this.replaced = 0;
+  }
+
+  replaceSync(css) {
+    this.css = css;
+    this.replaced += 1;
+  }
+}
 
 class FakeElement {
   constructor(tag) {
@@ -116,6 +131,14 @@ function setup(options) {
       const element = new FakeElement(tag);
       if (tag === "div" && !root.host) {
         root.host = element;
+        if (settings.constructable) {
+          const attach = element.attachShadow;
+          element.attachShadow = function (init) {
+            const shadow = attach.call(this, init);
+            shadow.adoptedStyleSheets = [];
+            return shadow;
+          };
+        }
       } else if (tag === "div" && !root.inner) {
         root.inner = element;
       }
@@ -124,6 +147,7 @@ function setup(options) {
   };
   const handlers = [];
   const sent = [];
+  const assetCalls = [];
   const browser = {
     onMessage(handler) {
       handlers.push(handler);
@@ -136,6 +160,7 @@ function setup(options) {
       return settings.replies ? settings.replies[message.type] : undefined;
     },
     assetUrl(file) {
+      assetCalls.push(file);
       return "chrome-extension://abc/" + file;
     }
   };
@@ -145,7 +170,8 @@ function setup(options) {
     browser,
     location: { href: "https://paypal-secure-login.com/login", replace(url) { calls.replaced.push(url); } },
     history: { length: settings.historyLength === undefined ? 3 : settings.historyLength, back() { calls.back += 1; } },
-    now: () => new Date(2026, 9, 25, 10, 30, 0)
+    now: () => new Date(2026, 9, 25, 10, 30, 0),
+    CSSStyleSheet: settings.constructable ? FakeSheet : undefined
   };
   const script = Sereno.contentScript.create(env);
   return {
@@ -153,6 +179,7 @@ function setup(options) {
     handlers,
     sent,
     calls,
+    assetCalls,
     documentElement,
     get host() {
       return root.host;
@@ -211,22 +238,56 @@ test("the listener handles only sereno:outcome messages", () => {
   assert.match(ui.surface.innerHTML, /<dialog /);
 });
 
-test("a warning opens one closed shadow host with the extension stylesheets and a native modal dialog", async () => {
-  const ui = setup();
+test("a warning opens one closed shadow host and a native modal dialog", async () => {
+  const ui = setup({ constructable: true });
   await ui.deliver(WARNING);
   assert.equal(ui.documentElement.children.length, 1);
   assert.equal(ui.documentElement.children[0], ui.host);
   assert.deepEqual(ui.host.shadowInit, { mode: "closed" });
-  const links = ui.host.shadow.children.filter((child) => child.tagName === "link");
-  assert.deepEqual(
-    links.map((link) => link.attributes.href),
-    ["chrome-extension://abc/ui/tokens.css", "chrome-extension://abc/ui/verdict-modal.css", "chrome-extension://abc/content/content.css"]
-  );
-  assert.ok(links.every((link) => link.attributes.rel === "stylesheet"));
   assert.equal(ui.dialog().opened, 1);
   assert.equal(ui.dialog().open, true);
   assert.equal(ui.documentElement.style.overflow, "hidden");
   assert.equal(ui.surface.querySelector(".verdict-score-fill").style.width, "92%");
+});
+
+test("the styles are one constructed stylesheet adopted by the shadow root, built from the bundle", async () => {
+  const ui = setup({ constructable: true });
+  await ui.deliver(WARNING);
+  const sheets = ui.host.shadow.adoptedStyleSheets;
+  assert.equal(sheets.length, 1);
+  assert.ok(sheets[0] instanceof FakeSheet);
+  assert.equal(sheets[0].replaced, 1);
+  assert.equal(sheets[0].css, ASSETS.css);
+  assert.deepEqual(ui.host.shadow.children.filter((child) => child.tagName === "style"), [], "no inline style needed");
+  await ui.deliver(BLOCK);
+  assert.equal(ui.host.shadow.adoptedStyleSheets.length, 1, "a new outcome does not adopt the sheet again");
+});
+
+test("without constructable stylesheets the bundle goes into one style element", async () => {
+  const ui = setup();
+  await ui.deliver(WARNING);
+  assert.equal(ui.host.shadow.adoptedStyleSheets, undefined);
+  const styles = ui.host.shadow.children.filter((child) => child.tagName === "style");
+  assert.equal(styles.length, 1);
+  assert.equal(styles[0].textContent, ASSETS.css);
+});
+
+test("the page is never asked for an extension URL: no link, no assetUrl call, no extension URL in the markup", async () => {
+  for (const constructable of [true, false]) {
+    const ui = setup({ constructable });
+    for (const outcome of [PENDING, WARNING, BLOCK, DEGRADED]) {
+      await ui.deliver(outcome);
+      assert.doesNotMatch(ui.surface.innerHTML, /chrome-extension:|<img|\ssrc=/);
+    }
+    assert.deepEqual(ui.host.shadow.children.filter((child) => child.tagName === "link"), []);
+    assert.deepEqual(ui.assetCalls, []);
+  }
+});
+
+test("the modal icons are inline svg", async () => {
+  const ui = setup();
+  await ui.deliver(WARNING);
+  assert.match(ui.surface.innerHTML, /<svg class="verdict-icon"/);
 });
 
 test("the same outcome twice renders once and does not stack another host", async () => {

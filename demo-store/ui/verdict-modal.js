@@ -35,10 +35,7 @@
   };
 
   function sizedIcon(name, cls, size) {
-    return (
-      "<img" + (cls ? ' class="' + cls + '"' : "") + ' src="' + ui.asset("icons/" + name + ".svg") + '" width="' + size +
-      '" height="' + size + '" alt="">'
-    );
+    return ui.sizedIcon(name, cls, size);
   }
 
   function detailRow(label, valueHtml) {
