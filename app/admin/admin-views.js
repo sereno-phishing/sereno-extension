@@ -53,23 +53,48 @@
     );
   }
 
-  function section(model, state) {
+  var TITLES = {
+    metricas: "Métricas de operación",
+    dominios: "Política por dominio",
+    cache: "Caché de veredictos"
+  };
+
+  /* "loading" or "error" while the section has not loaded; null once it has. */
+  function pendingSection(model) {
+    var load = (model.load || {})[model.section];
+    if (!load || load.status === "ready") {
+      return null;
+    }
+    return administrationUi.statusSection({ id: model.section, title: TITLES[model.section], state: load.status, message: load.message });
+  }
+
+  function section(model) {
+    var pending = pendingSection(model);
+    if (pending) {
+      return pending;
+    }
     switch (model.section) {
       case "dominios":
-        return administrationUi.domainsSection({ rows: model.domainsDraft || [], addPolicy: model.addPolicy, saved: model.domainsBanner });
+        return administrationUi.domainsSection({
+          rows: model.domainsDraft || [],
+          addPolicy: model.addPolicy,
+          saved: model.domainsBanner,
+          error: model.domainsError
+        });
       case "cache":
-        return administrationUi.cacheSection({ cache: state.cache, notice: model.cacheNotice });
+        return administrationUi.cacheSection({ cache: model.cache, notice: model.cacheNotice, error: model.cacheError });
       default:
         return administrationUi.metricsSection({ metrics: model.metrics, showAllQueries: model.showAllQueries });
     }
   }
 
-  /* model: the admin UI state (section, drafts, notices, metrics). */
+  /* model: the admin UI state (section, drafts, notices, the data the port
+     returned and the load state of each section). */
   function page(model, state) {
     if (!account.isAdmin(state.session)) {
       return accessGate();
     }
-    return sidebar(model.section, state.session) + '<main class="options-content">' + section(model, state) + "</main>";
+    return sidebar(model.section, state.session) + '<main class="options-content">' + section(model) + "</main>";
   }
 
   Sereno.adminViews = {

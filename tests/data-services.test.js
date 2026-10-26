@@ -22,6 +22,7 @@ const Sereno = load(
   "history/application/history-service.js",
   "survey/application/survey-service.js",
   "protection/application/protection-service.js",
+  "administration/application/administration-service.js",
   "platform/storage.js",
   "platform/seed.js",
   "platform/state-store.js",
@@ -32,13 +33,16 @@ const Sereno = load(
   "platform/providers/remote.js",
   "platform/providers/index.js",
   "ui/atoms.js",
+  "ui/molecules.js",
   "verdict/ui/verdict-ui.js",
+  "administration/ui/administration-views.js",
+  "app/admin/admin-views.js",
   "history/ui/history-views.js",
   "survey/ui/survey-views.js",
   "protection/ui/protection-views.js"
 );
 
-const { providers, historyService, surveyService, protectionService } = Sereno;
+const { providers, historyService, surveyService, protectionService, administrationService } = Sereno;
 const NOW = () => new Date(2026, 8, 21, 11, 30, 0);
 const BASE_URL = "https://api.sereno.test";
 
@@ -61,6 +65,12 @@ function fakeBackend(mock) {
     "POST /v1/auth/login": (body) => mock.auth.login(body.username, body.password),
     "GET /v1/history": () => mock.data.listHistory(),
     "DELETE /v1/history": () => mock.data.deleteHistory(),
+    "GET /v1/domains": () => mock.data.getDomainPolicies(),
+    "PUT /v1/domains": (body) => mock.data.putDomainPolicies(body.domains),
+    "GET /v1/cache": () => mock.data.getCache(),
+    "PUT /v1/cache/ttl": (body) => mock.data.setCacheTtl(body.ttlPhishingDays, body.ttlLegitHours),
+    "POST /v1/cache/invalidations": (body) => mock.data.invalidateCache(body.domain),
+    "GET /v1/metrics": () => mock.data.getMetrics(),
     "GET /v1/model": () => mock.data.getModelVersion(),
     "POST /v1/survey": (body) => mock.data.submitSurvey(body.answers)
   };
@@ -250,4 +260,176 @@ test("the model version comes from the backend and the notice follows it", () =>
   assert.doesNotMatch(protectionUi.modelVersionLabel({ session: null }, "1.2"), /is-updated/);
   assert.doesNotMatch(protectionUi.modelVersionLabel(state, null), /Modelo v/);
   assert.match(protectionUi.modelNotice("2.0"), /Modelo actualizado a v2\.0/);
+});
+
+/* ---------------- administration (HU-21, HU-28, HU-29) ---------------- */
+
+Object.keys(SETUPS).forEach((name) => {
+  test(name + ": administrationService loads and saves the domain policy", async () => {
+    const { services } = SETUPS[name]();
+    const loaded = await administrationService.loadDomains(services);
+    assert.equal(loaded.ok, true);
+    assert.equal(loaded.domains.length, 3);
+    assert.deepEqual(Object.keys(loaded.domains[0]).sort(), ["domain", "policy", "updatedAt"]);
+    const added = await administrationService.addDomain(services, { domain: "nuevo.pe", policy: "bloqueo", updatedAt: "2026-09-21" });
+    assert.equal(added.ok, true);
+    assert.deepEqual(added.domains[0], { domain: "nuevo.pe", policy: "bloqueo", updatedAt: "2026-09-21" });
+    assert.equal(added.domains.length, 4);
+    assert.deepEqual(await administrationService.saveDomains(services, []), { ok: true });
+    assert.deepEqual(await administrationService.loadDomains(services), { ok: true, domains: [] });
+  });
+
+  test(name + ": administrationService adding a listed domain moves it first without duplicating", async () => {
+    const { services } = SETUPS[name]();
+    const listed = (await administrationService.loadDomains(services)).domains[2];
+    const added = await administrationService.addDomain(services, { domain: listed.domain, policy: "bloqueo", updatedAt: "2026-09-22" });
+    assert.equal(added.domains.length, 3);
+    assert.deepEqual(added.domains[0], { domain: listed.domain, policy: "bloqueo", updatedAt: "2026-09-22" });
+  });
+
+  test(name + ": administrationService manages the verdict cache", async () => {
+    const { services } = SETUPS[name]();
+    const initial = await administrationService.loadCache(services);
+    assert.equal(initial.ok, true);
+    assert.equal(initial.cache.ttlPhishingDays, 7);
+    const ttl = await administrationService.saveTtl(services, "14", "0");
+    assert.equal(ttl.ok, true);
+    assert.equal(ttl.cache.ttlPhishingDays, 14);
+    assert.equal(ttl.cache.ttlLegitHours, 24);
+    const invalidated = await administrationService.invalidateDomain(services, "ejemplo.pe");
+    assert.equal(invalidated.ok, true);
+    assert.deepEqual(invalidated.cache.invalidations[0], {
+      domain: "ejemplo.pe",
+      status: "Se reevaluará en la próxima consulta",
+      date: "21/09/2026"
+    });
+    assert.deepEqual((await administrationService.loadCache(services)).cache, invalidated.cache);
+  });
+
+  test(name + ": administrationService loads the metrics", async () => {
+    const { services } = SETUPS[name]();
+    const metrics = await administrationService.loadMetrics(services);
+    assert.equal(metrics.ok, true);
+    assert.equal(metrics.metrics.analyzed, 1284);
+  });
+});
+
+test("administration failures are normalized with a Spanish message and nothing throws", async () => {
+  const cases = [
+    ["offline", failingServices(OFFLINE)],
+    ["timeout", failingServices(HUNG)],
+    ["server", failingServices(async () => reply(500, {}))],
+    ["cache_down", failingServices(async () => reply(503, { error: "cache_down" }))]
+  ];
+  for (const [code, services] of cases) {
+    const expected = { ok: false, error: code, message: providers.errors.message(code) };
+    const row = { domain: "a.pe", policy: "bloqueo", updatedAt: "2026-09-21" };
+    assert.deepEqual(await administrationService.loadDomains(services), expected, "domains " + code);
+    assert.deepEqual(await administrationService.addDomain(services, row), expected, "add " + code);
+    assert.deepEqual(await administrationService.saveDomains(services, [row]), expected, "save " + code);
+    assert.deepEqual(await administrationService.loadCache(services), expected, "cache " + code);
+    assert.deepEqual(await administrationService.saveTtl(services, "1", "1"), expected, "ttl " + code);
+    assert.deepEqual(await administrationService.invalidateDomain(services, "a.pe"), expected, "invalidate " + code);
+    assert.deepEqual(await administrationService.loadMetrics(services), expected, "metrics " + code);
+  }
+});
+
+test("malformed administration answers and broken ports read as a server failure", async () => {
+  const server = { ok: false, error: "server", message: providers.errors.message("server") };
+  const malformed = {
+    data: {
+      getDomainPolicies: async () => ({ ok: true, domains: "nope" }),
+      putDomainPolicies: async () => null,
+      getCache: async () => ({ ok: true, cache: null }),
+      setCacheTtl: async () => ({ ok: true }),
+      invalidateCache: async () => ({ ok: true, cache: 3 }),
+      getMetrics: async () => ({ ok: true, metrics: [] })
+    }
+  };
+  assert.deepEqual(await administrationService.loadDomains(malformed), server);
+  assert.deepEqual(await administrationService.addDomain(malformed, { domain: "a.pe", policy: "bloqueo", updatedAt: "x" }), server);
+  assert.deepEqual(await administrationService.saveDomains(malformed, []), server);
+  assert.deepEqual(await administrationService.loadCache(malformed), server);
+  assert.deepEqual(await administrationService.saveTtl(malformed, "1", "1"), server);
+  assert.deepEqual(await administrationService.invalidateDomain(malformed, "a.pe"), server);
+  assert.deepEqual(await administrationService.loadMetrics(malformed), server);
+  assert.deepEqual(await administrationService.loadDomains({}), server);
+  assert.deepEqual(await administrationService.loadMetrics({ data: { getMetrics: () => { throw new Error("boom"); } } }), server);
+});
+
+const ADMIN_STATE = { session: { username: "admin.sereno", role: "administrador", loginAt: "t", token: "x" } };
+const LOADED = {
+  metricas: { status: "ready" },
+  dominios: { status: "ready" },
+  cache: { status: "ready" }
+};
+function adminModel(extra) {
+  return Object.assign(
+    {
+      section: "dominios",
+      metrics: Sereno.seed.metrics,
+      cache: { ttlPhishingDays: 7, ttlLegitHours: 24, invalidations: [] },
+      domainsDraft: [{ domain: "a.pe", policy: "bloqueo", updatedAt: "2026-09-21" }],
+      addPolicy: "advertencia",
+      load: LOADED
+    },
+    extra
+  );
+}
+
+test("each admin section renders its loading state", () => {
+  ["metricas", "dominios", "cache"].forEach((section) => {
+    const html = Sereno.adminViews.page(adminModel({ section, load: { [section]: { status: "loading" } } }), ADMIN_STATE);
+    assert.match(html, /Cargando/, section);
+    assert.match(html, /role="status"/, section);
+    assert.doesNotMatch(html, /data-action="(save-domains|save-ttl|add-domain)"/, section);
+    assert.match(html, /data-action="nav"/, "the sidebar stays usable");
+  });
+});
+
+test("each admin section renders its error state with the message and a retry", () => {
+  const message = providers.errors.message("offline");
+  ["metricas", "dominios", "cache"].forEach((section) => {
+    const html = Sereno.adminViews.page(adminModel({ section, load: { [section]: { status: "error", message } } }), ADMIN_STATE);
+    assert.match(html, /role="alert"/, section);
+    assert.match(html, /Sin conexión/, section);
+    assert.match(html, new RegExp('data-action="retry" data-section="' + section + '"'), section);
+    assert.doesNotMatch(html, /data-action="(save-domains|save-ttl|add-domain)"/, section);
+  });
+});
+
+test("empty data shows an empty state while the controls stay", () => {
+  const domains = Sereno.adminViews.page(adminModel({ domainsDraft: [] }), ADMIN_STATE);
+  assert.match(domains, /Todavía no hay dominios en la lista/);
+  assert.match(domains, /data-action="add-domain"/);
+  assert.doesNotMatch(domains, /<table/);
+  const cache = Sereno.adminViews.page(adminModel({ section: "cache" }), ADMIN_STATE);
+  assert.match(cache, /No hay invalidaciones recientes/);
+  assert.match(cache, /data-action="save-ttl"/);
+  const metrics = Sereno.adminViews.page(adminModel({ section: "metricas", metrics: null }), ADMIN_STATE);
+  assert.match(metrics, /Todavía no hay métricas/);
+});
+
+test("the loaded sections keep their happy path markup", () => {
+  const domains = Sereno.adminViews.page(adminModel(), ADMIN_STATE);
+  assert.match(domains, /<table/);
+  assert.match(domains, /a\.pe/);
+  assert.doesNotMatch(domains, /role="alert"/);
+  const withInvalidation = { ttlPhishingDays: 9, ttlLegitHours: 5, invalidations: [{ domain: "x.pe", status: "s", date: "2026-09-18" }] };
+  const cache = Sereno.adminViews.page(adminModel({ section: "cache", cache: withInvalidation }), ADMIN_STATE);
+  assert.match(cache, /value="9"/);
+  assert.match(cache, /x\.pe/);
+  const metrics = Sereno.adminViews.page(adminModel({ section: "metricas" }), ADMIN_STATE);
+  assert.match(metrics, /1 284/);
+});
+
+test("a failed save or invalidation shows an error banner above the section", () => {
+  const message = providers.errors.message("timeout");
+  const domains = Sereno.adminViews.page(adminModel({ domainsError: message }), ADMIN_STATE);
+  assert.match(domains, /role="alert"/);
+  assert.match(domains, /tardó demasiado/);
+  assert.match(domains, /data-action="save-domains"/);
+  const cache = Sereno.adminViews.page(adminModel({ section: "cache", cacheError: message }), ADMIN_STATE);
+  assert.match(cache, /role="alert"/);
+  assert.match(cache, /data-action="save-ttl"/);
 });

@@ -176,7 +176,7 @@
     }
 
     async function putDomainPolicies(domains) {
-      await Sereno.administrationService.saveDomains(getStore(), clone(domains));
+      await getStore().set({ domains: clone(domains).map(Sereno.domainPolicy.toRow) });
       return { ok: true };
     }
 
@@ -186,12 +186,17 @@
     }
 
     async function setCacheTtl(phishingDays, legitHours) {
-      await Sereno.administrationService.saveTtl(getStore(), phishingDays, legitHours);
+      await getStore().update(function (state) {
+        return { cache: Sereno.verdictCache.withTtl(state.cache, phishingDays, legitHours) };
+      });
       return getCache();
     }
 
     async function invalidateCache(domain) {
-      await Sereno.administrationService.invalidateDomain(getStore(), domain, now());
+      var day = Sereno.time.formatDate(now());
+      await getStore().update(function (state) {
+        return { cache: Sereno.verdictCache.withInvalidation(state.cache, domain, day) };
+      });
       return getCache();
     }
 

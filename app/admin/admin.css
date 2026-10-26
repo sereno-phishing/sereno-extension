@@ -204,6 +204,26 @@ p {
   line-height: 1.21;
 }
 
+/* Error banner (a failed save or invalidation) and the status panels of a
+   section that is loading, empty or failed. */
+.banner-error.section-banner {
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.21;
+}
+
+.panel-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .banner-img {
   display: block;
   flex: 0 0 auto;

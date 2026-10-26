@@ -35,6 +35,26 @@
     return '<div class="card-head"><div class="card-title">' + ui.esc(title) + "</div>" + (extraHtml || "") + "</div>";
   }
 
+  function errorBanner(text) {
+    return ui.banner({ tone: "error", cls: "section-banner", role: "alert", iconHtml: ui.icon("bad", "banner-img"), text: text });
+  }
+
+  /* A section that has no data to show: "loading", "error" (message + retry)
+     or "empty". model: { id, title, state, message } */
+  function statusSection(model) {
+    var body;
+    if (model.state === "loading") {
+      body = '<div class="card panel-status" role="status">Cargando...</div>';
+    } else if (model.state === "error") {
+      body =
+        '<div class="card panel-status">' + errorBanner(model.message) +
+        '<button type="button" class="btn btn-ghost" data-action="retry" data-section="' + ui.esc(model.id) + '">Reintentar</button></div>';
+    } else {
+      body = '<div class="card panel-status">' + ui.esc(model.message) + "</div>";
+    }
+    return '<section class="section section-' + ui.esc(model.id) + '">' + sectionHead(model.title, "") + body + "</section>";
+  }
+
   function successBanner(text) {
     return ui.banner({ tone: "success", cls: "section-banner", role: "status", iconHtml: ui.icon("admin-banner-ok", "banner-img"), text: text });
   }
@@ -107,6 +127,9 @@
   /* model: { metrics, showAllQueries } */
   function metricsSection(model) {
     var metrics = model.metrics;
+    if (!metrics || typeof metrics.analyzed !== "number") {
+      return statusSection({ id: "metricas", title: "Métricas de operación", state: "empty", message: "Todavía no hay métricas para mostrar." });
+    }
     return (
       '<section class="section section-metricas">' +
       sectionHead("Métricas de operación", '<span class="section-ago">Últimas 24 horas</span>') +
@@ -148,6 +171,9 @@
   }
 
   function domainsTable(rows) {
+    if (!rows.length) {
+      return '<div class="card panel-status">Todavía no hay dominios en la lista.</div>';
+    }
     return ui.tableCard({
       tableCls: "t-policy",
       columns: ["Dominio", "Política", "Modificado", ""],
@@ -166,12 +192,13 @@
     });
   }
 
-  /* model: { rows, addPolicy, saved } */
+  /* model: { rows, addPolicy, saved, error? } */
   function domainsSection(model) {
     return (
       '<section class="section section-dominios">' +
       describedHead("Política por dominio", "Elige qué pasa cuando un dominio de la lista se detecta como phishing.") +
       (model.saved ? successBanner("Cambios guardados.") : "") +
+      (model.error ? errorBanner(model.error) : "") +
       addDomainCard(model.addPolicy) +
       domainsTable(model.rows) +
       '<div class="note-bar">Si un dominio no está en la lista, se aplica ' + ui.esc(domainPolicy.POLICIES[domainPolicy.DEFAULT_POLICY].label) + ".</div>" +
@@ -220,6 +247,9 @@
   }
 
   function invalidationsCard(cache) {
+    if (!(cache.invalidations || []).length) {
+      return '<div class="card panel-status">No hay invalidaciones recientes.</div>';
+    }
     return ui.tableCard({
       headHtml: cardHead("Invalidaciones recientes"),
       tableCls: "t-cache",
@@ -230,13 +260,14 @@
     });
   }
 
-  /* model: { cache, notice } */
+  /* model: { cache, notice, error? } */
   function cacheSection(model) {
     var cache = model.cache || {};
     return (
       '<section class="section section-cache">' +
       describedHead("Caché de veredictos", "Controla cuánto dura cada veredicto guardado y fuerza una nueva evaluación de un dominio.") +
       (model.notice ? successBanner(model.notice) : "") +
+      (model.error ? errorBanner(model.error) : "") +
       '<div class="cache-grid">' + ttlCard(cache) + invalidateCard() + "</div>" +
       invalidationsCard(cache) +
       "</section>"
@@ -244,6 +275,7 @@
   }
 
   Sereno.administrationUi = {
+    statusSection: statusSection,
     metricsSection: metricsSection,
     domainsSection: domainsSection,
     cacheSection: cacheSection
