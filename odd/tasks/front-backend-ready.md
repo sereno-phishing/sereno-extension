@@ -45,7 +45,7 @@ Out: the backend itself, ML, real persistence, metrics aggregation (HU-02, 06-12
 - [x] T1 Provider ports, config switch, mock + remote adapters, composition root `Sereno.services`, architecture guard test (tests first)
 - [x] T2 Async verdict service with timeout, offline and degraded states (HU-25/26)
 - [x] T3 Auth provider port: session token, remove plain-text compare (HU-13/14/15)
-- [ ] T4 Data providers for history, policy, cache, metrics, model version, survey (HU-17-21, 27-29, 32)
+- [x] T4 Data providers for history, policy, cache, metrics, model version, survey (HU-17-21, 27-29, 32)
 - [ ] T5 Service worker: navigation to verdict, real-tab badge, history write (HU-04/05/22/25)
 - [ ] T6 Content script: in-page modal for warn/block/pending/degraded (HU-05/22/25)
 - [ ] T7 UI states and a11y: degraded banner, errors, focus trap, ARIA, reduced motion
@@ -64,6 +64,8 @@ T1 done: provider ports, config switch, mock and remote adapters, composition ro
 T2 done: `verdict/domain/outcome.js` (Outcome model, fail-open rules), `verdict/application/verdict-service.js` (`evaluate(services, url, opts)`, own deadline, onPending, optional store publish) and a degraded protection level and card. Not yet wired into any page: script tags and the popup container passing the level come in T5-T7.
 
 T3 done: `account/domain/account.js` is password-free (format validation, session `{username, role, loginAt, token}`, error messages); `Sereno.accountService` is async (`login/register/logout/currentSession(services, store, ...)`) and goes through `services.auth`; the mock adapter is the only place that checks the seed password and issues opaque tokens. The popup uses `Sereno.services`, loads the provider scripts, `outcome.js` and `verdict-service.js`, and passes `Sereno.protection.levelOf(state)` to `protectionCard()`. The admin page reads no session, so it is unchanged. Account views show offline/timeout/server messages.
+
+T4 done: history, survey, model version, domain policy, cache and metrics go through `services.data`. New `platform/providers/errors.js` (`Sereno.providers.errors`: transport error codes to Spanish text and the normalized `{ok:false,error,message}`). `historyService.list/clear(services)`, `surveyService.saveDraft(store,answers)` / `submit(services,store,answers,now)`, `protectionService.loadModelVersion(services)`, `administrationService.loadDomains/saveDomains/addDomain/loadCache/saveTtl/invalidateDomain/loadMetrics(services,...)`, all async and never throwing. The mock plays the backend: it records history when it evaluates a site for a signed-in user and no longer calls any use case. The demo store evaluates recorded scenarios through `services.verdict.evaluate`. Popup shows loading/error states for history, survey result retry and the backend model version; every admin section has loading, empty and error states with retry. The stale auth comment in `ports.js` is fixed. Direct store access remains only for UI drafts, the session and `currentSite`.
 
 ## Verification evidence
 
@@ -84,6 +86,11 @@ T3:
 - GREEN: `node --test` = 141 pass, 0 fail (119 baseline, two obsolete plain-text tests removed from `use-cases.test.js`, 22+ new). `rg -n "password" account/domain` shows only parameter names of `validateCredentials` and comments; no comparison.
 - Commit: 576e70f
 
+T4 (two work units):
+- Unit A (popup side) RED: `tests/data-services.test.js` written first; `node --test` = 142 tests, 141 pass, 1 fail (the file could not load: `platform/providers/errors.js` missing). GREEN: `node --test` = 159 pass, 0 fail (141 baseline, 3 obsolete store-based tests removed from `use-cases.test.js`, 21 new). The two `.then` in the popup login/register handlers stay: an async function adds a microtask and breaks the popup tests' timing. Commit: addb8df
+- Unit B (admin side) RED: admin tests appended first; `node --test` = 174 tests, 159 pass, 15 fail (first: `mock: administrationService loads and saves the domain policy`, `loadDomains` not a function). GREEN: `node --test` = 177 pass, 0 fail (the obsolete store-based administration test removed, so `tests/use-cases.test.js` was deleted; 4 container tests in `tests/admin-page.test.js`). Commit: 6890b11
+- `rg -n "Sereno.seed|state\.(history|domains|cache|metrics)" history survey administration protection app` = no hits.
+
 ## Next step
 
-Launch the writer for T4 (data providers for history, policy, cache, metrics, model version, survey).
+Launch the writer for T5 (service worker: navigation to verdict, real-tab badge, history write; the history write is the backend's job through `verdict.evaluate`, so the worker only calls the verdict port).
