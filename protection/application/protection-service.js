@@ -16,8 +16,13 @@
     return store.set({ currentSite: site });
   }
 
-  function dismissModelNotice(store) {
-    return store.set({ modelNoticeDismissed: true });
+  /* Remembers the model version the user has now seen. The old boolean is
+     cleared so later backend versions announce themselves again. */
+  function dismissModelNotice(store, version) {
+    if (typeof version !== "string" || !version) {
+      return Promise.resolve();
+    }
+    return store.set({ lastSeenModelVersion: version, modelNoticeDismissed: false });
   }
 
   async function loadModelVersion(services) {

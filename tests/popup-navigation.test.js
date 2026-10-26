@@ -304,3 +304,32 @@ test("Tab is trapped inside the open confirmation and the menu returns focus on 
   assert.equal(popup.renders.at(-1).menuOpen, false);
   assert.equal(popup.focused.at(-1), '[data-action="toggle-menu"]');
 });
+
+test("dismissing the model notice stores the version the backend reported", async () => {
+  const dismissed = [];
+  const popup = await popupHarness({
+    state: { session: USER },
+    protectionService: {
+      loadModelVersion: async () => ({ ok: true, version: "2.0" }),
+      dismissModelNotice: (store, version) => { dismissed.push(version); }
+    }
+  });
+  await settle();
+  popup.actions["dismiss-notice"]();
+  assert.deepEqual(dismissed, ["2.0"]);
+});
+
+test("the model version is loaded once per user, not again when the notice is dismissed", async () => {
+  let loads = 0;
+  const popup = await popupHarness({
+    state: { session: USER },
+    protectionService: {
+      loadModelVersion: async () => { loads += 1; return { ok: true, version: "2.0" }; },
+      dismissModelNotice: (store, version) => popup.state && Object.assign(popup.state, { lastSeenModelVersion: version })
+    }
+  });
+  await settle();
+  popup.actions["dismiss-notice"]();
+  await settle();
+  assert.equal(loads, 1);
+});

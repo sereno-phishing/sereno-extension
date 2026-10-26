@@ -234,7 +234,8 @@
   function syncBackendData(state) {
     var session = state.session;
     var user = session ? session.username : null;
-    var modelKey = user + "|" + !!state.modelNoticeDismissed;
+    /* The backend reports one version, so it is asked once per user and not again when the notice is dismissed. */
+    var modelKey = String(user);
     if (modelKey !== loaded.modelKey) {
       loaded.modelKey = modelKey;
       loadModelVersion();
@@ -411,7 +412,7 @@
       refreshSession();
     },
     "dismiss-notice": function () {
-      Sereno.protectionService.dismissModelNotice(store);
+      Sereno.protectionService.dismissModelNotice(store, App.modelVersion);
     }
   };
 

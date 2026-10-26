@@ -72,7 +72,7 @@
 
   /* The notice names the model version the backend reported; without it there is nothing to announce. */
   function noticeIfVisible(state, model) {
-    return model.modelVersion && Sereno.protection.isNoticeVisible(state) ? protectionUi.modelNotice(model.modelVersion) : "";
+    return Sereno.protection.isNoticeVisible(state, model.modelVersion) ? protectionUi.modelNotice(model.modelVersion) : "";
   }
 
   /* "degraded" when the verdict backend is down (HU-26), otherwise "active". */
@@ -88,10 +88,11 @@
       parts.push(tabs(true, model.tabSlide));
     }
     var card = protectionUi.protectionCard(protectionLevel(state));
+    var site = protectionUi.siteCard(state.currentSite, protectionLevel(state));
     if (!session) {
       parts.push(
         card,
-        protectionUi.siteCard(state.currentSite, protectionLevel(state)),
+        site,
         protectionUi.iconLegend(),
         '<div class="flex-spacer"></div>',
         '<p class="muted-line">Inicia sesión para guardar tu historial.</p>',
@@ -101,10 +102,10 @@
           "</div>"
       );
     } else if (admin) {
-      parts.push(card, adminEntryCard(), noticeIfVisible(state, model));
+      parts.push(card, site, adminEntryCard(), noticeIfVisible(state, model));
     } else {
       parts.push(
-        '<div class="tab-panel" role="tabpanel" id="tabpanel-home" aria-labelledby="tab-home">' + card + noticeIfVisible(state, model) + "</div>"
+        '<div class="tab-panel" role="tabpanel" id="tabpanel-home" aria-labelledby="tab-home">' + card + site + noticeIfVisible(state, model) + "</div>"
       );
     }
     return '<section class="' + ui.classes(["view", "view-home", admin && "view-home-admin"]) + '">' + parts.join("") + "</section>";

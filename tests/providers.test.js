@@ -198,7 +198,7 @@ Object.keys(ADAPTERS).forEach((name) => {
     const metrics = await data.getMetrics();
     assert.equal(metrics.ok, true);
     assert.equal(metrics.metrics.analyzed, 1284);
-    assert.deepEqual(await data.getModelVersion(), { ok: true, version: "1.2" });
+    assert.deepEqual(await data.getModelVersion(), { ok: true, version: "1.3" });
     assert.deepEqual(await data.submitSurvey([5, 1, 5, 1, 5, 1, 5, 1, 5, 1]), { ok: true });
   });
 });

@@ -60,8 +60,8 @@ las pruebas automáticas no cubren está en
 5. Vuelve al popup para ver el estado del sitio y el historial de la navegación
    que simulaste. En el panel de administración puedes ver las métricas,
    los dominios y la caché de esa operación. Con `andres.torres` ves la experiencia
-   de usuario (tarjeta «Este sitio», pestañas Inicio/Historial); con `admin.sereno`
-   ves la tarjeta de administración que abre el panel.
+   de usuario (pestañas Inicio/Historial); con `admin.sereno` ves la tarjeta de
+   administración que abre el panel. La tarjeta «Este sitio» aparece con y sin sesión.
 
 Para empezar de cero, borra el historial desde el popup. También puedes quitar
 y volver a cargar la extensión en `chrome://extensions` para restaurar los datos
@@ -108,7 +108,7 @@ se conecte; las vistas no cambian.
 | Estado de la protección | HU-24 | Popup → tarjeta «Protección activa» y estado del sitio | Listo |
 | Evaluación pendiente | HU-25 | Badge `…`, toast en página, estado «Evaluando…» | Listo con mock |
 | Protección degradada | HU-26 | Badge `?`, aviso en página, tarjeta ámbar del popup | Listo; el popup no explica la causa (ver abajo) |
-| Versión del modelo | HU-27 | Pie del popup y aviso «Modelo actualizado» | Solo la lectura (`GET /v1/model`); el entrenamiento queda fuera |
+| Versión del modelo | HU-27 | Pie del popup (misma versión con y sin sesión) y aviso «Modelo actualizado» (solo con sesión, cuando la versión del backend difiere de la última vista) | Solo la lectura (`GET /v1/model`); el entrenamiento queda fuera |
 | Caché | HU-28 | Panel de administración → Caché | Listo con mock; backend |
 | Métricas de operación | HU-29 | Panel de administración → Métricas | Listo con mock; el cálculo es del backend |
 | Encuesta SUS | HU-32 | Popup → menú de cuenta → Encuesta de opinión | Listo con mock; backend recibe las respuestas |

@@ -82,7 +82,7 @@
      unknown, then only "Modelo" shows). The label highlights a fresh update. */
   function modelVersionLabel(state, version) {
     return (
-      '<span class="' + ui.classes(["footer-model", version && protection.isNoticeVisible(state) && "is-updated"]) + '">Modelo' +
+      '<span class="' + ui.classes(["footer-model", protection.isNoticeVisible(state, version) && "is-updated"]) + '">Modelo' +
       (version ? " v" + ui.esc(version) : "") + "</span>"
     );
   }

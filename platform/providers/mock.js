@@ -205,8 +205,7 @@
     }
 
     async function getModelVersion() {
-      var state = await getStore().get();
-      return { ok: true, version: Sereno.protection.modelVersion(state) };
+      return { ok: true, version: Sereno.seed.modelVersion };
     }
 
     async function submitSurvey(answers) {

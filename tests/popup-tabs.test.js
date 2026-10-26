@@ -19,7 +19,7 @@ function popupViews() {
     history: { entriesOf: () => [] },
     historyUi: { listView: ({ tabsHtml }) => `<section class="view view-history">${tabsHtml}</section>` },
     protection: { isNoticeVisible: () => false },
-    protectionUi: { protectionCard: () => "", modelVersionLabel: () => "" }
+    protectionUi: { protectionCard: () => "", siteCard: () => "", modelVersionLabel: () => "" }
   };
   const context = vm.createContext({ Sereno });
   vm.runInContext(fs.readFileSync(path.join(ROOT, "app/popup/popup-views.js"), "utf8"), context);

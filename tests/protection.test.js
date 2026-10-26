@@ -10,12 +10,30 @@ const { protection, onboarding, demoScenarios } = load(
   "demo-store/domain/scenarios.js"
 );
 
-test("the model notice shows for signed-in users until dismissed", () => {
-  assert.equal(protection.isNoticeVisible({ session: null }), false);
-  assert.equal(protection.isNoticeVisible({ session: { username: "a" }, modelNoticeDismissed: false }), true);
-  assert.equal(protection.isNoticeVisible({ session: { username: "a" }, modelNoticeDismissed: true }), false);
-  assert.equal(protection.modelVersion({ session: { username: "a" } }), "1.3");
-  assert.equal(protection.modelVersion({ session: null }), "1.2");
+test("the model notice is data driven: signed in, backend version differs from the last one seen", () => {
+  const user = { username: "a" };
+  assert.equal(protection.isNoticeVisible({ session: null, lastSeenModelVersion: "1.2" }, "1.3"), false);
+  assert.equal(protection.isNoticeVisible({ session: user, lastSeenModelVersion: "1.2" }, "1.3"), true);
+  assert.equal(protection.isNoticeVisible({ session: user, lastSeenModelVersion: "1.3" }, "1.3"), false);
+  assert.equal(protection.isNoticeVisible({ session: user, lastSeenModelVersion: "1.2" }, null), false);
+  assert.equal(protection.isNoticeVisible({ session: user, lastSeenModelVersion: "1.2" }), false);
+  assert.equal(protection.isNoticeVisible({ session: user }, "1.3"), true);
+});
+
+test("a state saved with the old modelNoticeDismissed flag does not show the notice again", () => {
+  const user = { username: "a" };
+  assert.equal(protection.isNoticeVisible({ session: user, modelNoticeDismissed: true }, "1.3"), false);
+  assert.equal(protection.isNoticeVisible({ session: user, modelNoticeDismissed: true, lastSeenModelVersion: "1.2" }, "1.3"), false);
+  assert.equal(protection.isNoticeVisible({ session: user, modelNoticeDismissed: false, lastSeenModelVersion: "1.2" }, "1.3"), true);
+});
+
+test("the domain no longer derives a model version from the session", () => {
+  assert.equal(protection.modelVersion, undefined);
+  assert.equal(protection.MODEL_VERSION, undefined);
+  assert.equal(protection.UPDATED_MODEL_VERSION, undefined);
+});
+
+test("evaluatingSite builds the placeholder", () => {
   assert.deepEqual(protection.evaluatingSite("x.pe", "t"), { domain: "x.pe", status: "evaluando", score: null, source: null, ts: "t" });
 });
 

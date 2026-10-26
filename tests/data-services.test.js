@@ -179,7 +179,7 @@ Object.keys(SETUPS).forEach((name) => {
 
   test(name + ": protectionService.loadModelVersion reads the version from the port", async () => {
     const { services, store } = SETUPS[name]();
-    assert.deepEqual(await protectionService.loadModelVersion(services), { ok: true, version: "1.2" });
+    assert.deepEqual(await protectionService.loadModelVersion(services), { ok: true, version: "1.3" });
     await store.set({ session: { username: "andres.torres", role: "usuario", loginAt: "t", token: "x" } });
     assert.deepEqual(await protectionService.loadModelVersion(services), { ok: true, version: "1.3" });
   });
@@ -253,11 +253,11 @@ test("survey result shows a retryable error when the submission failed", () => {
 
 test("the model version comes from the backend and the notice follows it", () => {
   const { protectionUi } = Sereno;
-  const state = { session: { username: "a" }, modelNoticeDismissed: false };
+  const state = { session: { username: "a" }, lastSeenModelVersion: "1.2" };
   assert.match(protectionUi.modelVersionLabel(state, "1.3"), /Modelo v1\.3/);
   assert.match(protectionUi.modelVersionLabel(state, "1.3"), /is-updated/);
-  assert.match(protectionUi.modelVersionLabel({ session: null }, "1.2"), /Modelo v1\.2/);
-  assert.doesNotMatch(protectionUi.modelVersionLabel({ session: null }, "1.2"), /is-updated/);
+  assert.match(protectionUi.modelVersionLabel({ session: null }, "1.3"), /Modelo v1\.3/);
+  assert.doesNotMatch(protectionUi.modelVersionLabel({ session: null }, "1.3"), /is-updated/);
   assert.doesNotMatch(protectionUi.modelVersionLabel(state, null), /Modelo v/);
   assert.match(protectionUi.modelNotice("2.0"), /Modelo actualizado a v2\.0/);
 });
