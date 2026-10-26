@@ -356,3 +356,7 @@ test("captureFocus restores focus on the element that matches after a re-render"
   const idle = Sereno.ui.captureFocus(root, { activeElement: { tagName: "BODY", getAttribute: () => null } });
   assert.doesNotThrow(idle);
 });
+
+test("the admin page shows a loading status until its first render replaces it", () => {
+  assert.match(read("app/admin/admin.html"), /<div id="app" class="options-shell">\s*<div class="card panel-status" role="status">Cargando el panel\.\.\.<\/div>\s*<\/div>/);
+});
