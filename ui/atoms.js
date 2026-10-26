@@ -13,6 +13,12 @@
   var DEFAULT_ASSET_ROOT = "../../assets/";
   var assetRoot = DEFAULT_ASSET_ROOT;
 
+  /* Inline mode (content script): { name: "<svg ...>" }. When set, icons and the
+     logo are drawn as inline svg and nothing points at an extension URL, so a
+     foreign page is never asked to load one (and its img-src policy cannot
+     block them). null keeps the default: <img> from the asset root. */
+  var inlineIcons = null;
+
   function esc(value) {
     return String(value === undefined || value === null ? "" : value)
       .replace(/&/g, "&amp;")
@@ -31,6 +37,33 @@
     assetRoot = root || DEFAULT_ASSET_ROOT;
   }
 
+  /* Switches the icons to inline svg fed by a { name: markup } map (see
+     tools/build-content-assets.js); called without a map it goes back to <img>. */
+  function setInlineAssets(icons) {
+    inlineIcons = icons || null;
+  }
+
+  /* Root <svg> of the bundled markup with a class, an optional size and the
+     accessibility attributes of a picture; a missing icon draws nothing. */
+  function inlineSvg(name, cls, size, alt) {
+    var markup = inlineIcons[name];
+    if (!markup) {
+      return "";
+    }
+    return markup.replace(/^<svg\b([^>]*)>/, function (match, attributes) {
+      var rest = attributes.replace(/\s(?:class|role|aria-hidden|aria-label|focusable)="[^"]*"/g, "");
+      if (size) {
+        rest = rest.replace(/\s(?:width|height)="[^"]*"/g, "");
+      }
+      return (
+        "<svg" + (cls ? ' class="' + esc(cls) + '"' : "") +
+        (size ? ' width="' + size + '" height="' + size + '"' : "") +
+        (alt ? ' role="img" aria-label="' + esc(alt) + '"' : ' aria-hidden="true" focusable="false"') +
+        rest + ">"
+      );
+    });
+  }
+
   /* Ordered [name, value] pairs -> ' name="value"' string. */
   function attrs(pairs) {
     return (pairs || [])
@@ -45,6 +78,10 @@
   }
 
   function image(path, cls, alt) {
+    if (inlineIcons) {
+      var named = /^icons\/(.+)\.svg$/.exec(path);
+      return named ? inlineSvg(named[1], cls, 0, alt) : "";
+    }
     return '<img class="' + cls + '" src="' + asset(path) + '" alt="' + esc(alt || "") + '">';
   }
 
@@ -53,12 +90,28 @@
     return image("icons/" + name + ".svg", cls, "");
   }
 
+  /* Icon with an explicit pixel size (class optional), as the views of the in-page
+     modal need it. */
+  function sizedIcon(name, cls, size) {
+    if (inlineIcons) {
+      return inlineSvg(name, cls, size, "");
+    }
+    return (
+      "<img" + (cls ? ' class="' + cls + '"' : "") + ' src="' + asset("icons/" + name + ".svg") + '" width="' + size +
+      '" height="' + size + '" alt="">'
+    );
+  }
+
   /* Fixed-size popup artwork: class "art art-<size>". */
   function art(name, size) {
     return icon(name, "art art-" + size);
   }
 
+  /* The PNG logo; inline mode draws the brand mark instead. */
   function logo(cls, alt) {
+    if (inlineIcons) {
+      return inlineSvg("brand", cls, 0, alt);
+    }
     return image("logo.png", cls, alt);
   }
 
@@ -125,10 +178,12 @@
     esc: esc,
     asset: asset,
     setAssetRoot: setAssetRoot,
+    setInlineAssets: setInlineAssets,
     attrs: attrs,
     classes: classes,
     image: image,
     icon: icon,
+    sizedIcon: sizedIcon,
     art: art,
     logo: logo,
     button: button,
