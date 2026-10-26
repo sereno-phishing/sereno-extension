@@ -46,7 +46,7 @@ Out: the backend itself, ML, real persistence, metrics aggregation (HU-02, 06-12
 - [x] T2 Async verdict service with timeout, offline and degraded states (HU-25/26)
 - [x] T3 Auth provider port: session token, remove plain-text compare (HU-13/14/15)
 - [x] T4 Data providers for history, policy, cache, metrics, model version, survey (HU-17-21, 27-29, 32)
-- [ ] T5 Service worker: navigation to verdict, real-tab badge, history write (HU-04/05/22/25)
+- [x] T5 Service worker: navigation to verdict, real-tab badge, history write (HU-04/05/22/25)
 - [ ] T6 Content script: in-page modal for warn/block/pending/degraded (HU-05/22/25)
 - [ ] T7 UI states and a11y: degraded banner, errors, focus trap, ARIA, reduced motion
 - [ ] T8 Manifest cleanup (name, permissions, host_permissions, CSP, min Chrome) and README provider guide
@@ -66,6 +66,25 @@ T2 done: `verdict/domain/outcome.js` (Outcome model, fail-open rules), `verdict/
 T3 done: `account/domain/account.js` is password-free (format validation, session `{username, role, loginAt, token}`, error messages); `Sereno.accountService` is async (`login/register/logout/currentSession(services, store, ...)`) and goes through `services.auth`; the mock adapter is the only place that checks the seed password and issues opaque tokens. The popup uses `Sereno.services`, loads the provider scripts, `outcome.js` and `verdict-service.js`, and passes `Sereno.protection.levelOf(state)` to `protectionCard()`. The admin page reads no session, so it is unchanged. Account views show offline/timeout/server messages.
 
 T4 done: history, survey, model version, domain policy, cache and metrics go through `services.data`. New `platform/providers/errors.js` (`Sereno.providers.errors`: transport error codes to Spanish text and the normalized `{ok:false,error,message}`). `historyService.list/clear(services)`, `surveyService.saveDraft(store,answers)` / `submit(services,store,answers,now)`, `protectionService.loadModelVersion(services)`, `administrationService.loadDomains/saveDomains/addDomain/loadCache/saveTtl/invalidateDomain/loadMetrics(services,...)`, all async and never throwing. The mock plays the backend: it records history when it evaluates a site for a signed-in user and no longer calls any use case. The demo store evaluates recorded scenarios through `services.verdict.evaluate`. Popup shows loading/error states for history, survey result retry and the backend model version; every admin section has loading, empty and error states with retry. The stale auth comment in `ports.js` is fixed. Direct store access remains only for UI drafts, the session and `currentSite`.
+
+T5 done: `background/service-worker.js` (classic MV3 worker: `importScripts` of platform, providers, domains, verdict and the navigation use case; registers `tabs.onUpdated/onActivated/onRemoved` synchronously; no globals, no timers, no `.then`). `protection/application/navigation-service.js` (`handleNavigation/handleTabActivated/handleTabRemoved/fromTabUpdate`) evaluates through `Sereno.verdictService`, paints the real-tab badge (safe, warning, block, pending `…`, degraded `?`), publishes `currentSite`/`protectionLevel` only for the active tab, keeps one record per tab in `chrome.storage.session` (a newer navigation on the tab invalidates an older result; the same url is not evaluated twice) and messages the tab. `platform/browser.js` gained `setBadge`, `notifyTab`, `getActiveTabId` and tab-record helpers; `setTabBadge` is unchanged for extension pages. Manifest declares the worker; permissions unchanged (`storage`, `tabs`). The worker imports no script that touches `window`/`document` (verified by loading them in Node) and ignores whether the provider is mock or remote. Not done on purpose: content script, host_permissions (T6), manifest cleanup (T8); README still says the prototype has no worker (T8). History write stays the backend's job through `verdict.evaluate`.
+
+## Contracts
+
+Tab message for the content script (T6), sent with `chrome.tabs.sendMessage`:
+
+```
+{ type: "sereno:outcome", outcome }
+outcome = { kind: "verdict", verdict: { domain, status, score, source, latencyMs } }
+        | { kind: "pending",  reason: "evaluating" }
+        | { kind: "degraded", reason: "offline" | "timeout" | "server" | "cache_down" }
+```
+
+- A `pending` message may come first when the wait is over 300 ms; the final outcome always follows.
+- The final outcome is sent again when the tab reports `complete` for the same url (a content script injected at `document_idle` misses the first one), so T6 must treat an equal outcome as idempotent and render the modal once.
+- Only `verdict` with status `bloqueo` blocks (`Sereno.verdictOutcome.blocksNavigation`); `degraded` never blocks (fail-open) but must show the degraded notice (`Sereno.verdictOutcome.notice`).
+- The message is not sent on tab activation; the popup state (`currentSite`, `protectionLevel`) and the badge are refreshed instead.
+- Per-tab record in `chrome.storage.session`, key `sereno.tab.<tabId>`: `{ token, url, startedAt, outcome|null }`.
 
 ## Verification evidence
 
@@ -91,6 +110,13 @@ T4 (two work units):
 - Unit B (admin side) RED: admin tests appended first; `node --test` = 174 tests, 159 pass, 15 fail (first: `mock: administrationService loads and saves the domain policy`, `loadDomains` not a function). GREEN: `node --test` = 177 pass, 0 fail (the obsolete store-based administration test removed, so `tests/use-cases.test.js` was deleted; 4 container tests in `tests/admin-page.test.js`). Commit: 6890b11
 - `rg -n "Sereno.seed|state\.(history|domains|cache|metrics)" history survey administration protection app` = no hits.
 
+T5:
+- RED: `tests/navigation-service.test.js`, `tests/browser.test.js` and `tests/service-worker.test.js` written first; with `navigation-service.js` and `service-worker.js` absent and `platform/browser.js` untouched, `node --test` = 185 tests, 178 pass, 7 fail (the 5 `browser.test.js` tests, first `setBadge paints text and colour on the given real tab`, plus the 2 files that could not load).
+- GREEN: `node --test` = 204 pass, 0 fail (177 baseline + 27 new). One test bug found on the way: activating a tab must publish without asking which tab is active (the event already says so).
+- `tests/service-worker.test.js` loads every imported script in Node through a fake `importScripts`, so a `window`/`document` access at load would fail the test; it also asserts the three listeners exist right after `require` and that the source has no timers, `.then`, `fetch(`, adapter references or top-level state.
+- `tests/architecture.test.js` still passes (background/ and protection/ have no network or adapter references).
+- Commit: 6ca8a82
+
 ## Next step
 
-Launch the writer for T5 (service worker: navigation to verdict, real-tab badge, history write; the history write is the backend's job through `verdict.evaluate`, so the worker only calls the verdict port).
+Launch the writer for T6 (content script: in-page modal for warn/block/pending/degraded, consuming the `sereno:outcome` message under "Contracts"; adds `content_scripts`/`host_permissions` to the manifest and must be idempotent per outcome).
