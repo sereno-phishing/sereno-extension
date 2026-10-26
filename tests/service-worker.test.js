@@ -17,6 +17,7 @@ const imported = [];
 const listeners = {};
 const badges = [];
 const messages = [];
+const created = [];
 const localData = {};
 const sessionData = new Map();
 
@@ -46,12 +47,20 @@ globalThis.chrome = {
     onUpdated: event("onUpdated"),
     onActivated: event("onActivated"),
     onRemoved: event("onRemoved"),
+    async create(details) {
+      created.push(details);
+    },
     async query() {
       return [{ id: 1 }];
     },
     async sendMessage(tabId, message) {
       messages.push({ tabId, message });
     }
+  },
+  runtime: {
+    id: "abc",
+    onMessage: event("runtime.onMessage"),
+    getURL: (file) => "chrome-extension://abc/" + file
   },
   storage: {
     onChanged: event("storage.onChanged"),
@@ -83,14 +92,15 @@ require(WORKER);
 const registeredRightAway = {
   onUpdated: (listeners.onUpdated || []).length,
   onActivated: (listeners.onActivated || []).length,
-  onRemoved: (listeners.onRemoved || []).length
+  onRemoved: (listeners.onRemoved || []).length,
+  onMessage: (listeners["runtime.onMessage"] || []).length
 };
 
 const source = fs.readFileSync(WORKER, "utf8");
 
 test("the three tab listeners are registered synchronously at load", () => {
-  assert.deepEqual(registeredRightAway, { onUpdated: 1, onActivated: 1, onRemoved: 1 });
-  [/^chrome\.tabs\.onUpdated\.addListener\(/m, /^chrome\.tabs\.onActivated\.addListener\(/m, /^chrome\.tabs\.onRemoved\.addListener\(/m].forEach((pattern) => {
+  assert.deepEqual(registeredRightAway, { onUpdated: 1, onActivated: 1, onRemoved: 1, onMessage: 1 });
+  [/^chrome\.runtime\.onMessage\.addListener\(/m, /^chrome\.tabs\.onUpdated\.addListener\(/m, /^chrome\.tabs\.onActivated\.addListener\(/m, /^chrome\.tabs\.onRemoved\.addListener\(/m].forEach((pattern) => {
     assert.match(source, pattern);
   });
 });
@@ -151,4 +161,44 @@ test("non web pages and irrelevant tab events are ignored", async () => {
   await onUpdated(2, { title: "x" }, { id: 2, url: "https://a.pe/" });
   await onUpdated(2, { status: "complete" }, undefined);
   assert.deepEqual({ badges: badges.length, messages: messages.length }, before);
+});
+
+function ask(message, tabId, url) {
+  const [onMessage] = listeners["runtime.onMessage"];
+  return new Promise((resolve) => {
+    const keptOpen = onMessage(message, tabId === undefined ? {} : { id: "abc", tab: { id: tabId, url } }, resolve);
+    if (keptOpen !== true) {
+      resolve("not kept open");
+    }
+  });
+}
+
+test("content script requests are answered asynchronously from the stored tab record", async () => {
+  const url = "https://paypal-secure-login.com/login";
+  const [onUpdated] = listeners.onUpdated;
+  await onUpdated(3, { status: "loading", url }, { id: 3, url });
+
+  const current = await ask({ type: "sereno:get-outcome" }, 3, url);
+  assert.equal(current.ok, true);
+  assert.equal(current.outcome.verdict.status, "advertencia");
+
+  assert.deepEqual(await ask({ type: "sereno:continue", url }, 3, url), { ok: true });
+  assert.deepEqual(sessionData.get("sereno.tab.3").continued, ["https://paypal-secure-login.com"]);
+  assert.equal((await ask({ type: "sereno:get-outcome" }, 3, url)).acknowledged, true);
+
+  assert.deepEqual(await ask({ type: "sereno:detail", url }, 3, url), { ok: true });
+  assert.deepEqual(created, [{ url: "chrome-extension://abc/app/popup/popup.html" }]);
+});
+
+test("a block is never continued through the worker", async () => {
+  const url = "https://pago-servicios-linea.net/checkout";
+  const [onUpdated] = listeners.onUpdated;
+  await onUpdated(4, { status: "loading", url }, { id: 4, url });
+  assert.deepEqual(await ask({ type: "sereno:continue", url }, 4, url), { ok: false, error: "blocked" });
+});
+
+test("messages that are not for the content script are left alone", () => {
+  const [onMessage] = listeners["runtime.onMessage"];
+  assert.notEqual(onMessage({ type: "other" }, { id: "abc" }, () => {}), true);
+  assert.notEqual(onMessage(undefined, undefined, () => {}), true);
 });

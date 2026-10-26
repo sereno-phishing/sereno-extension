@@ -71,6 +71,21 @@ async function onTabRemoved(tabId) {
   await globalThis.Sereno.navigationService.handleTabRemoved(buildDeps(), { tabId });
 }
 
+/* Requests from the content script (get-outcome, continue, detail). The reply
+   is asynchronous, so the listener returns true to keep the channel open; any
+   other message is left to its own receiver. */
+function onRuntimeMessage(message, sender, sendResponse) {
+  const navigation = globalThis.Sereno.navigationService;
+  if (!navigation.isContentMessage(message)) {
+    return false;
+  }
+  (async () => {
+    sendResponse(await navigation.handleMessage(buildDeps(), message, sender));
+  })();
+  return true;
+}
+
+chrome.runtime.onMessage.addListener(onRuntimeMessage);
 chrome.tabs.onUpdated.addListener(onTabUpdated);
 chrome.tabs.onActivated.addListener(onTabActivated);
 chrome.tabs.onRemoved.addListener(onTabRemoved);

@@ -83,6 +83,9 @@ function fakeBrowser(options) {
     },
     async removeTabRecord(tabId) {
       records.delete(tabId);
+    },
+    openPage(path) {
+      calls.push({ op: "open", path });
     }
   };
   return port;
@@ -343,4 +346,113 @@ test("a broken provider still yields a fail-open degraded outcome on the tab", a
   const outcome = await nav.handleNavigation(deps, { tabId: 1, url: "https://a.pe/" });
   assert.equal(outcome.kind, "degraded");
   assert.equal(badgesOf(deps.browser)[0].text, "?");
+});
+
+/* ---------- content script requests (T6) ---------- */
+
+const WEB_URL = "https://paypal-secure-login.com/login";
+const fromTab = (id, url) => ({ tab: { id, url: url || WEB_URL } });
+
+async function navigated(status, url) {
+  const target = url || WEB_URL;
+  const deps = makeDeps({
+    browser: fakeBrowser({ active: 1 }),
+    services: fakeServices({ [target]: verdictResult(status, "paypal-secure-login.com") })
+  });
+  await nav.handleNavigation(deps, { tabId: 1, url: target });
+  return deps;
+}
+
+test("isContentMessage recognises only the three content script requests", () => {
+  ["sereno:get-outcome", "sereno:continue", "sereno:detail"].forEach((type) => assert.equal(nav.isContentMessage({ type }), true, type));
+  [null, undefined, {}, { type: "sereno:outcome" }, { type: "x" }, "sereno:continue"].forEach((value) => assert.equal(nav.isContentMessage(value), false));
+});
+
+test("get-outcome answers from the stored record of the sender tab", async () => {
+  const deps = await navigated("advertencia");
+  const reply = await nav.handleMessage(deps, { type: "sereno:get-outcome" }, fromTab(1));
+  assert.equal(reply.ok, true);
+  assert.equal(reply.outcome.kind, "verdict");
+  assert.equal(reply.outcome.verdict.status, "advertencia");
+  assert.equal(reply.acknowledged, undefined);
+
+  const nothing = await nav.handleMessage(deps, { type: "sereno:get-outcome" }, fromTab(9));
+  assert.deepEqual(nothing, { ok: true, outcome: null });
+});
+
+test("requests without a sender tab are refused", async () => {
+  const deps = await navigated("advertencia");
+  for (const type of ["sereno:get-outcome", "sereno:continue", "sereno:detail"]) {
+    const reply = await nav.handleMessage(deps, { type, url: WEB_URL }, {});
+    assert.equal(reply.ok, false, type);
+  }
+});
+
+test("continue is stored per tab and origin for a warning and then marks the outcome as acknowledged", async () => {
+  const deps = await navigated("advertencia");
+  const reply = await nav.handleMessage(deps, { type: "sereno:continue", url: WEB_URL }, fromTab(1));
+  assert.deepEqual(reply, { ok: true });
+  assert.deepEqual(deps.browser.records.get(1).continued, ["https://paypal-secure-login.com"]);
+
+  const again = await nav.handleMessage(deps, { type: "sereno:get-outcome" }, fromTab(1));
+  assert.equal(again.acknowledged, true);
+
+  await nav.handleMessage(deps, { type: "sereno:continue", url: WEB_URL + "?x=1" }, fromTab(1));
+  assert.equal(deps.browser.records.get(1).continued.length, 1);
+});
+
+test("continue is never accepted for a block, nor for another origin, nor without a final outcome", async () => {
+  const blocked = await navigated("bloqueo");
+  const refused = await nav.handleMessage(blocked, { type: "sereno:continue", url: WEB_URL }, fromTab(1));
+  assert.deepEqual(refused, { ok: false, error: "blocked" });
+  assert.equal(blocked.browser.records.get(1).continued, undefined);
+
+  const warned = await navigated("advertencia");
+  const other = await nav.handleMessage(warned, { type: "sereno:continue", url: "https://otro.pe/" }, fromTab(1));
+  assert.equal(other.ok, false);
+  const safe = await navigated("seguro");
+  assert.equal((await nav.handleMessage(safe, { type: "sereno:continue", url: WEB_URL }, fromTab(1))).ok, false);
+  const unknownTab = await nav.handleMessage(warned, { type: "sereno:continue", url: WEB_URL }, fromTab(5));
+  assert.equal(unknownTab.ok, false);
+  const badUrl = await nav.handleMessage(warned, { type: "sereno:continue", url: "javascript:1" }, fromTab(1));
+  assert.equal(badUrl.ok, false);
+});
+
+test("the continue decision survives a new navigation on the same tab and is sent with the outcome", async () => {
+  const deps = await navigated("advertencia");
+  await nav.handleMessage(deps, { type: "sereno:continue", url: WEB_URL }, fromTab(1));
+  const next = "https://paypal-secure-login.com/otra";
+  deps.services = fakeServices({ [next]: verdictResult("advertencia", "paypal-secure-login.com") });
+  deps.browser.calls.length = 0;
+  await nav.handleNavigation(deps, { tabId: 1, url: next });
+  assert.deepEqual(deps.browser.records.get(1).continued, ["https://paypal-secure-login.com"]);
+  const sent = messagesOf(deps.browser);
+  assert.equal(sent[sent.length - 1].message.acknowledged, true);
+  assert.equal(sent[sent.length - 1].message.outcome.verdict.status, "advertencia");
+});
+
+test("a block on a continued origin is still sent without the acknowledged flag", async () => {
+  const deps = await navigated("advertencia");
+  await nav.handleMessage(deps, { type: "sereno:continue", url: WEB_URL }, fromTab(1));
+  const next = "https://paypal-secure-login.com/bloqueado";
+  deps.services = fakeServices({ [next]: verdictResult("bloqueo", "paypal-secure-login.com") });
+  deps.browser.calls.length = 0;
+  await nav.handleNavigation(deps, { tabId: 1, url: next });
+  const sent = messagesOf(deps.browser);
+  assert.equal(sent[sent.length - 1].message.acknowledged, undefined);
+});
+
+test("detail opens the popup page in a tab", async () => {
+  const deps = await navigated("advertencia");
+  const reply = await nav.handleMessage(deps, { type: "sereno:detail", url: WEB_URL }, fromTab(1));
+  assert.deepEqual(reply, { ok: true });
+  assert.deepEqual(deps.browser.calls.filter((call) => call.op === "open"), [{ op: "open", path: "app/popup/popup.html" }]);
+});
+
+test("handleMessage never throws and ignores unknown messages", async () => {
+  const deps = makeDeps({ browser: { async loadTabRecord() { throw new Error("boom"); }, openPage() { throw new Error("no"); } } });
+  await assert.doesNotReject(nav.handleMessage(deps, { type: "sereno:get-outcome" }, fromTab(1)));
+  assert.equal((await nav.handleMessage(deps, { type: "sereno:detail" }, fromTab(1))).ok, false);
+  assert.equal((await nav.handleMessage(deps, { type: "nope" }, fromTab(1))).ok, false);
+  await assert.doesNotReject(nav.handleMessage(undefined, undefined, undefined));
 });
