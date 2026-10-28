@@ -7,7 +7,8 @@
    the timeouts); no other script is touched. The remote run reaches a fake
    backend that serves the REST contract documented in
    platform/providers/remote.js through globalThis.fetch, exactly where the
-   real adapter finds it. The scenarios must give identical normalized results.
+   real adapter finds it. The non-survey scenarios must give identical normalized
+   results; survey is deliberately excluded because it is now always remote.
 
    The fake backend reuses the mock adapter over its own private store as the
    server logic: it is a stand-in for the real server, not part of the client. */
@@ -112,7 +113,7 @@ function fakeBackend(Sereno) {
     "POST /v1/cache/invalidations": (body) => server.data.invalidateCache(body.domain),
     "GET /v1/metrics": () => server.data.getMetrics(),
     "GET /v1/model": () => server.data.getModelVersion(),
-    "POST /v1/survey": (body) => server.data.submitSurvey(body.answers)
+    "POST /v1/survey": () => ({ ok: true })
   };
 
   function injectedFailure(init) {
@@ -349,23 +350,6 @@ const SCENARIOS = {
     const metrics = await env.Sereno.administrationService.loadMetrics(env.services);
     const model = await env.Sereno.protectionService.loadModelVersion(env.services);
     return { metrics, model };
-  },
-
-  "survey submit": async (env) => {
-    const { surveyService } = env.Sereno;
-    const store = env.newStore();
-    const answers = [4, 2, 5, 1, 4, 2, 5, 1, 4, 2];
-    const failed = await env.failing("server", (services) => surveyService.submit(services, store, answers, env.now));
-    const pendingState = (await store.get()).survey;
-    const done = await surveyService.submit(env.services, store, answers, env.now);
-    const state = (await store.get()).survey;
-    return {
-      failed: failureOf(failed),
-      completedAfterFailure: pendingState.completedAt,
-      done,
-      answers: state.answers,
-      completed: typeof state.completedAt === "string" && state.completedAt.length > 0
-    };
   }
 };
 
@@ -458,13 +442,6 @@ const EXPECTED = {
     assert.equal(r.metrics.ok, true);
     assert.equal(r.model.ok, true);
     assert.equal(typeof r.model.version, "string");
-  },
-  "survey submit": (r) => {
-    assert.equal(r.failed.ok, false);
-    assert.equal(r.failed.error, "server");
-    assert.ok(!r.completedAfterFailure, "a failed submit records nothing");
-    assert.deepEqual(r.done, { ok: true });
-    assert.equal(r.completed, true);
   },
   "service worker navigation to a safe site": (r) => {
     assert.equal(r.badge.tabId, 1);

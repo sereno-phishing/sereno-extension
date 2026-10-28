@@ -1,5 +1,5 @@
-/* Survey · presentational views: one SUS question with its scale, and the
-   final score. Classic script that registers Sereno.surveyUi. */
+/* Survey · presentational views: one SUS question, backend status and the
+   submission outcome. Classic script that registers Sereno.surveyUi. */
 
 (function (Sereno) {
   "use strict";
@@ -7,7 +7,7 @@
   var ui = Sereno.ui;
   var survey = Sereno.survey;
 
-  var ANONYMOUS = "Tus respuestas son anónimas.";
+  var PRIVACY_NOTE = "Tus respuestas no incluyen tu usuario. Registramos tu participación para evitar envíos repetidos.";
 
   function scaleButton(value, selected) {
     var pressed = selected === value;
@@ -33,7 +33,7 @@
       }).join("") + "</div>" +
       '<div class="scale-labels"><span>Totalmente en desacuerdo</span><span>Totalmente de acuerdo</span></div>' +
       '<div class="flex-spacer"></div>' +
-      '<p class="survey-note">' + ANONYMOUS + "</p>" +
+      '<p class="survey-note">' + PRIVACY_NOTE + "</p>" +
       '<div class="survey-actions">' +
       ui.button({ label: "Atrás", variant: "ghost", action: "survey-back", disabled: model.index === 0 }) +
       ui.button({
@@ -46,19 +46,36 @@
     );
   }
 
-  /* result: survey.score() output; options.error: Spanish text when the
-     submission failed (the score still shows, the user can retry). */
-  function resultView(result, options) {
-    var error = options && options.error;
+  /* model: { state: "loading" | "error", error? } */
+  function statusView(model) {
+    var failed = model.state === "error";
     return (
-      '<section class="view view-survey-result"><h1 class="sr-only">Resultado de la encuesta</h1><div class="sus-result">' +
-      '<div class="sus-score">' + result.score + " / 100</div>" +
-      '<div class="sus-band sus-band-' + result.bandId + '">' + ui.esc(result.band) + "</div>" +
-      '<p class="sus-note">' + ANONYMOUS + "</p>" +
-      (error
-        ? ui.banner({ tone: "error", role: "alert", iconHtml: ui.art("bad", "16"), text: error }) +
-          ui.button({ label: "Reintentar", variant: "ghost", action: "survey-retry" })
-        : "") +
+      '<section class="view view-survey-result"><h1 class="sr-only">Encuesta de opinión</h1><div class="sus-result">' +
+      (failed
+        ? ui.banner({ tone: "error", role: "alert", iconHtml: ui.art("bad", "16"), text: model.error }) +
+          ui.button({ label: "Reintentar", variant: "ghost", action: "survey-status-retry" })
+        : '<p class="sus-note" role="status">Cargando el estado de la encuesta…</p>') +
+      ui.button({ label: "Cerrar", variant: "primary", cls: "sus-close", action: "survey-close" }) +
+      "</div></section>"
+    );
+  }
+
+  /* model.state: "submitting" | "accepted" | "already" | "error" */
+  function resultView(model) {
+    var body = "";
+    if (model.state === "submitting") {
+      body = '<p class="sus-note" role="status">Enviando tus respuestas…</p>';
+    } else if (model.state === "accepted" || model.state === "already") {
+      body = '<h1 role="status">Gracias por tu opinión</h1>';
+    } else {
+      body = '<h1>No se pudo enviar la encuesta</h1>' +
+        ui.banner({ tone: "error", role: "alert", iconHtml: ui.art("bad", "16"), text: model.error }) +
+        ui.button({ label: "Reintentar", variant: "ghost", action: "survey-retry" });
+    }
+    return (
+      '<section class="view view-survey-result">' +
+      (model.state === "submitting" ? '<h1 class="sr-only">Envío de la encuesta</h1>' : "") +
+      '<div class="sus-result">' + body +
       ui.button({ label: "Cerrar", variant: "primary", cls: "sus-close", action: "survey-close" }) +
       "</div></section>"
     );
@@ -66,6 +83,7 @@
 
   Sereno.surveyUi = {
     questionView: questionView,
+    statusView: statusView,
     resultView: resultView
   };
 })(globalThis.Sereno = globalThis.Sereno || {});

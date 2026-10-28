@@ -1,6 +1,7 @@
 /* Platform · independent provider axes. provider selects verdict/data;
    authProvider selects authentication (defaults to provider when omitted).
-   Local development uses remote auth only. baseUrl is the backend origin;
+   Surveys always use the remote adapter: there is no mock or fallback path.
+   Local development uses remote auth and surveys. baseUrl is the backend origin;
    manifest host_permissions must permit its scheme and host. */
 
 (function (Sereno) {

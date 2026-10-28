@@ -19,12 +19,13 @@ const Sereno = load(
   "platform/storage.js", "platform/state-store.js", "platform/providers/remote.js"
 );
 
-test("extension remote auth completes the JSON session lifecycle over real loopback HTTP", {
+test("extension remote auth and survey complete their JSON lifecycle over real loopback HTTP", {
   skip: !fs.existsSync(python) && "Sibling backend virtual environment is unavailable",
   timeout: 20000
 }, async (t) => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "opencode", "sereno-auth-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "sereno-auth-"));
   const dataFile = path.join(directory, "auth.json");
+  const surveyFile = path.join(directory, "surveys.json");
   const script = [
     "from app import create_app",
     "from werkzeug.serving import make_server",
@@ -77,6 +78,16 @@ test("extension remote auth completes the JSON session lifecycle over real loopb
   const registered = await account.register(services, store, "throwaway", "test-only-password", new Date());
   assert.equal(registered.ok, true);
   const firstToken = registered.token;
+  const answers = [1, 2, 3, 4, 5, 1, 2, 3, 4, 5];
+  assert.deepEqual(await services.survey.status(), { ok: true, submitted: false });
+  assert.deepEqual(await services.survey.submit(answers), { ok: true });
+  assert.deepEqual(await services.survey.status(), { ok: true, submitted: true });
+  assert.deepEqual(await services.survey.submit(answers), { ok: false, error: "already_submitted" });
+  const surveyData = JSON.parse(fs.readFileSync(surveyFile, "utf8"));
+  assert.equal(surveyData.surveys.length, 1);
+  assert.deepEqual(surveyData.surveys[0].answers, answers);
+  assert.deepEqual(Object.keys(surveyData.surveys[0]).sort(), ["answers", "submittedAt"]);
+  assert.deepEqual(surveyData.participants, ["throwaway"]);
   const persisted = JSON.parse(fs.readFileSync(dataFile, "utf8"));
   assert.equal(persisted.sessions[firstToken].username, "throwaway");
   assert.notEqual(persisted.users.throwaway.password_hash, "test-only-password");
@@ -89,9 +100,16 @@ test("extension remote auth completes the JSON session lifecycle over real loopb
   assert.equal((await account.login(services, store, "throwaway", "test-only-password", new Date())).ok, true);
   assert.equal((await account.currentSession(services, store)).session.username, "throwaway");
   assert.deepEqual(await account.logout(services, store), { ok: true, synced: true });
+  assert.deepEqual(await services.survey.status(), { ok: false, error: "invalid" });
+  assert.deepEqual(await services.survey.submit(answers), { ok: false, error: "invalid" });
+  const second = await account.register(services, store, "second-account", "test-only-password", new Date());
+  assert.equal(second.ok, true);
+  assert.deepEqual(await services.survey.status(), { ok: true, submitted: false });
+  assert.deepEqual(await account.logout(services, store), { ok: true, synced: true });
   cookie = "sereno_session=" + firstToken;
   assert.equal((await services.auth.session()).session, null);
   assert.deepEqual(JSON.parse(fs.readFileSync(dataFile, "utf8")).sessions, {});
   assert.doesNotMatch(JSON.stringify(await store.get()), /test-only-password/);
-  assert.ok(calls.every((route) => route.startsWith("/v1/auth/")));
+  assert.ok(calls.every((route) => route.startsWith("/v1/auth/") || route === "/v1/survey"));
+  assert.equal(calls.filter((route) => route === "/v1/survey").length, 7);
 });

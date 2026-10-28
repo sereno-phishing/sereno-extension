@@ -6,7 +6,8 @@
    Every method is async and never throws. Success resolves { ok: true, ... };
    failure resolves { ok: false, error } where error is one of
      transport  "timeout" | "offline" | "server" | "cache_down"
-     domain     "invalid" (login) | "duplicate" (register)
+     domain     "invalid" (login) | "duplicate" (register) |
+                "already_submitted" (survey submit)
 
    verdict port
      evaluate(url)            -> { ok, domain, status, score, source, latencyMs }
@@ -32,7 +33,10 @@
      invalidateCache(domain)           -> { ok, cache }
      getMetrics()                      -> { ok, metrics }   (dashboard shape of Sereno.seed.metrics)
      getModelVersion()                 -> { ok, version }
-     submitSurvey(answers)             -> { ok }   (answers: ten SUS values, completes the survey) */
+
+   survey port (always remote; no mock implementation or fallback)
+     status()                          -> { ok, submitted }
+     submit(answers)                   -> { ok }   (answers: ten SUS values) */
 
 (function (Sereno) {
   "use strict";
@@ -52,9 +56,9 @@
         "setCacheTtl",
         "invalidateCache",
         "getMetrics",
-        "getModelVersion",
-        "submitSurvey"
-      ]
+        "getModelVersion"
+      ],
+      survey: ["status", "submit"]
     }
   };
 })(globalThis.Sereno = globalThis.Sereno || {});

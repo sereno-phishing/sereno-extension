@@ -107,14 +107,16 @@
 
   var SEPARATOR = '<div class="menu-sep"></div>';
 
-  function accountMenu(session) {
+  function accountMenu(session, options) {
+    options = options || {};
+    var surveyEntry = options.showSurvey === false ? "" : SEPARATOR + menuItem("open-survey", "Encuesta de opinión");
     return (
       '<div class="menu-overlay" data-action="close-menu">' +
       '<div class="account-menu" role="menu" aria-label="Cuenta">' +
       '<div class="menu-head"><div class="menu-user">' + ui.esc(session.username) + "</div>" +
       '<div class="menu-role">Rol: ' + ui.esc(session.role) + "</div></div>" +
       (account.isAdmin(session) ? menuItem("open-admin", "Panel de administración") : "") +
-      SEPARATOR + menuItem("open-survey", "Encuesta de opinión") +
+      surveyEntry +
       SEPARATOR + menuItem("logout", "Cerrar sesión", true) +
       "</div></div>"
     );

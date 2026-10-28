@@ -98,9 +98,13 @@ function popupCases() {
   add("history error", { view: "history", historyError: "No se pudo cargar." }, USER);
   add("history empty", { view: "history", historyEntries: [] }, USER);
   add("detail", { view: "detail" }, USER);
+  add("survey status loading", { view: "surveyStatus", surveyStatus: "loading" }, USER);
+  add("survey status error", { view: "surveyStatus", surveyStatus: "error", surveyStatusError: "No se pudo consultar." }, USER);
   add("survey", { view: "survey" }, USER);
-  add("survey result", { view: "surveyResult", surveyAnswers: [3, 3, 3, 3, 3, 3, 3, 3, 3, 3] }, USER);
-  add("survey result error", { view: "surveyResult", surveyError: "No se pudo enviar." }, USER);
+  add("survey result sending", { view: "surveyResult", surveySubmission: "submitting" }, USER);
+  add("survey result accepted", { view: "surveyResult", surveySubmission: "accepted" }, USER);
+  add("survey result duplicate", { view: "surveyResult", surveySubmission: "already" }, USER);
+  add("survey result error", { view: "surveyResult", surveySubmission: "error", surveyError: "No se pudo enviar." }, USER);
   add("login", { view: "login" }, null);
   add("login error", { view: "login", loginError: true, loginErrorCode: "invalid", draftUsername: "x", draftPassword: "y" }, null);
   add("register", { view: "register" }, null);
@@ -183,10 +187,20 @@ test("the popup tabs are a labelled tablist with roving tabindex and linked pane
 });
 
 test("the account menu is not a tab target and the avatar button has a name", () => {
-  const html = popupViews.page({ ...BASE, view: "home", menuOpen: true }, { session: USER, currentSite: {} });
+  const html = popupViews.page({ ...BASE, view: "home", menuOpen: true, surveyMenuStatus: "available" }, { session: USER, currentSite: {} });
   assert.match(html, /aria-label="Cuenta de ana"/);
   assert.match(html, /aria-expanded="true"/);
   assert.match(html, /role="menu" aria-label="Cuenta"/);
+  assert.match(html, /data-action="open-survey"[^>]*>Encuesta de opinión/);
+
+  for (const status of ["loading", "submitted"]) {
+    const hidden = popupViews.page({ ...BASE, view: "home", menuOpen: true, surveyMenuStatus: status }, { session: USER, currentSite: {} });
+    assert.doesNotMatch(hidden, /open-survey|Encuesta de opinión/, status);
+    assert.match(hidden, /data-action="logout"[^>]*>Cerrar sesión/);
+    assert.deepEqual(problems(hidden), [], status);
+  }
+  const recoverable = popupViews.page({ ...BASE, view: "home", menuOpen: true, surveyMenuStatus: "error" }, { session: USER, currentSite: {} });
+  assert.match(recoverable, /data-action="open-survey"[^>]*>Encuesta de opinión/);
 });
 
 test("the clear-history confirmation is a labelled modal dialog and the page behind it is inert", () => {
@@ -218,7 +232,10 @@ test("the survey exposes its progress, its scale group and a single h1", () => {
 test("banners that report failures are alerts and progress or loading states are status regions", () => {
   assert.match(historyUi.listView({ tabsHtml: "", entries: [], filter: "todas", error: "x" }), /role="alert"/);
   assert.match(historyUi.listView({ tabsHtml: "", entries: [], filter: "todas", loading: true }), /role="status"/);
-  assert.match(surveyUi.resultView({ score: 70, band: "Buena", bandId: "good" }, { error: "x" }), /role="alert"/);
+  assert.match(surveyUi.statusView({ state: "loading" }), /role="status"/);
+  assert.match(surveyUi.statusView({ state: "error", error: "x" }), /role="alert"/);
+  assert.match(surveyUi.resultView({ state: "submitting" }), /role="status"/);
+  assert.match(surveyUi.resultView({ state: "error", error: "x" }), /role="alert"/);
 });
 
 test("the score bar in the detail is decorative and its value is read as text", () => {

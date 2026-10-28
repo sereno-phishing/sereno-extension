@@ -1,4 +1,4 @@
-/* Platform · remote adapter: implements the verdict, auth and data ports over
+/* Platform · remote adapter: implements verdict, auth, data and survey ports over
    HTTP+JSON. Classic script that registers Sereno.providers.remote.
 
    BACKEND CONTRACT (all paths under config.baseUrl, JSON bodies, cookies sent
@@ -19,9 +19,11 @@
      POST   /v1/cache/invalidations  { domain }                         -> { cache }
      GET    /v1/metrics                                                 -> { metrics }
      GET    /v1/model                                                   -> { version }
-     POST   /v1/survey               { answers }                        -> {}
+     GET    /v1/survey                                                  -> { submitted }
+     POST   /v1/survey               { answers }                        -> {}  409 { error: "already_submitted" }
    Errors: a non-2xx body { error } with a known code is passed through
    ("invalid", "duplicate", "cache_down", "timeout", "offline", "server");
+   "already_submitted" is accepted only from POST /v1/survey.
    HTTP 504 maps to "timeout"; any other failure maps to "server".
    create({ baseUrl, timeoutMs, fetch }) never throws to its callers: a network
    failure resolves "offline"; no answer within timeoutMs aborts the request
@@ -49,12 +51,13 @@
     return { ok: false, error: error };
   }
 
-  function errorOf(status, body) {
+  function errorOf(status, body, allowedErrors) {
     if (status === 504) {
       return "timeout";
     }
     var code = body && typeof body === "object" ? body.error : null;
-    return KNOWN_ERRORS.indexOf(code) >= 0 ? code : "server";
+    var allowed = KNOWN_ERRORS.concat(allowedErrors || []);
+    return allowed.indexOf(code) >= 0 ? code : "server";
   }
 
   function create(options) {
@@ -67,7 +70,7 @@
         return globalThis.fetch.apply(globalThis, arguments);
       };
 
-    async function request(method, path, payload) {
+    async function request(method, path, payload, allowedErrors) {
       var controller = new AbortController();
       var timedOut = false;
       var timer = setTimeout(function () {
@@ -94,7 +97,7 @@
           }
         }
         if (!response.ok) {
-          return failure(errorOf(response.status, body));
+          return failure(errorOf(response.status, body, allowedErrors));
         }
         return Object.assign({ ok: true }, body);
       } catch (error) {
@@ -155,9 +158,14 @@
         },
         getModelVersion: function () {
           return request("GET", "/v1/model");
+        }
+      },
+      survey: {
+        status: function () {
+          return request("GET", "/v1/survey");
         },
-        submitSurvey: function (answers) {
-          return request("POST", "/v1/survey", { answers: answers });
+        submit: function (answers) {
+          return request("POST", "/v1/survey", { answers: answers }, ["already_submitted"]);
         }
       }
     };

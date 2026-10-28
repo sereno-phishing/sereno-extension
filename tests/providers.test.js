@@ -83,7 +83,8 @@ function fakeBackend(mock) {
       "POST /v1/cache/invalidations": () => mock.data.invalidateCache(body.domain),
       "GET /v1/metrics": () => mock.data.getMetrics(),
       "GET /v1/model": () => mock.data.getModelVersion(),
-      "POST /v1/survey": () => mock.data.submitSurvey(body.answers)
+      "GET /v1/survey": () => ({ ok: true, submitted: false }),
+      "POST /v1/survey": () => ({ ok: true })
     }[key];
     if (!route) {
       return reply(404, { error: "server" });
@@ -109,7 +110,7 @@ Object.keys(ADAPTERS).forEach((name) => {
 
   test(name + " adapter implements every port method", () => {
     const adapter = make();
-    ["verdict", "auth", "data"].forEach((port) => {
+    ["verdict", "auth", "data"].concat(name === "remote" ? ["survey"] : []).forEach((port) => {
       providers.ports.METHODS[port].forEach((method) => {
         assert.equal(typeof adapter[port][method], "function", port + "." + method);
       });
@@ -193,14 +194,24 @@ Object.keys(ADAPTERS).forEach((name) => {
     assert.deepEqual((await data.getCache()).cache, invalidated.cache);
   });
 
-  test(name + " data serves metrics, model version and survey submission", async () => {
+  test(name + " data serves metrics and model version", async () => {
     const { data } = make();
     const metrics = await data.getMetrics();
     assert.equal(metrics.ok, true);
     assert.equal(metrics.metrics.analyzed, 1284);
     assert.deepEqual(await data.getModelVersion(), { ok: true, version: "1.3" });
-    assert.deepEqual(await data.submitSurvey([5, 1, 5, 1, 5, 1, 5, 1, 5, 1]), { ok: true });
   });
+});
+
+test("remote survey checks status and submits the exact JSON contract", async () => {
+  const fetchFake = fakeBackend(newMock());
+  const { survey } = newRemote(fetchFake);
+  const answers = [5, 1, 5, 1, 5, 1, 5, 1, 5, 1];
+  assert.deepEqual(await survey.status(), { ok: true, submitted: false });
+  assert.deepEqual(await survey.submit(answers), { ok: true });
+  assert.equal(fetchFake.calls[0].method, "GET");
+  assert.equal(fetchFake.calls[0].body, undefined);
+  assert.deepEqual(fetchFake.calls[1].body, { answers });
 });
 
 test("mock verdict waits for the injected delay only", async () => {
@@ -259,12 +270,12 @@ test("composition root picks the adapter from config", () => {
   assert.equal(mocked.provider, "mock");
   const remote = providers.create({ config: { provider: "remote", baseUrl: BASE_URL, timeoutMs: 100 }, fetch: async () => reply(200, {}) });
   assert.equal(remote.provider, "remote");
-  assert.deepEqual(Object.keys(remote).sort(), ["auth", "data", "provider", "verdict"]);
+  assert.deepEqual(Object.keys(remote).sort(), ["auth", "data", "provider", "survey", "verdict"]);
   assert.throws(() => providers.create({ config: { provider: "carrier-pigeon" } }), /provider/);
 });
 
 test("the default config ships with the mock provider and Sereno.services uses it", async () => {
   assert.equal(providers.config.provider, "mock");
   assert.equal(Sereno.services.provider, "mock");
-  assert.deepEqual(Object.keys(Sereno.services).sort(), ["auth", "data", "provider", "verdict"]);
+  assert.deepEqual(Object.keys(Sereno.services).sort(), ["auth", "data", "provider", "survey", "verdict"]);
 });

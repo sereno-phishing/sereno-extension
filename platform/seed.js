@@ -39,7 +39,10 @@
       { domain: "paypal-secure-login.com", policy: "advertencia", updatedAt: "2026-09-20" },
       { domain: "banco-verifica-cuenta.com", policy: "bloqueo", updatedAt: "2026-09-19" }
     ],
-    survey: { answers: [], completedAt: null },
+    /* Local UI-only drafts and legacy completion markers, isolated by account.
+       Backend status is the sole participation authority; submitted answers and
+       participation records are not seeded here. */
+    survey: { byUser: {} },
     lastSeenModelVersion: "1.2",
     cache: {
       ttlPhishingDays: 7,

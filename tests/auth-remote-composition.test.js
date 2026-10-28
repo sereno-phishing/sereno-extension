@@ -21,10 +21,32 @@ function compose(store, fetch) {
   return Sereno.providers.create({ config: { provider: "mock", authProvider: "remote", baseUrl: "http://127.0.0.1:5000" }, store, fetch, delayMs: 0 });
 }
 
-test("local defaults route authentication only to the backend", () => {
+test("local defaults route authentication and surveys to the backend", () => {
   assert.equal(Sereno.providers.config.provider, "mock");
   assert.equal(Sereno.providers.config.authProvider, "remote");
   assert.equal(Sereno.providers.config.baseUrl, "http://127.0.0.1:5000");
+  assert.equal(typeof Sereno.services.survey.status, "function");
+  assert.equal(typeof Sereno.services.survey.submit, "function");
+  assert.equal(typeof Sereno.services.data.submitSurvey, "undefined");
+});
+
+test("survey status and submission are remote while verdict and data remain local", async () => {
+  const store = openStore();
+  const calls = [];
+  const services = compose(store, async (url, init) => {
+    calls.push({ url, init });
+    return { ok: true, status: 200, json: async () => (init.method === "GET" ? { submitted: false } : {}) };
+  });
+  assert.equal((await services.verdict.evaluate("https://tienda-servicios.pe")).ok, true);
+  assert.equal((await services.data.getMetrics()).metrics.analyzed, 1284);
+  assert.deepEqual(await services.survey.status(), { ok: true, submitted: false });
+  assert.deepEqual(await services.survey.submit([3, 3, 3, 3, 3, 3, 3, 3, 3, 3]), { ok: true });
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].url, "http://127.0.0.1:5000/v1/survey");
+  assert.equal(calls[0].init.method, "GET");
+  assert.equal(calls[1].url, "http://127.0.0.1:5000/v1/survey");
+  assert.equal(calls[1].init.method, "POST");
+  assert.ok(calls.every((call) => call.init.credentials === "include"));
 });
 
 test("remote registration keeps verdict and data local and never stores submitted passwords", async () => {

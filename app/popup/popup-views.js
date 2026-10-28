@@ -9,7 +9,6 @@
   var ui = Sereno.ui;
   var account = Sereno.account;
   var history = Sereno.history;
-  var survey = Sereno.survey;
   var onboardingUi = Sereno.onboardingUi;
   var accountUi = Sereno.accountUi;
   var historyUi = Sereno.historyUi;
@@ -134,10 +133,12 @@
         });
       case "detail":
         return historyUi.detailView(history.findById(userEntries(model), model.detailId));
+      case "surveyStatus":
+        return surveyUi.statusView({ state: model.surveyStatus, error: model.surveyStatusError });
       case "survey":
         return surveyUi.questionView({ index: model.surveyIndex, selected: model.surveyAnswers[model.surveyIndex] });
       case "surveyResult":
-        return surveyUi.resultView(survey.score(model.surveyAnswers), { error: model.surveyError });
+        return surveyUi.resultView({ state: model.surveySubmission, error: model.surveyError });
       default:
         return home(state, model);
     }
@@ -162,7 +163,9 @@
       sessionNotice(model, state) +
       '<main class="app-content" id="content"' + (model.confirmOpen ? " inert" : "") + ">" + content(model, state) + "</main>" +
       footer(state, model) +
-      (model.menuOpen && state.session ? accountUi.accountMenu(state.session) : "") +
+      (model.menuOpen && state.session
+        ? accountUi.accountMenu(state.session, { showSurvey: model.surveyMenuStatus !== "loading" && model.surveyMenuStatus !== "submitted" })
+        : "") +
       (model.confirmOpen ? historyUi.clearConfirm() : "")
     );
   }

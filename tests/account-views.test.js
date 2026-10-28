@@ -29,3 +29,21 @@ test("register marks the username field only for a duplicate", () => {
   assert.match(duplicate, /Elige otro nombre de usuario\./);
   assert.match(accountUi.registerView({ error: true, errorCode: "invalid" }), /usuario y una contraseña válidos/);
 });
+
+test("accountMenu keeps its default contract and can omit only the survey entry", () => {
+  const user = { username: "ana", role: "usuario" };
+  const admin = { username: "admin", role: "administrador" };
+  const defaultMenu = accountUi.accountMenu(user);
+  assert.equal(accountUi.accountMenu(user, {}), defaultMenu);
+  assert.match(defaultMenu, /data-action="open-survey"[^>]*>Encuesta de opinión/);
+  assert.match(defaultMenu, /data-action="logout"[^>]*>Cerrar sesión/);
+
+  const completedUser = accountUi.accountMenu(user, { showSurvey: false });
+  assert.doesNotMatch(completedUser, /open-survey|Encuesta de opinión/);
+  assert.match(completedUser, /data-action="logout"[^>]*>Cerrar sesión/);
+
+  const completedAdmin = accountUi.accountMenu(admin, { showSurvey: false });
+  assert.doesNotMatch(completedAdmin, /open-survey|Encuesta de opinión/);
+  assert.match(completedAdmin, /data-action="open-admin"[^>]*>Panel de administración/);
+  assert.match(completedAdmin, /data-action="logout"[^>]*>Cerrar sesión/);
+});

@@ -6,9 +6,9 @@ página http/https que abres y muestra el resultado de tres formas: el badge del
 completo, el panel de administración, la política de privacidad y una tienda de
 demo para probar los flujos.
 
-Authentication uses the sibling local backend at `http://127.0.0.1:5000`.
-Verdicts, history, metrics, administration and survey data remain **mocked**;
-this is not real phishing protection. Start the backend before signing in;
+La autenticación y el envío de encuestas SUS usan el backend local hermano en
+`http://127.0.0.1:5000`. Los veredictos, el historial, las métricas y la
+administración siguen **simulados**; esto no es protección real contra phishing. Start the backend before signing in;
 [Conectar el backend](#conectar-el-backend) has the local setup.
 
 **Estado de la verificación.** `node --test` cubre dominios, casos de uso,
@@ -138,7 +138,7 @@ se conecte; las vistas no cambian.
 | Versión del modelo | HU-27 | Pie del popup (misma versión con y sin sesión) y aviso «Modelo actualizado» (solo con sesión, cuando la versión del backend difiere de la última vista) | Solo la lectura (`GET /v1/model`); el entrenamiento queda fuera |
 | Caché | HU-28 | Panel de administración → Caché | Listo con mock; backend |
 | Métricas de operación | HU-29 | Panel de administración → Métricas | Listo con mock; el cálculo es del backend |
-| Encuesta SUS | HU-32 | Popup → menú de cuenta → Encuesta de opinión | Listo con mock; backend recibe las respuestas |
+| Encuesta SUS | HU-32 | Popup → menú de cuenta → Encuesta de opinión | Envío al backend local; tras confirmar la participación, la opción desaparece para esa cuenta; borradores locales por cuenta; Chrome pendiente |
 
 Pendiente conocido en HU-26: el popup muestra «Protección degradada» sin la
 causa (sin conexión, tiempo agotado, servidor o caché). El aviso en página sí
@@ -216,7 +216,7 @@ sereno-extension/
   eventos y la suscripción.
 - **Una sola costura al backend.** Nada fuera de `platform/providers/` usa `fetch`,
   `XMLHttpRequest` ni un adaptador. Todo lo demás depende de `Sereno.services`
-  (`verdict`, `auth`, `data`). `tests/architecture.test.js` lo verifica.
+  (`verdict`, `auth`, `data`, `survey`). `tests/architecture.test.js` lo verifica.
 - **Service worker** (`background/service-worker.js`). Registra de forma síncrona
   `tabs.onUpdated`, `tabs.onActivated`, `tabs.onRemoved` y `runtime.onMessage`, y
   delega en `Sereno.navigationService`. No guarda estado en variables globales ni
@@ -257,8 +257,8 @@ sereno-extension/
   - `tabs`: leer `tab.url` y `changeInfo.url` en el worker. Sin este permiso (ni
     permisos de host) Chrome no entrega la URL. Es el que muestra el aviso de
     «historial de navegación» al instalar.
-  - `host_permissions`: `http://127.0.0.1:5000/*` for local authentication;
-    no wildcard host, HTTPS permission, or `cookies` API permission is added.
+  - `host_permissions`: `http://127.0.0.1:5000/*` para autenticación y encuestas
+    locales; no se añade comodín de hosts, permiso HTTPS ni acceso a la API `cookies`.
   - Sin `activeTab`, `scripting` ni `<all_urls>`: el content script se declara en
     el manifest, que le da acceso a las páginas http/https sin permisos de host.
 - **CSP.** Las páginas de la extensión declaran `script-src 'self'; object-src
@@ -299,7 +299,7 @@ sereno-extension/
 
 ## Conectar el backend
 
-### Local authentication quick start
+### Inicio rápido: autenticación y encuestas locales
 
 1. From the sibling `sereno-backend/`, with its existing virtual environment:
 
@@ -317,18 +317,20 @@ sereno-extension/
 
    ```js
    Sereno.providers.config = {
-     provider: "mock",              // Verdict and data only
-     authProvider: "remote",        // Registration, login, session, logout
+     provider: "mock",              // Veredictos y datos de demo
+     authProvider: "remote",        // Registro, login, sesión y logout
      baseUrl: "http://127.0.0.1:5000",
      timeoutMs: 4000,
      mockDelayMs: 700
    };
    ```
 
-   `authProvider` defaults to `provider` when omitted, preserving callers that
-   select one adapter for all ports. Unknown values fail closed. The current
-   backend implements auth only: do not set `provider: "remote"` for this setup.
-   API errors never trigger mock authentication. On remote auth operations,
+   `authProvider` usa `provider` cuando se omite, para conservar los consumidores
+   anteriores. Los valores desconocidos fallan de forma cerrada. La encuesta usa
+   siempre el adaptador remoto y no tiene mock ni fallback. El backend actual
+   implementa autenticación y `GET/POST /v1/survey`; no se debe configurar `provider: "remote"`
+   porque los demás datos continúan simulados. Los errores de API nunca activan
+   autenticación ni encuestas mock. On remote auth operations,
    account use cases remove legacy mock users/passwords and mock sessions from
    local state. Submitted passwords go only to the auth port, not local storage.
    A successful session check adopts the server identity, replacing stale local
@@ -339,14 +341,18 @@ sereno-extension/
    grants `http://127.0.0.1:5000/*`, matching the local auth origin. Register a
    new account, close/reopen the popup, log out, and log in again. Backend
    accounts are not seeded; newly registered users have no administrator role.
-   History and all non-auth data stay in the mock/local state, not backend JSON.
+   El historial, los veredictos y la administración permanecen en el estado
+   mock/local. Las respuestas SUS se agregan al JSON aislado del backend y la
+   participación se registra por separado para impedir envíos repetidos. El estado
+   local conserva borradores por usuario, pero nunca decide si una cuenta puede participar.
 
 4. Run `node --test` from this repository. `tests/auth-local-http.test.js` starts
    the sibling backend on an ephemeral loopback port with temporary JSON, runs
-   the actual remote adapter, then stops the server and deletes its test data.
-   It requires the sibling backend virtual environment; otherwise it reports a
-   skip. It never accesses runtime `data/db.json`. Provider-switch tests still
-   compare full mock/remote adapters using a simulated backend.
+   el adaptador remoto real para autenticación y encuestas, luego detiene el servidor
+   y elimina sus datos temporales. Requiere el entorno virtual del backend hermano;
+   de lo contrario informa un `skip`. Nunca accede a `data/db.json`. Las pruebas de
+   cambio de proveedor comparan los comportamientos no migrados y excluyen el contrato
+   de encuesta, que ahora es deliberadamente remoto.
 
 ### Cookie boundary and other configurations
 
@@ -394,7 +400,8 @@ añade).
 | POST | `/v1/cache/invalidations` | `{ domain }` | `{ cache }` | |
 | GET | `/v1/metrics` | | `{ metrics }` | |
 | GET | `/v1/model` | | `{ version }` | |
-| POST | `/v1/survey` | `{ answers }` | `{}` | |
+| GET | `/v1/survey` | | `{ submitted: boolean }` | 401 `invalid`, 500 `server` |
+| POST | `/v1/survey` | `{ answers }` | `{}` | 409 `already_submitted`, 400 `invalid`, 401 `invalid`, 500 `server` |
 
 Formas:
 
@@ -407,12 +414,15 @@ Formas:
   `PUT` reemplaza la lista completa.
 - `cache`: `{ ttlPhishingDays, ttlLegitHours, invalidations: [{ domain, status, date }] }`.
 - `metrics`: la forma del panel (`Sereno.seed.metrics` en `platform/seed.js`).
-- `answers`: diez valores de la escala SUS.
+- `answers`: diez valores enteros de la escala SUS (1–5). El servidor obtiene la cuenta de la sesión; el cliente no envía el usuario.
+- `submitted`: indica si la cuenta autenticada ya participó. La participación se almacena separada de las respuestas.
 - `POST /v1/verdict` también registra la visita en el historial del usuario con
   sesión: el cliente nunca escribe el historial.
 
 Errores: un cuerpo no 2xx `{ error }` con un código conocido se pasa tal cual
-(`invalid`, `duplicate`, `cache_down`, `timeout`, `offline`, `server`). Un 504 es
+(`invalid`, `duplicate`, `cache_down`, `timeout`, `offline`, `server`). En el
+POST de encuesta también se conserva `already_submitted`; no se interpreta así
+ningún 409 de otros endpoints. Un 504 es
 `timeout`; cualquier otro fallo es `server`. Sin red es `offline`. Si no hay
 respuesta en `timeoutMs`, el adaptador aborta la petición y devuelve `timeout`.
 
@@ -427,7 +437,8 @@ Cada método es asíncrono y no lanza. Devuelve `{ ok: true, ... }` o
 | --- | --- |
 | `verdict` | `evaluate(url)` |
 | `auth` | `login(username, password)`, `register(username, password)`, `logout()`, `session()` |
-| `data` | `listHistory()`, `deleteHistory()`, `getDomainPolicies()`, `putDomainPolicies(domains)`, `getCache()`, `setCacheTtl(phishingDays, legitHours)`, `invalidateCache(domain)`, `getMetrics()`, `getModelVersion()`, `submitSurvey(answers)` |
+| `data` | `listHistory()`, `deleteHistory()`, `getDomainPolicies()`, `putDomainPolicies(domains)`, `getCache()`, `setCacheTtl(phishingDays, legitHours)`, `invalidateCache(domain)`, `getMetrics()`, `getModelVersion()` |
+| `survey` | `status()`, `submit(answers)` (siempre remoto, sin fallback mock) |
 
 ### Regla fail-open
 
@@ -484,10 +495,13 @@ worker (`chrome://extensions` → «service worker») y revisa:
       `@font-face`), así que el modal usa la fuente sans-serif del sistema.
       Aceptarlo o cargar Inter en el documento.
 - [ ] Un lector de pantalla recorre el modal, los estados de carga y el popup.
-- [ ] Local backend auth: confirm the host permission is granted, HttpOnly/Lax
-      cookie acceptance, registration/login, popup-close/reopen restoration and
-      logout/revocation in real Chrome. Wrong credentials and network/500 errors
-      must not sign in using demo accounts. Non-auth data/verdicts stay mocked.
+- [ ] Backend local: confirmar el permiso de host, la cookie HttpOnly/Lax, registro,
+      login, restauración al cerrar y abrir el popup, logout/revocación y envío SUS
+      repetido en Chrome real. Sin sesión y ante errores de red/400/401/500, la
+      encuesta debe consultar el estado remoto antes de mostrar preguntas, impedir un
+      segundo envío y mostrar el fallo sin fingir éxito. La confirmación no debe exponer
+      el puntaje SUS. Los borradores no deben aparecer al cambiar de cuenta. Veredictos
+      y demás datos siguen simulados.
 - [ ] With a future HTTPS backend, verify Secure/None cookies and remote verdict
       failures (offline, timeout, 500, cache outage) degrade without blocking.
 

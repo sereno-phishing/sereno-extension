@@ -1,9 +1,8 @@
 "use strict";
 
-/* Use cases that read and write backend-owned data (history, survey, model
-   version) go through the data port only. Every case runs against the mock
-   adapter and against the remote adapter (a fake fetch serving the REST
-   contract on top of a mock), so both behave the same. */
+/* Use cases reach backend-owned data through ports. History/model/admin use
+   data; survey submission uses the remote-only survey port. The remaining data
+   cases run against mock and remote adapters to preserve their swap contract. */
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -72,7 +71,8 @@ function fakeBackend(mock) {
     "POST /v1/cache/invalidations": (body) => mock.data.invalidateCache(body.domain),
     "GET /v1/metrics": () => mock.data.getMetrics(),
     "GET /v1/model": () => mock.data.getModelVersion(),
-    "POST /v1/survey": (body) => mock.data.submitSurvey(body.answers)
+    "GET /v1/survey": () => ({ ok: true, submitted: false }),
+    "POST /v1/survey": () => ({ ok: true })
   };
   return async (url, init) => {
     const key = ((init && init.method) || "GET") + " " + url.slice(BASE_URL.length);
@@ -90,19 +90,20 @@ const SETUPS = {
   mock() {
     const store = openStore();
     const adapter = providers.mock.create({ store, delayMs: 0, now: NOW });
-    return { services: { data: adapter.data, verdict: adapter.verdict, auth: adapter.auth }, store, adapter };
+    const remote = providers.remote.create({ baseUrl: BASE_URL, timeoutMs: 50, fetch: fakeBackend(adapter) });
+    return { services: { data: adapter.data, verdict: adapter.verdict, auth: adapter.auth, survey: remote.survey }, store, adapter };
   },
   remote() {
     const store = openStore();
     const adapter = providers.mock.create({ store, delayMs: 0, now: NOW });
     const remote = providers.remote.create({ baseUrl: BASE_URL, timeoutMs: 50, fetch: fakeBackend(adapter) });
-    return { services: { data: remote.data, verdict: remote.verdict, auth: remote.auth }, store, adapter };
+    return { services: { data: remote.data, verdict: remote.verdict, auth: remote.auth, survey: remote.survey }, store, adapter };
   }
 };
 
 function failingServices(fetchImpl) {
   const remote = providers.remote.create({ baseUrl: BASE_URL, timeoutMs: 30, fetch: fetchImpl });
-  return { data: remote.data, verdict: remote.verdict, auth: remote.auth };
+  return { data: remote.data, verdict: remote.verdict, auth: remote.auth, survey: remote.survey };
 }
 
 const OFFLINE = async () => {
@@ -170,11 +171,12 @@ Object.keys(SETUPS).forEach((name) => {
     assert.match(entries[0].id, /^h-/);
   });
 
-  test(name + ": surveyService.submit sends the answers and stamps completion locally only on success", async () => {
+  test(name + ": surveyService.submit sends the answers remotely and stamps only the signed-in account", async () => {
     const { services, store } = SETUPS[name]();
     const answers = [5, 1, 5, 1, 5, 1, 5, 1, 5, 1];
-    assert.deepEqual(await surveyService.submit(services, store, answers, NOW()), { ok: true });
-    assert.deepEqual((await store.get()).survey, { answers, completedAt: "2026-09-21T11:30" });
+    await services.auth.login("andres.torres", "sereno123");
+    assert.deepEqual(await surveyService.submit(services, store, "andres.torres", answers, NOW()), { ok: true });
+    assert.deepEqual((await store.get()).survey, { byUser: { "andres.torres": { answers, completedAt: "2026-09-21T11:30" } } });
   });
 
   test(name + ": protectionService.loadModelVersion reads the version from the port", async () => {
@@ -185,14 +187,16 @@ Object.keys(SETUPS).forEach((name) => {
   });
 });
 
-test("surveyService.saveDraft stores partial answers without completing the survey", async () => {
+test("surveyService.saveDraft stores partial answers for the signed-in account without completing the survey", async () => {
   const store = openStore();
-  assert.deepEqual(await surveyService.saveDraft(store, [4, null]), { ok: true });
-  assert.deepEqual((await store.get()).survey, { answers: [4, null], completedAt: null });
+  await store.set({ session: { username: "andres.torres", role: "usuario", token: "remote" } });
+  assert.deepEqual(await surveyService.saveDraft(store, "andres.torres", [4, null]), { ok: true });
+  assert.deepEqual((await store.get()).survey, { byUser: { "andres.torres": { answers: [4, null], completedAt: null } } });
 });
 
 test("failures are normalized with a Spanish message and nothing throws", async () => {
   const store = openStore();
+  await store.set({ session: { username: "andres.torres", role: "usuario", token: "remote" } });
   const answers = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
   const cases = [
     ["offline", failingServices(OFFLINE)],
@@ -204,22 +208,26 @@ test("failures are normalized with a Spanish message and nothing throws", async 
     const expected = { ok: false, error: code, message: providers.errors.message(code) };
     assert.deepEqual(await historyService.list(services), expected, "list " + code);
     assert.deepEqual(await historyService.clear(services), expected, "clear " + code);
-    assert.deepEqual(await surveyService.submit(services, store, answers, NOW()), expected, "survey " + code);
+    assert.deepEqual(await surveyService.submit(services, store, "andres.torres", answers, NOW()), expected, "survey " + code);
     assert.deepEqual(await protectionService.loadModelVersion(services), expected, "model " + code);
   }
-  assert.equal((await store.get()).survey.completedAt, null);
+  assert.equal(surveyService.completedAtFor(await store.get(), "andres.torres"), null);
 });
 
 test("a failing survey submission leaves no completion stamp and broken ports do not throw", async () => {
   const store = openStore();
-  const throwing = { data: { listHistory: () => { throw new Error("boom"); }, deleteHistory: async () => null, getModelVersion: async () => ({ ok: true }), submitSurvey: async () => ({ ok: true }) } };
+  await store.set({ session: { username: "andres.torres", role: "usuario", token: "remote" } });
+  const throwing = {
+    data: { listHistory: () => { throw new Error("boom"); }, deleteHistory: async () => null, getModelVersion: async () => ({ ok: true }) },
+    survey: { submit: async () => { throw new Error("boom"); } }
+  };
   const server = { ok: false, error: "server", message: providers.errors.message("server") };
   assert.deepEqual(await historyService.list(throwing), server);
   assert.deepEqual(await historyService.clear(throwing), server);
   assert.deepEqual(await protectionService.loadModelVersion(throwing), server);
   assert.deepEqual(await historyService.list({}), server);
-  assert.deepEqual(await surveyService.submit({}, store, [1], NOW()), server);
-  assert.equal((await store.get()).survey.completedAt, null);
+  assert.deepEqual(await surveyService.submit({}, store, "andres.torres", [1], NOW()), server);
+  assert.equal(surveyService.completedAtFor(await store.get(), "andres.torres"), null);
 });
 
 test("history list shows loading and error states and keeps the happy path markup", () => {
@@ -240,15 +248,40 @@ test("history list shows loading and error states and keeps the happy path marku
   assert.match(stale, /role="alert"/);
 });
 
-test("survey result shows a retryable error when the submission failed", () => {
+test("survey views never expose the SUS score and distinguish pending, accepted, duplicate and retryable failure", () => {
   const { surveyUi } = Sereno;
-  const result = Sereno.survey.score([5, 1, 5, 1, 5, 1, 5, 1, 5, 1]);
-  assert.doesNotMatch(surveyUi.resultView(result), /role="alert"/);
-  const failed = surveyUi.resultView(result, { error: "Sin conexión. Revisa tu red e inténtalo de nuevo." });
+  const pending = surveyUi.resultView({ state: "submitting" });
+  assert.match(pending, /Enviando/);
+  assert.doesNotMatch(pending, /Gracias por tu opinión|\/ 100|Excelente|Bueno|Aceptable|A mejorar/);
+
+  const accepted = surveyUi.resultView({ state: "accepted" });
+  assert.match(accepted, /Gracias por tu opinión/);
+  assert.equal(accepted.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim(), "Gracias por tu opinión Cerrar");
+  assert.match(accepted, /role="status"/);
+  assert.doesNotMatch(accepted, /\/ 100|Excelente|Bueno|Aceptable|A mejorar|survey-retry/);
+
+  const duplicate = surveyUi.resultView({ state: "already" });
+  assert.equal(duplicate.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim(), "Gracias por tu opinión Cerrar");
+  assert.match(duplicate, /role="status"/);
+  assert.match(surveyUi.questionView({ index: 0, selected: null }), /Tus respuestas no incluyen tu usuario/);
+  assert.doesNotMatch(duplicate, /survey-retry|\/ 100/);
+
+  const failed = surveyUi.resultView({ state: "error", error: "Sin conexión. Revisa tu red e inténtalo de nuevo." });
   assert.match(failed, /role="alert"/);
   assert.match(failed, /Sin conexión/);
   assert.match(failed, /data-action="survey-retry"/);
-  assert.match(failed, /100 \/ 100/);
+  assert.doesNotMatch(failed, /Gracias por tu opinión|\/ 100/);
+});
+
+test("survey status loading and failure do not render questions", () => {
+  const loading = Sereno.surveyUi.statusView({ state: "loading" });
+  assert.match(loading, /Cargando/);
+  assert.match(loading, /role="status"/);
+  assert.doesNotMatch(loading, /Pregunta 1|data-action="answer"/);
+  const failed = Sereno.surveyUi.statusView({ state: "error", error: "Sin conexión." });
+  assert.match(failed, /role="alert"/);
+  assert.match(failed, /data-action="survey-status-retry"/);
+  assert.doesNotMatch(failed, /Pregunta 1|data-action="answer"/);
 });
 
 test("the model version comes from the backend and the notice follows it", () => {

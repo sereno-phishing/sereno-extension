@@ -11,7 +11,7 @@ const realUi = load("ui/atoms.js", "ui/dom.js").ui;
 
 // Exercise the actual controller without exposing its private App state.
 async function popupHarness(extra = {}) {
-  const state = { session: null, accounts: [], survey: { answers: [] }, history: {}, ...(extra.state || {}) };
+  const state = { session: null, accounts: [], survey: { byUser: {} }, history: {}, ...(extra.state || {}) };
   const originalState = structuredClone(state);
   const renders = [];
   const focused = [];
@@ -20,6 +20,7 @@ async function popupHarness(extra = {}) {
   const listeners = {};
   const documentListeners = {};
   let actions;
+  let subscriber = null;
   const root = {
     innerHTML: "",
     addEventListener: (name, handler) => { listeners[name] = handler; },
@@ -33,16 +34,32 @@ async function popupHarness(extra = {}) {
     onboarding: { isDone: () => true },
     preferences: { read: () => null, write: (...args) => calls.push(["preferences.write", ...args]) },
     stateStore: { open: () => ({
-      subscribe: (handler) => handler(state),
+      subscribe: (handler) => { subscriber = handler; handler(state); },
       ready: () => Promise.resolve(state),
+      get: () => Promise.resolve(structuredClone(state)),
+      set: (patch) => {
+        calls.push(["store.set"]);
+        Object.assign(state, patch);
+        if (subscriber) subscriber(state);
+        return Promise.resolve();
+      },
       update: (mutate) => {
         calls.push(["store.update"]);
-        Object.assign(state, mutate(state));
+        const patch = mutate(structuredClone(state));
+        if (patch) Object.assign(state, patch);
+        if (patch && subscriber) subscriber(state);
         return Promise.resolve();
+      },
+      transact: (mutate) => {
+        calls.push(["store.transact"]);
+        const outcome = mutate(structuredClone(state)) || {};
+        if (outcome.patch) Object.assign(state, outcome.patch);
+        if (outcome.patch && subscriber) subscriber(state);
+        return Promise.resolve(outcome.result);
       }
     }) },
     time: { stamp: () => { calls.push(["completedAt"]); return "completed"; } },
-    services: extra.services || {},
+    services: extra.services || { survey: { status: async () => ({ ok: true, submitted: false }), submit: async () => ({ ok: true }) } },
     historyService: extra.historyService || { list: async () => ({ ok: true, entries: [] }), clear: async () => ({ ok: true }) },
     protectionService: extra.protectionService || { loadModelVersion: async () => ({ ok: true, version: "1.2" }) },
     accountService: {
@@ -68,7 +85,13 @@ async function popupHarness(extra = {}) {
   }
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../app/popup/popup-page.js"), "utf8"), context);
   await Promise.resolve();
-  return { actions, listeners, documentListeners, focused, trapped, state, originalState, calls, renders, root };
+  return {
+    actions, listeners, documentListeners, focused, trapped, state, originalState, calls, renders, root,
+    emitState(patch) {
+      Object.assign(state, patch);
+      if (subscriber) subscriber(state);
+    }
+  };
 }
 
 test("tab sliding runs once per real tab change, not on initial render, repeat clicks or redraws", async () => {
@@ -90,31 +113,34 @@ test("tab sliding runs once per real tab change, not on initial render, repeat c
 
 for (const index of [0, 4, 9]) {
   test(`exiting survey question ${index + 1} retains autosaved answers without completion or extra writes`, async () => {
-    const popup = await popupHarness();
+    const popup = await popupHarness({ state: { session: USER, survey: { byUser: {} } } });
     popup.actions["open-survey"]();
+    await settle();
     for (let step = 0; step <= index; step += 1) {
       popup.actions.answer({ getAttribute: () => "3" });
       if (step < index) popup.actions["survey-next"]();
     }
     assert.equal(popup.renders.at(-1).surveyIndex, index);
-    const savedAnswers = Array.from(popup.state.survey.answers);
+    const savedAnswers = Array.from(popup.state.survey.byUser.ana.answers);
     const writesBeforeExit = popup.calls.length;
     popup.actions["survey-close"]();
     assert.equal(popup.root.innerHTML, "home");
     assert.equal(popup.renders.at(-1).tab, "home");
     assert.equal(popup.calls.length, writesBeforeExit);
-    assert.deepEqual(Array.from(popup.state.survey.answers), savedAnswers);
-    assert.equal(popup.state.survey.completedAt, undefined);
-    assert.ok(popup.calls.every(([call]) => call === "store.update"));
+    assert.deepEqual(Array.from(popup.state.survey.byUser.ana.answers), savedAnswers);
+    assert.equal(popup.state.survey.byUser.ana.completedAt, null);
+    assert.ok(popup.calls.every(([call]) => call === "store.transact"));
     popup.actions["open-survey"]();
+    await settle();
     assert.equal(popup.renders.at(-1).surveyIndex, 0);
     assert.deepEqual(popup.renders.at(-1).surveyAnswers, savedAnswers);
   });
 }
 
 test("survey previous-question action still navigates questions without exiting or saving", async () => {
-  const popup = await popupHarness();
+  const popup = await popupHarness({ state: { session: USER } });
   popup.actions["open-survey"]();
+  await settle();
   popup.actions["survey-back"]();
   assert.equal(popup.renders.at(-1).surveyIndex, 0);
   popup.actions.answer({ getAttribute: () => "4" });
@@ -198,26 +224,277 @@ test("a failing history load shows its message and retry reloads it", async () =
   assert.equal(popup.renders.at(-1).historyError, null);
 });
 
-test("a failed survey submission keeps the result on screen with a message and can be retried", async () => {
-  let offline = true;
+test("a new signed-in popup restores backend-confirmed participation without entering the survey", async () => {
   const popup = await popupHarness({
-    services: { data: { submitSurvey: async () => (offline ? { ok: false, error: "offline" } : { ok: true }) } }
+    state: { session: USER, survey: { byUser: {} } },
+    services: { survey: { status: async () => ({ ok: true, submitted: true }), submit: async () => ({ ok: true }) } }
+  });
+  await settle();
+  const model = popup.renders.at(-1);
+  assert.equal(model.view, "home");
+  assert.equal(model.surveyMenuStatus, "submitted");
+});
+
+test("signing in restores backend-confirmed participation without entering the survey", async () => {
+  const popup = await popupHarness({
+    services: { survey: { status: async () => ({ ok: true, submitted: true }), submit: async () => ({ ok: true }) } }
+  });
+  popup.emitState({ session: USER });
+  await settle();
+  assert.equal(popup.renders.at(-1).view, "home");
+  assert.equal(popup.renders.at(-1).surveyMenuStatus, "submitted");
+});
+
+test("a new signed-in popup shows survey eligibility only after backend confirmation", async () => {
+  let release;
+  const status = new Promise((resolve) => { release = resolve; });
+  const popup = await popupHarness({
+    state: { session: USER, survey: { byUser: { ana: { answers: [], completedAt: "local-only" } } } },
+    services: { survey: { status: () => status, submit: async () => ({ ok: true }) } }
+  });
+  assert.equal(popup.renders.at(-1).view, "home");
+  assert.equal(popup.renders.at(-1).surveyMenuStatus, "loading");
+  release({ ok: true, submitted: false });
+  await settle();
+  assert.equal(popup.renders.at(-1).view, "home");
+  assert.equal(popup.renders.at(-1).surveyMenuStatus, "available");
+});
+
+test("opening the survey waits for backend status before showing questions", async () => {
+  let release;
+  const status = new Promise((resolve) => { release = resolve; });
+  const popup = await popupHarness({
+    state: { session: USER, survey: { byUser: {} } },
+    services: { survey: { status: () => status, submit: async () => ({ ok: true }) } }
   });
   popup.actions["open-survey"]();
+  assert.equal(popup.renders.at(-1).view, "surveyStatus");
+  assert.equal(popup.renders.at(-1).surveyStatus, "loading");
+  release({ ok: true, submitted: false });
+  await settle();
+  assert.equal(popup.renders.at(-1).view, "survey");
+  assert.equal(popup.renders.at(-1).surveyStatus, "available");
+});
+
+test("a failed survey status is honest and retry can reveal the questionnaire", async () => {
+  let offline = true;
+  const popup = await popupHarness({
+    state: { session: USER, survey: { byUser: {} } },
+    services: { survey: { status: async () => (offline ? { ok: false, error: "offline" } : { ok: true, submitted: false }), submit: async () => ({ ok: true }) } }
+  });
+  popup.actions["open-survey"]();
+  await settle();
+  assert.equal(popup.renders.at(-1).view, "surveyStatus");
+  assert.equal(popup.renders.at(-1).surveyStatus, "error");
+  assert.match(popup.renders.at(-1).surveyStatusError, /Sin conexión/);
+  offline = false;
+  popup.actions["survey-status-retry"]();
+  await settle();
+  assert.equal(popup.renders.at(-1).view, "survey");
+});
+
+test("backend submitted status shows recorded thanks without questions even when local storage is empty", async () => {
+  const popup = await popupHarness({
+    state: { session: USER, survey: { byUser: {} } },
+    services: { survey: { status: async () => ({ ok: true, submitted: true }), submit: async () => ({ ok: true }) } }
+  });
+  popup.actions["open-survey"]();
+  await settle();
+  const model = popup.renders.at(-1);
+  assert.equal(model.view, "surveyResult");
+  assert.equal(model.surveySubmission, "already");
+  assert.equal(popup.state.survey.byUser.ana, undefined);
+});
+
+test("a local completion marker is not trusted when backend status says the survey is available", async () => {
+  const popup = await popupHarness({
+    state: { session: USER, survey: { byUser: { ana: { answers: [4, 2], completedAt: "old" } } } },
+    services: { survey: { status: async () => ({ ok: true, submitted: false }), submit: async () => ({ ok: true }) } }
+  });
+  popup.actions["open-survey"]();
+  await settle();
+  assert.equal(popup.renders.at(-1).view, "survey");
+  assert.deepEqual(popup.renders.at(-1).surveyAnswers.slice(0, 2), [4, 2]);
+});
+
+test("survey submission shows pending, then recorded thanks only after backend acceptance", async () => {
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const popup = await popupHarness({
+    state: { session: USER, survey: { byUser: {} } },
+    services: { survey: { status: async () => ({ ok: true, submitted: false }), submit: () => pending } }
+  });
+  popup.actions["open-survey"]();
+  await settle();
+  for (let step = 0; step < 10; step += 1) {
+    popup.actions.answer({ getAttribute: () => "3" });
+    popup.actions["survey-next"]();
+  }
+  const submitting = popup.renders.at(-1);
+  assert.equal(submitting.view, "surveyResult");
+  assert.equal(submitting.surveySubmission, "submitting");
+  assert.equal(popup.state.survey.byUser.ana.completedAt, null);
+  release({ ok: true });
+  await settle();
+  assert.equal(popup.renders.at(-1).surveySubmission, "accepted");
+  assert.equal(popup.renders.at(-1).surveyMenuStatus, "submitted");
+  assert.equal(popup.state.survey.byUser.ana.completedAt, "completed");
+  popup.actions["survey-close"]();
+  assert.equal(popup.renders.at(-1).view, "home");
+  assert.equal(popup.renders.at(-1).surveyMenuStatus, "submitted");
+});
+
+for (const error of ["invalid", "server", "offline"]) {
+  test(`survey ${error} submission failure shows no success and can retry`, async () => {
+    let fail = true;
+    const popup = await popupHarness({
+      state: { session: USER, survey: { byUser: {} } },
+      services: { survey: {
+        status: async () => ({ ok: true, submitted: false }),
+        submit: async () => (fail ? { ok: false, error } : { ok: true })
+      } }
+    });
+    popup.actions["open-survey"]();
+    await settle();
+    for (let step = 0; step < 10; step += 1) {
+      popup.actions.answer({ getAttribute: () => "3" });
+      popup.actions["survey-next"]();
+    }
+    await settle();
+    assert.equal(popup.renders.at(-1).surveySubmission, "error");
+    assert.equal(popup.state.survey.byUser.ana.completedAt, null);
+    fail = false;
+    popup.actions["survey-retry"]();
+    await settle();
+    assert.equal(popup.renders.at(-1).surveySubmission, "accepted");
+  });
+}
+
+test("duplicate submission converges to already-participated info without a POST retry", async () => {
+  const popup = await popupHarness({
+    state: { session: USER, survey: { byUser: {} } },
+    services: { survey: { status: async () => ({ ok: true, submitted: false }), submit: async () => ({ ok: false, error: "already_submitted" }) } }
+  });
+  popup.actions["open-survey"]();
+  await settle();
   for (let step = 0; step < 10; step += 1) {
     popup.actions.answer({ getAttribute: () => "3" });
     popup.actions["survey-next"]();
   }
   await settle();
-  const failed = popup.renders.at(-1);
-  assert.equal(failed.view, "surveyResult");
-  assert.match(failed.surveyError, /Sin conexión/);
-  assert.equal(popup.state.survey.completedAt, undefined);
-  offline = false;
-  popup.actions["survey-retry"]();
+  assert.equal(popup.renders.at(-1).surveySubmission, "already");
+  assert.equal(popup.renders.at(-1).surveyMenuStatus, "submitted");
+  assert.equal(popup.state.survey.byUser.ana.completedAt, null);
+});
+
+test("switching accounts clears survey UI and loads only the target account draft", async () => {
+  const popup = await popupHarness({
+    state: {
+      session: USER,
+      survey: {
+        byUser: {
+          ana: { answers: [4, 2], completedAt: null },
+          bea: { answers: [1, 5], completedAt: null }
+        }
+      }
+    }
+  });
+  popup.actions["open-survey"]();
   await settle();
-  assert.equal(popup.renders.at(-1).surveyError, null);
-  assert.equal(popup.state.survey.completedAt, "completed");
+  assert.deepEqual(popup.renders.at(-1).surveyAnswers.slice(0, 2), [4, 2]);
+  popup.actions.answer({ getAttribute: () => "3" });
+  popup.emitState({ session: { username: "bea", role: "usuario" } });
+  const switched = popup.renders.at(-1);
+  assert.deepEqual(switched.surveyAnswers.slice(0, 2), [1, 5]);
+  assert.equal(switched.surveyIndex, 0);
+  assert.equal(switched.surveyError, null);
+  popup.emitState({ session: null });
+  assert.ok(popup.renders.at(-1).surveyAnswers.every((answer) => answer === null));
+});
+
+test("a late background survey status cannot hide the new account survey entry", async () => {
+  let releaseAna;
+  let releaseBea;
+  const ana = new Promise((resolve) => { releaseAna = resolve; });
+  const bea = new Promise((resolve) => { releaseBea = resolve; });
+  let checks = 0;
+  const popup = await popupHarness({
+    state: { session: USER, survey: { byUser: {} } },
+    services: { survey: { status: () => (++checks === 1 ? ana : bea), submit: async () => ({ ok: true }) } }
+  });
+  popup.emitState({ session: { username: "bea", role: "usuario" }, survey: { byUser: {} } });
+  releaseBea({ ok: true, submitted: false });
+  await settle();
+  assert.equal(popup.renders.at(-1).surveyMenuStatus, "available");
+  releaseAna({ ok: true, submitted: true });
+  await settle();
+  assert.equal(popup.renders.at(-1).surveyMenuStatus, "available");
+  assert.equal(popup.renders.at(-1).view, "home");
+});
+
+test("a failed background survey status stays honest and the menu action can retry", async () => {
+  let offline = true;
+  const popup = await popupHarness({
+    state: { session: USER, survey: { byUser: {} } },
+    services: { survey: {
+      status: async () => (offline ? { ok: false, error: "offline" } : { ok: true, submitted: false }),
+      submit: async () => ({ ok: true })
+    } }
+  });
+  await settle();
+  assert.equal(popup.renders.at(-1).view, "home");
+  assert.equal(popup.renders.at(-1).surveyMenuStatus, "error");
+  offline = false;
+  popup.actions["open-survey"]();
+  await settle();
+  assert.equal(popup.renders.at(-1).view, "survey");
+  assert.equal(popup.renders.at(-1).surveyMenuStatus, "available");
+});
+
+test("a late survey status response after an account switch cannot reveal the old account questionnaire", async () => {
+  let releaseAna;
+  let releaseBea;
+  const ana = new Promise((resolve) => { releaseAna = resolve; });
+  const bea = new Promise((resolve) => { releaseBea = resolve; });
+  let checks = 0;
+  const popup = await popupHarness({
+    state: { session: USER, survey: { byUser: {} } },
+    services: { survey: { status: () => (++checks === 1 ? ana : bea), submit: async () => ({ ok: true }) } }
+  });
+  popup.actions["open-survey"]();
+  popup.emitState({ session: { username: "bea", role: "usuario" }, survey: { byUser: {} } });
+  releaseBea({ ok: true, submitted: true });
+  await settle();
+  releaseAna({ ok: true, submitted: false });
+  await settle();
+  const model = popup.renders.at(-1);
+  assert.equal(model.view, "surveyResult");
+  assert.equal(model.surveySubmission, "already");
+});
+
+test("a late survey response after an account switch cannot clear the new account UI", async () => {
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const popup = await popupHarness({
+    state: { session: USER, survey: { byUser: { ana: { answers: [], completedAt: null } } } },
+    services: { survey: { status: async () => ({ ok: true, submitted: false }), submit: () => pending } }
+  });
+  popup.actions["open-survey"]();
+  await settle();
+  for (let step = 0; step < 10; step += 1) {
+    popup.actions.answer({ getAttribute: () => "3" });
+    popup.actions["survey-next"]();
+  }
+  popup.emitState({
+    session: { username: "bea", role: "usuario" },
+    survey: { byUser: { ana: { answers: Array(10).fill(3), completedAt: null }, bea: { answers: [2], completedAt: null } } }
+  });
+  release({ ok: true });
+  await settle();
+  const model = popup.renders.at(-1);
+  assert.deepEqual(model.surveyAnswers.slice(0, 1), [2]);
+  assert.equal(model.surveyError, null);
+  assert.equal(popup.state.survey.byUser.bea.completedAt, null);
 });
 
 test("boot renders at once and then refreshes the session through the auth port", async () => {

@@ -42,6 +42,11 @@
     historyLoading: false,
     historyError: null,
     modelVersion: null,
+    // Account-scoped participation confirmed by the backend for menu visibility.
+    surveyMenuStatus: "idle",
+    surveyStatus: "idle",
+    surveyStatusError: null,
+    surveySubmission: "idle",
     surveyError: null,
     // True while the backend could not confirm the stored session (offline notice).
     sessionOffline: false
@@ -51,6 +56,9 @@
   var loaded = { user: null, modelKey: null };
   var historyRun = 0;
   var modelRun = 0;
+  var surveyStatusRun = 0;
+  var surveySubmitRun = 0;
+  var surveyUser = null;
 
   var root = null;
 
@@ -96,42 +104,117 @@
 
   /* ---------------- survey flow ---------------- */
 
+  function currentSurveyUser() {
+    return App.state && App.state.session ? App.state.session.username : null;
+  }
+
   function resetSurveyDraftFromState() {
-    App.surveyAnswers = survey.draftAnswers(App.state && App.state.survey && App.state.survey.answers);
+    App.surveyAnswers = survey.draftAnswers(Sereno.surveyService.draftFor(App.state, currentSurveyUser()));
     App.surveyIndex = 0;
   }
 
-  /* Sends the finished survey to the backend; a failure keeps the score on
-     screen with a message and a retry. */
-  async function submitSurvey() {
-    var hadError = !!App.surveyError;
+  /* Refreshes account-scoped participation without changing the current view.
+     While pending, the menu entry stays hidden so completed accounts do not see
+     it flash. A failure remains retryable through the visible menu entry. */
+  async function loadSurveyMenuStatus() {
+    surveyStatusRun += 1;
+    var run = surveyStatusRun;
+    var username = currentSurveyUser();
+    if (!username) {
+      App.surveyMenuStatus = "idle";
+      return;
+    }
+    App.surveyMenuStatus = "loading";
+    render();
+    var result = await Sereno.surveyService.status(services);
+    if (run !== surveyStatusRun || currentSurveyUser() !== username) {
+      return;
+    }
+    App.surveyMenuStatus = !result.ok ? "error" : result.submitted ? "submitted" : "available";
+    render();
+  }
+
+  /* Eligibility is backend-owned. The local completion marker is retained
+     only as UI history and never decides whether the form is available. */
+  async function loadSurveyStatus() {
+    surveyStatusRun += 1;
+    var run = surveyStatusRun;
+    var username = currentSurveyUser();
+    surveySubmitRun += 1;
+    App.surveyMenuStatus = "loading";
+    App.surveyStatus = "loading";
+    App.surveyStatusError = null;
+    App.surveySubmission = "idle";
     App.surveyError = null;
-    var result = await Sereno.surveyService.submit(services, store, App.surveyAnswers, new Date());
+    App.view = "surveyStatus";
+    render();
+    var result = await Sereno.surveyService.status(services);
+    if (run !== surveyStatusRun || currentSurveyUser() !== username) {
+      return;
+    }
     if (!result.ok) {
+      App.surveyMenuStatus = "error";
+      App.surveyStatus = "error";
+      App.surveyStatusError = result.message;
+      App.view = "surveyStatus";
+    } else if (result.submitted) {
+      App.surveyMenuStatus = "submitted";
+      App.surveyStatus = "submitted";
+      App.surveySubmission = "already";
+      App.view = "surveyResult";
+    } else {
+      App.surveyMenuStatus = "available";
+      App.surveyStatus = "available";
+      App.view = "survey";
+    }
+    render();
+  }
+
+  /* Sends the finished survey to the backend. Success is rendered only after
+     acceptance; duplicate means this account already participated. */
+  async function submitSurvey() {
+    surveySubmitRun += 1;
+    var run = surveySubmitRun;
+    var username = currentSurveyUser();
+    var answers = App.surveyAnswers.slice();
+    App.surveySubmission = "submitting";
+    App.surveyError = null;
+    App.view = "surveyResult";
+    render();
+    var result = await Sereno.surveyService.submit(services, store, username, answers, new Date());
+    if (run !== surveySubmitRun || currentSurveyUser() !== username) {
+      return;
+    }
+    if (result.ok) {
+      App.surveyMenuStatus = "submitted";
+      App.surveyStatus = "submitted";
+      App.surveySubmission = "accepted";
+    } else if (result.error === "already_submitted") {
+      App.surveyMenuStatus = "submitted";
+      App.surveyStatus = "submitted";
+      App.surveySubmission = "already";
+    } else {
+      App.surveySubmission = "error";
       App.surveyError = result.message;
     }
-    if (!result.ok || hadError) {
-      render();
-    }
+    render();
   }
 
   function selectAnswer(value) {
-    if (!value) {
+    if (App.surveyStatus !== "available" || App.view !== "survey" || !value) {
       return;
     }
+    var username = currentSurveyUser();
     App.surveyAnswers[App.surveyIndex] = value;
-    Sereno.surveyService.saveDraft(store, App.surveyAnswers);
+    Sereno.surveyService.saveDraft(store, username, App.surveyAnswers);
     render();
   }
 
   function nextSurveyQuestion() {
-    if (!App.surveyAnswers[App.surveyIndex]) {
+    if (App.surveyStatus !== "available" || App.view !== "survey" || !App.surveyAnswers[App.surveyIndex]) {
       return;
     }
     if (survey.isLastQuestion(App.surveyIndex)) {
-      App.view = "surveyResult";
-      App.surveyError = null;
-      render();
       submitSurvey();
       return;
     }
@@ -227,6 +310,31 @@
     var result = await Sereno.protectionService.loadModelVersion(services);
     if (run === modelRun) {
       setData({ modelVersion: result.ok ? result.version : null });
+    }
+  }
+
+  function syncSurveyAccount(state) {
+    var username = state.session ? state.session.username : null;
+    if (username === surveyUser) {
+      return;
+    }
+    surveyUser = username;
+    surveyStatusRun += 1;
+    surveySubmitRun += 1;
+    App.surveyAnswers = survey.draftAnswers(Sereno.surveyService.draftFor(state, username));
+    App.surveyIndex = 0;
+    App.surveyMenuStatus = username ? "loading" : "idle";
+    App.surveyStatus = "idle";
+    App.surveyStatusError = null;
+    App.surveySubmission = "idle";
+    App.surveyError = null;
+    var inSurvey = App.view === "surveyStatus" || App.view === "survey" || App.view === "surveyResult";
+    if (!username && inSurvey) {
+      show("home");
+    } else if (username && inSurvey) {
+      loadSurveyStatus();
+    } else if (username) {
+      loadSurveyMenuStatus();
     }
   }
 
@@ -352,8 +460,7 @@
     "open-survey": function () {
       App.menuOpen = false;
       resetSurveyDraftFromState();
-      App.view = "survey";
-      render();
+      loadSurveyStatus();
     },
     answer: function (target) {
       selectAnswer(Number(target.getAttribute("data-value")));
@@ -365,8 +472,14 @@
       }
     },
     "survey-next": nextSurveyQuestion,
+    "survey-status-retry": loadSurveyStatus,
     "survey-retry": submitSurvey,
     "survey-close": function () {
+      surveyStatusRun += 1;
+      surveySubmitRun += 1;
+      App.surveyStatus = "idle";
+      App.surveyStatusError = null;
+      App.surveySubmission = "idle";
       App.surveyError = null;
       show("home");
       render();
@@ -491,13 +604,14 @@
     document.addEventListener("keydown", onKeydown);
     store.subscribe(function (state) {
       App.state = state;
+      syncSurveyAccount(state);
       syncBackendData(state);
       render();
     });
     store.ready().then(function (state) {
       App.state = state;
+      syncSurveyAccount(state);
       syncBackendData(state);
-      App.surveyAnswers = survey.draftAnswers(state.survey && state.survey.answers);
       if (!onboarding.isDone(state)) {
         App.view = "onboarding";
         App.onboardingStep = 1;

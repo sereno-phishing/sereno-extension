@@ -1,6 +1,6 @@
 /* Platform · composition root: the only place that knows which adapter backs
    the ports. Classic script that registers Sereno.providers.create and
-   Sereno.services = { provider, verdict, auth, data }. Everything else
+   Sereno.services = { provider, verdict, auth, data, survey }. Everything else
    (use cases, containers, pages) depends on Sereno.services alone.
    create({ config?, fetch?, store?, delayMs?, now? }): config defaults to
    Sereno.providers.config; fetch, store, delayMs and now are test seams. */
@@ -42,7 +42,13 @@
       throw new Error("Unknown auth provider: " + authProvider);
     }
     var adapter = adapterFor(config.provider);
-    return { provider: config.provider, verdict: adapter.verdict, auth: adapterFor(authProvider).auth, data: adapter.data };
+    return {
+      provider: config.provider,
+      verdict: adapter.verdict,
+      auth: adapterFor(authProvider).auth,
+      data: adapter.data,
+      survey: adapterFor("remote").survey
+    };
   }
 
   Sereno.providers.create = create;

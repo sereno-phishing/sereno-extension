@@ -241,14 +241,6 @@
       return { ok: true, version: Sereno.seed.modelVersion };
     }
 
-    async function submitSurvey(answers) {
-      var stamp = Sereno.time.stamp(now());
-      await getStore().update(function (state) {
-        return { survey: Object.assign({}, state.survey, { answers: answers.slice(), completedAt: stamp }) };
-      });
-      return { ok: true };
-    }
-
     return {
       verdict: { evaluate: evaluate },
       auth: { login: login, register: register, logout: logout, session: session },
@@ -261,8 +253,7 @@
         setCacheTtl: setCacheTtl,
         invalidateCache: invalidateCache,
         getMetrics: getMetrics,
-        getModelVersion: getModelVersion,
-        submitSurvey: submitSurvey
+        getModelVersion: getModelVersion
       }
     };
   }
