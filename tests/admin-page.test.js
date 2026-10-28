@@ -15,12 +15,18 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
 const ROWS = [{ domain: "a.pe", policy: "bloqueo", updatedAt: "2026-09-21" }];
 const CACHE = { ttlPhishingDays: 7, ttlLegitHours: 24, invalidations: [] };
 
-async function adminHarness(administrationService, session, currentSession) {
+async function adminHarness(administrationService, session, currentSession, initialHash = "") {
   const renders = [];
+  const location = { hash: initialHash };
+  let hashchange = () => {};
   let actions;
   let subscriber = () => {};
   let state = { session: session === undefined ? { username: "admin", role: "administrador" } : session };
-  const root = { innerHTML: "", querySelector: () => null };
+  let input = { value: "" };
+  const root = {
+    set innerHTML(_html) { input = { value: "" }; },
+    querySelector: (selector) => selector === '[name="newDomain"]' ? input : null
+  };
   const Sereno = {
     services: {},
     time: { isoDay: () => "2026-09-22" },
@@ -50,6 +56,7 @@ async function adminHarness(administrationService, session, currentSession) {
   const context = vm.createContext({
     Sereno,
     document: { getElementById: () => root },
+    window: { location, addEventListener: (type, listener) => { if (type === "hashchange") hashchange = listener; } },
     setTimeout,
     clearTimeout
   });
@@ -58,12 +65,42 @@ async function adminHarness(administrationService, session, currentSession) {
   return {
     actions,
     renders,
+    location,
+    domainInput: () => input,
+    navigate(hash) { location.hash = hash; hashchange(); },
     emit(nextSession) {
       state = { session: nextSession };
       subscriber(state);
     }
   };
 }
+
+test("fragment routes restore sections and follow browser navigation", async () => {
+  for (const section of ["metricas", "dominios", "cache"]) {
+    const harness = await adminHarness(service(), undefined, undefined, "#" + section);
+    assert.equal(harness.renders.at(-1).section, section);
+  }
+  const harness = await adminHarness(service(), undefined, undefined, "#dominios");
+  harness.actions.nav({ getAttribute: () => "cache" });
+  assert.equal(harness.location.hash, "#cache");
+  harness.navigate("#cache");
+  assert.equal(harness.renders.at(-1).section, "cache");
+  harness.navigate("#dominios");
+  assert.equal(harness.renders.at(-1).section, "dominios");
+  harness.navigate("#main");
+  assert.equal(harness.renders.at(-1).section, "dominios");
+  harness.navigate("#unknown");
+  assert.equal(harness.renders.at(-1).section, "metricas");
+  assert.equal((await adminHarness(service())).renders.at(-1).section, "metricas");
+});
+
+test("changing the new domain policy keeps the typed domain", async () => {
+  const harness = await adminHarness(service(), undefined, undefined, "#dominios");
+  harness.domainInput().value = "ejemplo.com";
+  harness.actions["pick-add-policy"]({ getAttribute: () => "bloqueo" });
+  assert.equal(harness.renders.at(-1).addPolicy, "bloqueo");
+  assert.equal(harness.domainInput().value, "ejemplo.com");
+});
 
 function deferred() {
   let resolve;

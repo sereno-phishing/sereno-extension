@@ -14,11 +14,16 @@
 
   var NOTICE_MS = 2600;
 
+  function sectionFromHash(hash) {
+    var section = hash.slice(1);
+    return ["metricas", "dominios", "cache"].indexOf(section) !== -1 ? section : "metricas";
+  }
+
   var App = {
     initialized: false,
     state: null,
     authorization: "checking",
-    section: "metricas",
+    section: sectionFromHash(window.location.hash),
     showAllQueries: false,
     addPolicy: domainPolicy.DEFAULT_POLICY,
     metrics: null,
@@ -307,8 +312,7 @@
       if (!authorizedSnapshot()) {
         return;
       }
-      App.section = target.getAttribute("data-section") || "metricas";
-      render();
+      window.location.hash = "#" + sectionFromHash("#" + (target.getAttribute("data-section") || ""));
     },
     "toggle-queries": function () {
       if (!authorizedSnapshot()) {
@@ -321,8 +325,13 @@
       if (!authorizedSnapshot()) {
         return;
       }
+      var draft = readValue("newDomain");
       App.addPolicy = domainPolicy.policyOrDefault(target.getAttribute("data-policy"));
       render();
+      var input = root.querySelector('[name="newDomain"]');
+      if (input) {
+        input.value = draft;
+      }
     },
     "add-domain": addDomain,
     "pick-row-policy": function (target) {
@@ -360,6 +369,13 @@
       return;
     }
     App.initialized = true;
+    window.addEventListener("hashchange", function () {
+      if (window.location.hash === "#main") {
+        return;
+      }
+      App.section = sectionFromHash(window.location.hash);
+      render();
+    });
     Sereno.ui.delegateActions(root, ACTIONS);
     store.subscribe(observeState);
     var state = await store.ready();
