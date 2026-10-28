@@ -74,6 +74,13 @@ test("history padding matches home on all sides to keep tabs aligned", () => {
   assert.doesNotMatch(history, /(?:^|;)\s*(?:padding-inline|padding-block|width):/);
 });
 
+test("home and history keep their scrollbar gutter and administrator tabs aligned", () => {
+  const css = fs.readFileSync(path.join(ROOT, "app/popup/popup.css"), "utf8");
+  assert.match(css, /\.app-content:has\(\.view-home\),\s*\.app-content:has\(\.view-history\)\s*\{\s*scrollbar-gutter:\s*stable;/);
+  assert.doesNotMatch(css, /\.view-home-admin\s*\{[^}]*padding:/);
+  assert.match(css.match(/\.app-content\s*\{([^}]*)\}/)[1], /overflow-y:\s*auto;/);
+});
+
 test("the offline session notice is a polite live region with a retry action", () => {
   const views = popupViews();
   const state = { session: { username: "user", role: "user" }, history: {} };

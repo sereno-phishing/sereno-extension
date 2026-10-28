@@ -287,7 +287,7 @@
     historyRun += 1;
     var run = historyRun;
     var session = App.state && App.state.session;
-    if (!session || account.isAdmin(session)) {
+    if (!session) {
       setData({ historyEntries: [], historyLoading: false, historyError: null });
       return;
     }
@@ -616,7 +616,7 @@
         App.view = "onboarding";
         App.onboardingStep = 1;
       } else {
-        var historyTab = state.session && !account.isAdmin(state.session) && App.tab === "history";
+        var historyTab = state.session && App.tab === "history";
         show(historyTab ? "history" : "home");
       }
       render();

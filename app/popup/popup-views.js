@@ -83,7 +83,7 @@
     var session = state.session;
     var admin = account.isAdmin(session);
     var parts = ['<h1 class="sr-only">Sereno</h1>'];
-    if (session && !admin) {
+    if (session) {
       parts.push(tabs(true, model.tabSlide));
     }
     var card = protectionUi.protectionCard(protectionLevel(state));
@@ -100,11 +100,10 @@
           ui.button({ label: "Crear cuenta", variant: "ghost", block: true, action: "go-register" }) +
           "</div>"
       );
-    } else if (admin) {
-      parts.push(card, site, adminEntryCard(), noticeIfVisible(state, model));
     } else {
       parts.push(
-        '<div class="tab-panel" role="tabpanel" id="tabpanel-home" aria-labelledby="tab-home">' + card + site + noticeIfVisible(state, model) + "</div>"
+        '<div class="tab-panel" role="tabpanel" id="tabpanel-home" aria-labelledby="tab-home">' +
+        card + site + (admin ? adminEntryCard() : "") + noticeIfVisible(state, model) + "</div>"
       );
     }
     return '<section class="' + ui.classes(["view", "view-home", admin && "view-home-admin"]) + '">' + parts.join("") + "</section>";

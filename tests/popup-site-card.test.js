@@ -54,6 +54,13 @@ test("for a user the site card sits inside the home tab panel, between the prote
   assert.equal(count(html, /<h1\b/g), 1);
 });
 
+test("admin home exposes history tabs and the administration entry", () => {
+  const html = Sereno.popupViews.page(BASE, { session: ADMIN });
+  assert.match(html, /data-tab="history"/);
+  assert.match(html, /id="tabpanel-home"/);
+  assert.match(html, /data-action="open-admin"/);
+});
+
 test("for an admin the site card sits between the protection card and the admin card", () => {
   const html = render(ADMIN);
   const protection = html.indexOf("protection-card");

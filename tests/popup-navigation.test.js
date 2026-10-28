@@ -28,7 +28,7 @@ async function popupHarness(extra = {}) {
     querySelectorAll: () => extra.items || []
   };
   const Sereno = {
-    account: { isAdmin: () => false },
+    account: { isAdmin: (session) => !!session && session.role === "administrador" },
     history: { ALL: "all" },
     survey: { draftAnswers: (answers) => [...answers] },
     onboarding: { isDone: () => true },
@@ -191,6 +191,18 @@ for (const kind of ["login", "register"]) {
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 const USER = { username: "ana", role: "usuario" };
+
+test("administrator can load and open personal history", async () => {
+  const entries = [{ id: "admin-entry", domain: "example.com" }];
+  const popup = await popupHarness({
+    state: { session: { username: "admin", role: "administrador" } },
+    historyService: { list: async () => ({ ok: true, entries }), clear: async () => ({ ok: true }) }
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  popup.actions.tab({ getAttribute: () => "history" });
+  assert.equal(popup.renders.at(-1).view, "history");
+  assert.deepEqual(popup.renders.at(-1).historyEntries, entries);
+});
 
 test("a signed-in popup loads history and model version through the ports", async () => {
   const entries = [{ id: "h-1", domain: "a.pe", status: "seguro", score: 0.1, source: "modelo", ts: "2026-09-21T10:00", latencyMs: 10 }];

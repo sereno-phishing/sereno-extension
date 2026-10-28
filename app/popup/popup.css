@@ -167,6 +167,12 @@ button {
   background: var(--bg);
 }
 
+/* Keep tab widths stable when the history gains a scrollbar. */
+.app-content:has(.view-home),
+.app-content:has(.view-history) {
+  scrollbar-gutter: stable;
+}
+
 .view {
   display: flex;
   flex-direction: column;
@@ -332,10 +338,6 @@ button {
 
 .view-home {
   padding: 20px;
-}
-
-.view-home-admin {
-  padding: 16px;
 }
 
 .protection-card {
