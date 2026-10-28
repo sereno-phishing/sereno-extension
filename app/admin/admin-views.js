@@ -35,12 +35,15 @@
       '<div class="sidebar-brand">' + ui.logo("sidebar-logo", "Sereno") + '<span class="sidebar-name">Sereno</span></div>' +
       nav(activeSection) +
       '<div class="sidebar-foot">' +
-      '<button type="button" class="sidebar-demo" data-action="open-demo">Abrir tienda de demo</button>' +
       '<div class="sidebar-user"><span class="sidebar-avatar" aria-hidden="true"></span>' +
       '<div><div class="sidebar-username">' + ui.esc(session.username) + "</div>" +
       '<div class="sidebar-role">' + ui.esc(account.roleTitle(session.role)) + "</div></div></div>" +
       "</div></aside>"
     );
+  }
+
+  function checkingGate() {
+    return '<main class="access-gate" id="main" tabindex="-1"><div class="card panel-status" role="status">Verificando la sesión...</div></main>';
   }
 
   /* Shown instead of the panel when nobody, or a non-admin user, is signed in. */
@@ -91,7 +94,10 @@
   /* model: the admin UI state (section, drafts, notices, the data the port
      returned and the load state of each section). */
   function page(model, state) {
-    if (!account.isAdmin(state.session)) {
+    if (model.authorization === "checking") {
+      return checkingGate();
+    }
+    if ((model.authorization !== undefined && model.authorization !== "authorized") || !account.isAdmin(state.session)) {
       return accessGate();
     }
     return (

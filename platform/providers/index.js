@@ -38,15 +38,24 @@
       return adapter;
     }
     var authProvider = config.authProvider === undefined ? config.provider : config.authProvider;
+    var policyProvider = config.policyProvider === undefined ? config.provider : config.policyProvider;
     if (authProvider !== "mock" && authProvider !== "remote") {
       throw new Error("Unknown auth provider: " + authProvider);
     }
+    if (policyProvider !== "mock" && policyProvider !== "remote") {
+      throw new Error("Unknown policy provider: " + policyProvider);
+    }
     var adapter = adapterFor(config.provider);
+    var policyData = adapterFor(policyProvider).data;
+    var data = Object.assign({}, adapter.data, {
+      getDomainPolicies: policyData.getDomainPolicies,
+      putDomainPolicies: policyData.putDomainPolicies
+    });
     return {
       provider: config.provider,
       verdict: adapter.verdict,
       auth: adapterFor(authProvider).auth,
-      data: adapter.data,
+      data: data,
       survey: adapterFor("remote").survey
     };
   }

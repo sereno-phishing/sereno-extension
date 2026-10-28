@@ -18,34 +18,44 @@ function openStore() {
 }
 
 function compose(store, fetch) {
-  return Sereno.providers.create({ config: { provider: "mock", authProvider: "remote", baseUrl: "http://127.0.0.1:5000" }, store, fetch, delayMs: 0 });
+  return Sereno.providers.create({ config: { provider: "mock", authProvider: "remote", policyProvider: "remote", baseUrl: "http://127.0.0.1:5000" }, store, fetch, delayMs: 0 });
 }
 
-test("local defaults route authentication and surveys to the backend", () => {
+test("local defaults route authentication, surveys and domain policies to the backend", () => {
   assert.equal(Sereno.providers.config.provider, "mock");
   assert.equal(Sereno.providers.config.authProvider, "remote");
+  assert.equal(Sereno.providers.config.policyProvider, "remote");
   assert.equal(Sereno.providers.config.baseUrl, "http://127.0.0.1:5000");
   assert.equal(typeof Sereno.services.survey.status, "function");
   assert.equal(typeof Sereno.services.survey.submit, "function");
   assert.equal(typeof Sereno.services.data.submitSurvey, "undefined");
 });
 
-test("survey status and submission are remote while verdict and data remain local", async () => {
+test("survey and policies are remote while verdict, history, cache and metrics remain local", async () => {
   const store = openStore();
   const calls = [];
   const services = compose(store, async (url, init) => {
     calls.push({ url, init });
+    const pathname = new URL(url).pathname;
+    if (pathname === "/v1/domains") {
+      return { ok: true, status: 200, json: async () => ({ domains: [] }) };
+    }
     return { ok: true, status: 200, json: async () => (init.method === "GET" ? { submitted: false } : {}) };
   });
   assert.equal((await services.verdict.evaluate("https://tienda-servicios.pe")).ok, true);
   assert.equal((await services.data.getMetrics()).metrics.analyzed, 1284);
+  assert.equal((await services.data.getCache()).cache.ttlPhishingDays, 7);
+  assert.equal((await services.data.listHistory()).entries.length, 0);
+  assert.deepEqual(await services.data.getDomainPolicies(), { ok: true, domains: [] });
+  assert.deepEqual(await services.data.putDomainPolicies([]), { ok: true, domains: [] });
   assert.deepEqual(await services.survey.status(), { ok: true, submitted: false });
   assert.deepEqual(await services.survey.submit([3, 3, 3, 3, 3, 3, 3, 3, 3, 3]), { ok: true });
-  assert.equal(calls.length, 2);
-  assert.equal(calls[0].url, "http://127.0.0.1:5000/v1/survey");
-  assert.equal(calls[0].init.method, "GET");
-  assert.equal(calls[1].url, "http://127.0.0.1:5000/v1/survey");
-  assert.equal(calls[1].init.method, "POST");
+  assert.deepEqual(calls.map((call) => [new URL(call.url).pathname, call.init.method]), [
+    ["/v1/domains", "GET"],
+    ["/v1/domains", "PUT"],
+    ["/v1/survey", "GET"],
+    ["/v1/survey", "POST"]
+  ]);
   assert.ok(calls.every((call) => call.init.credentials === "include"));
 });
 
@@ -103,6 +113,13 @@ test("remote restoration drops legacy mock sessions even when offline", async ()
   assert.equal((await store.get()).session, null);
 });
 
-test("unknown authentication providers fail closed", () => {
+test("omitting policyProvider preserves the selected data adapter for explicit configurations", async () => {
+  const store = openStore();
+  const services = Sereno.providers.create({ config: { provider: "mock", authProvider: "remote", baseUrl: "http://127.0.0.1:5000" }, store, fetch: async () => { throw new Error("policy must stay mock"); }, delayMs: 0 });
+  assert.equal((await services.data.getDomainPolicies()).domains.length, 3);
+});
+
+test("unknown authentication and policy providers fail closed", () => {
   assert.throws(() => Sereno.providers.create({ config: { provider: "mock", authProvider: "typo" } }), /auth.*provider/i);
+  assert.throws(() => Sereno.providers.create({ config: { provider: "mock", policyProvider: "typo" } }), /policy.*provider/i);
 });

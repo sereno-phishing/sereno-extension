@@ -6,7 +6,8 @@
    Every method is async and never throws. Success resolves { ok: true, ... };
    failure resolves { ok: false, error } where error is one of
      transport  "timeout" | "offline" | "server" | "cache_down"
-     domain     "invalid" (login) | "duplicate" (register) |
+     domain     "invalid" (login/session) | "duplicate" (register) |
+                "forbidden" (domain policies) |
                 "already_submitted" (survey submit)
 
    verdict port

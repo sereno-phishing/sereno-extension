@@ -102,21 +102,6 @@ p {
   margin-top: auto;
 }
 
-.sidebar-demo {
-  padding: 0 12px;
-  border: 0;
-  background: none;
-  color: var(--indigo-600);
-  font-size: 13px;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-}
-
-.sidebar-demo:hover {
-  text-decoration: underline;
-}
-
 .sidebar-user {
   display: flex;
   align-items: center;
@@ -236,6 +221,13 @@ p {
 .options-content .card {
   padding: 0;
   border-radius: 12px;
+}
+
+.options-content .card.domains-empty {
+  padding: 24px 20px;
+  align-items: center;
+  text-align: center;
+  line-height: 1.5;
 }
 
 .card-head {

@@ -14,6 +14,7 @@
     offline: "Sin conexión. Revisa tu red e inténtalo de nuevo.",
     server: "El servidor no está disponible. Inténtalo más tarde.",
     cache_down: "El caché de veredictos no está disponible. Inténtalo más tarde.",
+    forbidden: "Solo una cuenta de administrador puede gestionar las políticas por dominio.",
     already_submitted: "Esta cuenta ya participó en la encuesta. Gracias por tu opinión."
   };
   var CODES = Object.keys(MESSAGES);

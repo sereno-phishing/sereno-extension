@@ -66,6 +66,14 @@ test("only the composition root reads Sereno.providers.config", () => {
   assert.deepEqual(readers, ["platform/providers/index.js"]);
 });
 
+test("admin page loads account session restoration before its container", () => {
+  const html = fs.readFileSync(path.join(ROOT, "app/admin/admin.html"), "utf8");
+  const service = html.indexOf('src="../../account/application/account-service.js"');
+  const page = html.indexOf('src="admin-page.js"');
+  assert.ok(service >= 0, "account service script is present");
+  assert.ok(service < page, "account service loads before the admin container");
+});
+
 test("config.js is the only file that holds the backend address", () => {
   const holders = sourceFiles(ROOT)
     .concat(providerFiles())

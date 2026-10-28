@@ -6,15 +6,15 @@ página http/https que abres y muestra el resultado de tres formas: el badge del
 completo, el panel de administración, la política de privacidad y una tienda de
 demo para probar los flujos.
 
-La autenticación y el envío de encuestas SUS usan el backend local hermano en
-`http://127.0.0.1:5000`. Los veredictos, el historial, las métricas y la
-administración siguen **simulados**; esto no es protección real contra phishing. Start the backend before signing in;
+La autenticación, el envío de encuestas SUS y las políticas por dominio usan el
+backend local hermano en `http://127.0.0.1:5000`. Los veredictos, el historial,
+la caché y las métricas siguen **simulados**; esto no es protección real contra phishing. Start the backend before signing in;
 [Conectar el backend](#conectar-el-backend) has the local setup.
 
 **Estado de la verificación.** `node --test` cubre dominios, casos de uso,
 vistas (HTML y DOM simulado), el service worker, el content script y la
 equivalencia entre mock y remote. An isolated Node HTTP test also exercises the
-real local backend with throwaway JSON data and the remote auth adapter.
+real local backend with throwaway JSON data and the remote auth/policy adapters.
 **Real Chrome cookie behavior remains unverified**; Node supplies its own test
 cookie jar and does not enforce browser cookie policy. Manual checks remain in
 [Verificación manual en Chrome](#verificación-manual-en-chrome).
@@ -44,12 +44,13 @@ cookie jar and does not enforce browser cookie policy. Manual checks remain in
 1. Abre el popup de Sereno. La primera vez verás el onboarding de 3 pasos
    (qué hace, qué permiso necesita y cómo leer una alerta). Pulsa **Empezar**.
 2. Start the backend and create a throwaway account in the popup. Backend
-   registration assigns the user role; demo credentials and mock administrator
-   accounts do not authenticate against it. For the entirely offline demo only,
-   set `authProvider: "mock"` as described below to use `andres.torres` or
+   registration always assigns `usuario`; demo credentials and mock administrator
+   accounts do not authenticate against it. To test the administrator panel,
+   promote the throwaway account offline as documented in [Conectar el backend](#conectar-el-backend).
+   For the entirely offline demo only,
+   set `authProvider: "mock"` and `policyProvider: "mock"` as described below to use `andres.torres` or
    `admin.sereno` with password `sereno123`.
-3. Abre la tienda de demo desde el panel de administración (botón
-   **Abrir tienda de demo**, abajo a la izquierda) o directamente en
+3. Abre la tienda de demo directamente en
    `chrome-extension://<ID>/app/demo-store/store.html`, reemplazando `<ID>` por el ID de
    la extensión que muestra `chrome://extensions`.
 4. Prueba los 4 escenarios del simulador, en la esquina inferior izquierda:
@@ -61,7 +62,7 @@ cookie jar and does not enforce browser cookie policy. Manual checks remain in
    Cada escenario pasa por un estado «Evaluando…» de ~0.7 s antes del veredicto.
 5. Vuelve al popup para ver el estado del sitio y el historial de la navegación
    que simulaste. En el panel de administración puedes ver las métricas,
-   los dominios y la caché de esa operación. Con `andres.torres` ves la experiencia
+   las políticas remotas y los datos simulados de métricas/caché. Con `andres.torres` ves la experiencia
    de usuario (pestañas Inicio/Historial); con `admin.sereno` ves la tarjeta de
    administración que abre el panel. La tarjeta «Este sitio» aparece con y sin sesión.
 
@@ -129,7 +130,7 @@ se conecte; las vistas no cambian.
 | Filtrar historial | HU-18 | Popup → Historial → chips de filtro | Listo |
 | Borrar historial | HU-19 | Popup → Historial → Borrar historial | Listo con mock; backend |
 | Detalle del veredicto | HU-20 | Popup → detalle del historial y «Ver detalle» del aviso | Listo |
-| Política por dominio | HU-21 | Panel de administración → Política por dominio | Listo con mock; backend |
+| Política por dominio | HU-21 | Panel de administración → Política por dominio | Backend local; solo administrador; Chrome pendiente |
 | Bloqueo | HU-22 | Modal rojo en la página y en la tienda de demo | Listo con mock; modal real sin probar en Chrome |
 | Política de privacidad | HU-23 | `app/privacy/privacy.html`, enlace del pie del popup | Listo |
 | Estado de la protección | HU-24 | Popup → tarjeta «Protección activa» y estado del sitio | Listo |
@@ -175,7 +176,7 @@ sereno-extension/
 ├── time/                         # Fechas y sellos de tiempo (funciones puras)
 ├── platform/                     # Bordes técnicos
 │   ├── providers/                # La costura del backend (ver «Conectar el backend»)
-│   │   ├── config.js             # Independent provider/authProvider axes, baseUrl, timeoutMs
+│   │   ├── config.js             # Independent provider/authProvider/policyProvider axes, baseUrl, timeoutMs
 │   │   ├── ports.js              # Contrato de los puertos (verdict, auth, data)
 │   │   ├── mock.js               # Adaptador con datos de ejemplo
 │   │   ├── remote.js             # Adaptador REST (HTTP + JSON)
@@ -257,7 +258,7 @@ sereno-extension/
   - `tabs`: leer `tab.url` y `changeInfo.url` en el worker. Sin este permiso (ni
     permisos de host) Chrome no entrega la URL. Es el que muestra el aviso de
     «historial de navegación» al instalar.
-  - `host_permissions`: `http://127.0.0.1:5000/*` para autenticación y encuestas
+  - `host_permissions`: `http://127.0.0.1:5000/*` para autenticación, encuestas y políticas
     locales; no se añade comodín de hosts, permiso HTTPS ni acceso a la API `cookies`.
   - Sin `activeTab`, `scripting` ni `<all_urls>`: el content script se declara en
     el manifest, que le da acceso a las páginas http/https sin permisos de host.
@@ -291,15 +292,15 @@ sereno-extension/
   comprobados por prueba. Las pruebas son de cadena y DOM simulado; no se usó un
   lector de pantalla.
 - Los datos simulados de usuarios, historial, reglas por dominio, caché y
-  métricas están en `platform/seed.js`, y solo el adaptador mock los lee. El botón
-  **Abrir tienda de demo** del panel de administración abre
-  `app/demo-store/store.html`.
+  métricas están en `platform/seed.js`, y solo el adaptador mock los lee. La
+  configuración entregada usa las reglas por dominio remotas; el mock de reglas
+  permanece disponible solo para pruebas y configuraciones explícitas.
 - Ejecuta las pruebas con `node --test` desde la raíz. Necesitas Node 18 o
   superior, sin dependencias.
 
 ## Conectar el backend
 
-### Inicio rápido: autenticación y encuestas locales
+### Inicio rápido: autenticación, encuestas y políticas locales
 
 1. From the sibling `sereno-backend/`, with its existing virtual environment:
 
@@ -317,20 +318,22 @@ sereno-extension/
 
    ```js
    Sereno.providers.config = {
-     provider: "mock",              // Veredictos y datos de demo
+     provider: "mock",              // Veredictos, historial, caché y métricas de demo
      authProvider: "remote",        // Registro, login, sesión y logout
+     policyProvider: "remote",      // Solo GET/PUT de políticas por dominio
      baseUrl: "http://127.0.0.1:5000",
      timeoutMs: 4000,
      mockDelayMs: 700
    };
    ```
 
-   `authProvider` usa `provider` cuando se omite, para conservar los consumidores
-   anteriores. Los valores desconocidos fallan de forma cerrada. La encuesta usa
-   siempre el adaptador remoto y no tiene mock ni fallback. El backend actual
-   implementa autenticación y `GET/POST /v1/survey`; no se debe configurar `provider: "remote"`
-   porque los demás datos continúan simulados. Los errores de API nunca activan
-   autenticación ni encuestas mock. On remote auth operations,
+   `authProvider` y `policyProvider` usan `provider` cuando se omiten, para conservar
+   los consumidores anteriores. Los valores desconocidos fallan de forma cerrada.
+   La encuesta usa siempre el adaptador remoto y no tiene mock ni fallback. El
+   backend actual implementa autenticación, `GET/POST /v1/survey` y `GET/PUT /v1/domains`;
+   no se debe configurar `provider: "remote"` porque los demás datos continúan
+   simulados. Los errores de API nunca activan autenticación, encuestas ni políticas
+   mock. On remote auth operations,
    account use cases remove legacy mock users/passwords and mock sessions from
    local state. Submitted passwords go only to the auth port, not local storage.
    A successful session check adopts the server identity, replacing stale local
@@ -340,15 +343,22 @@ sereno-extension/
 3. Load/reload the unpacked extension in `chrome://extensions`. Its manifest
    grants `http://127.0.0.1:5000/*`, matching the local auth origin. Register a
    new account, close/reopen the popup, log out, and log in again. Backend
-   accounts are not seeded; newly registered users have no administrator role.
-   El historial, los veredictos y la administración permanecen en el estado
-   mock/local. Las respuestas SUS se agregan al JSON aislado del backend y la
+   accounts are not seeded; newly registered users have role `usuario`. To promote
+   a throwaway account, stop the server and follow the sibling
+   [`sereno-backend/README.md`](../sereno-backend/README.md): back up its temporary
+   auth JSON, replace that user's exact role with `administrador` (never `admin`),
+   and restart. Never edit the runtime JSON while the server is running. Existing
+   server sessions reload the current role on each request, so promotion or demotion
+   takes effect without logging in again. El historial, los veredictos, la caché y
+   las métricas permanecen en el estado mock/local. Las respuestas SUS se agregan al JSON aislado del backend y la
    participación se registra por separado para impedir envíos repetidos. El estado
    local conserva borradores por usuario, pero nunca decide si una cuenta puede participar.
 
 4. Run `node --test` from this repository. `tests/auth-local-http.test.js` starts
    the sibling backend on an ephemeral loopback port with temporary JSON, runs
-   el adaptador remoto real para autenticación y encuestas, luego detiene el servidor
+   el adaptador remoto real para autenticación y encuestas. `tests/admin-local-http.test.js`
+   usa el mismo aislamiento para denegación de usuario, promoción/democión manual,
+   persistencia y fallos sin fallback de políticas; luego detiene el servidor
    y elimina sus datos temporales. Requiere el entorno virtual del backend hermano;
    de lo contrario informa un `skip`. Nunca accede a `data/db.json`. Las pruebas de
    cambio de proveedor comparan los comportamientos no migrados y excluyen el contrato
@@ -370,7 +380,8 @@ See [network requests](https://developer.chrome.com/docs/extensions/develop/conc
 [cookies](https://developer.chrome.com/docs/extensions/develop/concepts/storage-and-cookies),
 and [match patterns](https://developer.chrome.com/docs/extensions/develop/concepts/match-patterns).
 
-For an entirely offline demo, set both axes to `"mock"`, clear `baseUrl`, and
+For an entirely offline demo, set `provider`, `authProvider` and
+`policyProvider` to `"mock"`, clear `baseUrl`, and
 remove `host_permissions`; reload the extension. Previously purged demo users
 require a fresh extension state. Returning to remote auth does not migrate demo
 accounts to the backend. For a future remote deployment, use trusted HTTPS and
@@ -393,8 +404,8 @@ añade).
 | GET | `/v1/auth/session` | | `{ session }` (`null` sin sesión) | |
 | GET | `/v1/history` | | `{ entries }` | |
 | DELETE | `/v1/history` | | `{}` | |
-| GET | `/v1/domains` | | `{ domains }` | |
-| PUT | `/v1/domains` | `{ domains }` | `{}` | |
+| GET | `/v1/domains` | | `{ domains }` | 401 `invalid`, 403 `forbidden`, 500 `server` |
+| PUT | `/v1/domains` | `{ domains }` | `{ domains }` | 400 `invalid`, 401 `invalid`, 403 `forbidden`, 500 `server` |
 | GET | `/v1/cache` | | `{ cache }` | `cache_down` |
 | PUT | `/v1/cache/ttl` | `{ ttlPhishingDays, ttlLegitHours }` | `{ cache }` | |
 | POST | `/v1/cache/invalidations` | `{ domain }` | `{ cache }` | |
@@ -420,9 +431,11 @@ Formas:
   sesión: el cliente nunca escribe el historial.
 
 Errores: un cuerpo no 2xx `{ error }` con un código conocido se pasa tal cual
-(`invalid`, `duplicate`, `cache_down`, `timeout`, `offline`, `server`). En el
-POST de encuesta también se conserva `already_submitted`; no se interpreta así
-ningún 409 de otros endpoints. Un 504 es
+(`invalid`, `duplicate`, `cache_down`, `timeout`, `offline`, `server`). En las
+rutas de políticas también se conserva `forbidden`, con un mensaje específico
+para permisos de administrador; las rutas de autenticación y encuesta mantienen
+su mapeo existente. En el POST de encuesta también se conserva `already_submitted`;
+no se interpreta así ningún 409 de otros endpoints. Un 504 es
 `timeout`; cualquier otro fallo es `server`. Sin red es `offline`. Si no hay
 respuesta en `timeoutMs`, el adaptador aborta la petición y devuelve `timeout`.
 
@@ -430,7 +443,7 @@ respuesta en `timeoutMs`, el adaptador aborta la petición y devuelve `timeout`.
 
 Cada método es asíncrono y no lanza. Devuelve `{ ok: true, ... }` o
 `{ ok: false, error }`, con `error` en `timeout | offline | server | cache_down`
-(transporte) o `invalid | duplicate` (dominio). Definidos en
+(transporte) o `invalid | duplicate | forbidden` (dominio). Definidos en
 `platform/providers/ports.js`.
 
 | Puerto | Método |
@@ -439,6 +452,10 @@ Cada método es asíncrono y no lanza. Devuelve `{ ok: true, ... }` o
 | `auth` | `login(username, password)`, `register(username, password)`, `logout()`, `session()` |
 | `data` | `listHistory()`, `deleteHistory()`, `getDomainPolicies()`, `putDomainPolicies(domains)`, `getCache()`, `setCacheTtl(phishingDays, legitHours)`, `invalidateCache(domain)`, `getMetrics()`, `getModelVersion()` |
 | `survey` | `status()`, `submit(answers)` (siempre remoto, sin fallback mock) |
+
+La composición reemplaza únicamente `data.getDomainPolicies` y
+`data.putDomainPolicies` con `policyProvider`; historial, caché, métricas,
+veredictos y navegación conservan el proveedor general.
 
 ### Regla fail-open
 

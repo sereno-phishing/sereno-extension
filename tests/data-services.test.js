@@ -123,6 +123,7 @@ test("error messages are Spanish and unknown codes read as a server problem", ()
   assert.match(errors.message("offline"), /Sin conexión/);
   assert.match(errors.message("timeout"), /tardó demasiado/);
   assert.match(errors.message("cache_down"), /caché/);
+  assert.match(errors.message("forbidden"), /administrador/);
   assert.match(errors.message("nope"), /servidor no está disponible/);
   assert.deepEqual(errors.failure("timeout"), { ok: false, error: "timeout", message: errors.message("timeout") });
 });
@@ -347,6 +348,16 @@ Object.keys(SETUPS).forEach((name) => {
   });
 });
 
+test("domain policy authorization failures preserve the administrator-only message", async () => {
+  const denied = { data: {
+    getDomainPolicies: async () => ({ ok: false, error: "forbidden" }),
+    putDomainPolicies: async () => ({ ok: false, error: "forbidden" })
+  } };
+  const expected = { ok: false, error: "forbidden", message: providers.errors.message("forbidden") };
+  assert.deepEqual(await administrationService.loadDomains(denied), expected);
+  assert.deepEqual(await administrationService.saveDomains(denied, []), expected);
+});
+
 test("administration failures are normalized with a Spanish message and nothing throws", async () => {
   const cases = [
     ["offline", failingServices(OFFLINE)],
@@ -410,6 +421,12 @@ function adminModel(extra) {
   );
 }
 
+test("admin view never renders cached administrator content while session verification is pending", () => {
+  const html = Sereno.adminViews.page(adminModel({ authorization: "checking" }), ADMIN_STATE);
+  assert.match(html, /Verificando la sesión/);
+  assert.doesNotMatch(html, /data-action="nav"|data-action="save-domains"/);
+});
+
 test("each admin section renders its loading state", () => {
   ["metricas", "dominios", "cache"].forEach((section) => {
     const html = Sereno.adminViews.page(adminModel({ section, load: { [section]: { status: "loading" } } }), ADMIN_STATE);
@@ -452,8 +469,11 @@ test("the loaded sections keep their happy path markup", () => {
   const cache = Sereno.adminViews.page(adminModel({ section: "cache", cache: withInvalidation }), ADMIN_STATE);
   assert.match(cache, /value="9"/);
   assert.match(cache, /x\.pe/);
+  assert.match(cache, /simulados para la demostración/);
   const metrics = Sereno.adminViews.page(adminModel({ section: "metricas" }), ADMIN_STATE);
   assert.match(metrics, /1 284/);
+  assert.match(metrics, /Datos simulados/);
+  assert.match(metrics, /no son métricas personales/);
 });
 
 test("a failed save or invalidation shows an error banner above the section", () => {

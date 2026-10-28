@@ -11,25 +11,32 @@ const vm = require("node:vm");
 const { load } = require("./load");
 
 const { domainPolicy } = load("administration/domain/domain-policy.js");
-const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+const settle = () => new Promise((resolve) => setImmediate(resolve));
 const ROWS = [{ domain: "a.pe", policy: "bloqueo", updatedAt: "2026-09-21" }];
 const CACHE = { ttlPhishingDays: 7, ttlLegitHours: 24, invalidations: [] };
 
-async function adminHarness(administrationService, session) {
+async function adminHarness(administrationService, session, currentSession) {
   const renders = [];
   let actions;
-  const state = { session: session === undefined ? { username: "admin", role: "administrador" } : session };
+  let subscriber = () => {};
+  let state = { session: session === undefined ? { username: "admin", role: "administrador" } : session };
   const root = { innerHTML: "", querySelector: () => null };
   const Sereno = {
     services: {},
     time: { isoDay: () => "2026-09-22" },
     domainPolicy,
     administrationService,
+    accountService: {
+      currentSession: currentSession || (async () => ({ ok: true, session: state.session, verified: true }))
+    },
     account: { isAdmin: (current) => !!current && current.role === "administrador" },
-    stateStore: { open: () => ({ subscribe: () => {}, ready: () => Promise.resolve(state) }) },
+    stateStore: { open: () => ({
+      subscribe: (listener) => { subscriber = listener; },
+      ready: () => Promise.resolve(state)
+    }) },
     adminViews: {
-      page: (model) => {
-        renders.push({ ...model, load: JSON.parse(JSON.stringify(model.load)) });
+      page: (model, renderedState) => {
+        renders.push({ ...model, renderedSession: renderedState.session, load: JSON.parse(JSON.stringify(model.load)) });
         return "page";
       }
     },
@@ -48,7 +55,20 @@ async function adminHarness(administrationService, session) {
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../app/admin/admin-page.js"), "utf8"), context);
   await settle();
-  return { actions, renders };
+  return {
+    actions,
+    renders,
+    emit(nextSession) {
+      state = { session: nextSession };
+      subscriber(state);
+    }
+  };
+}
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((done) => { resolve = done; });
+  return { promise, resolve };
 }
 
 function service(overrides) {
@@ -63,6 +83,37 @@ function service(overrides) {
     ...overrides
   };
 }
+
+test("a cached administrator cannot load or render privileged data before backend verification", async () => {
+  const verification = deferred();
+  const calls = [];
+  const spy = service({
+    loadDomains: async () => { calls.push("domains"); return { ok: true, domains: ROWS }; },
+    loadCache: async () => { calls.push("cache"); return { ok: true, cache: CACHE }; },
+    loadMetrics: async () => { calls.push("metrics"); return { ok: true, metrics: { analyzed: 1 } }; }
+  });
+  const harness = await adminHarness(spy, { username: "cached", role: "administrador" }, () => verification.promise);
+  assert.deepEqual(calls, []);
+  assert.equal(harness.renders.at(-1).authorization, "checking");
+  verification.resolve({ ok: true, session: { username: "verified", role: "administrador" }, verified: true });
+  await settle();
+  assert.deepEqual(calls.sort(), ["cache", "domains", "metrics"]);
+  assert.equal(harness.renders.at(-1).renderedSession.username, "verified");
+});
+
+test("signed-out, demoted or unreachable sessions cannot authorize from a cached administrator", async () => {
+  for (const answer of [
+    { ok: true, session: null, verified: true },
+    { ok: true, session: { username: "cached", role: "usuario" }, verified: true },
+    { ok: true, session: { username: "cached", role: "administrador" }, verified: false }
+  ]) {
+    const calls = [];
+    const spy = service({ loadMetrics: async () => { calls.push("metrics"); return { ok: true, metrics: {} }; } });
+    const harness = await adminHarness(spy, { username: "cached", role: "administrador" }, async () => answer);
+    assert.deepEqual(calls, []);
+    assert.equal(harness.renders.at(-1).authorization, "denied");
+  }
+});
 
 test("an administrator's panel loads every section through the use cases", async () => {
   const { renders } = await adminHarness(service());
@@ -95,6 +146,23 @@ test("a failing section shows its message while the others load, and retry reloa
   await settle();
   assert.deepEqual(renders.at(-1).load.cache, { status: "ready" });
   assert.deepEqual(renders.at(-1).cache, CACHE);
+});
+
+test("a demotion blocks UI policy writes and ignores stale privileged responses", async () => {
+  const domains = deferred();
+  let writes = 0;
+  const harness = await adminHarness(service({
+    loadDomains: () => domains.promise,
+    saveDomains: async () => { writes += 1; return { ok: true }; }
+  }));
+  harness.emit({ username: "admin", role: "usuario" });
+  await settle();
+  harness.actions["save-domains"]();
+  domains.resolve({ ok: true, domains: ROWS });
+  await settle();
+  assert.equal(writes, 0);
+  assert.equal(harness.renders.at(-1).authorization, "denied");
+  assert.equal(harness.renders.at(-1).domainsDraft.length, 0);
 });
 
 test("a failed save keeps the draft and shows the message; a good one clears it", async () => {

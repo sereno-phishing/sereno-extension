@@ -274,6 +274,23 @@ test("the admin panel starts with a skip link to a focusable main region", () =>
   assert.match(adminViews.page({}, { session: null }), /<main[^>]* id="main"/);
 });
 
+test("admin navigation excludes the demo store while preserving its sections", () => {
+  const html = adminHtml("metricas");
+  assert.doesNotMatch(html, /open-demo|Abrir tienda de demo/);
+  for (const section of ["metricas", "dominios", "cache"]) {
+    assert.match(html, new RegExp('data-section="' + section + '"'));
+  }
+});
+
+test("empty domain policies render a dedicated empty state and keep the add controls", () => {
+  const html = adminHtml("dominios", { domainsDraft: [] });
+  assert.deepEqual(problems(html), []);
+  assert.match(html, /class="card panel-status domains-empty"[^>]*>Todavía no hay dominios en la lista\./);
+  assert.match(html, /name="newDomain"/);
+  assert.match(html, /data-action="add-domain"/);
+  assert.doesNotMatch(html, /<table/);
+});
+
 test("admin tables name their columns and rows, and the actions column has a hidden name", () => {
   const html = adminHtml("dominios");
   assert.match(html, /<caption class="sr-only">Dominios con política propia<\/caption>/);

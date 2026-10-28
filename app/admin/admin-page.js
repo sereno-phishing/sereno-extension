@@ -1,7 +1,6 @@
-/* Admin panel · container: owns the panel UI state (section, policy draft,
-   notices), subscribes to the shared store, delegates data-action clicks to
-   the administration use cases and re-renders through Sereno.adminViews.
-   Classic script. No inline handlers (MV3 CSP). */
+/* Admin panel · container: restores the backend session before authorizing,
+   owns the panel UI state, delegates actions to administration use cases and
+   re-renders through Sereno.adminViews. Classic script; no inline handlers. */
 
 (function () {
   "use strict";
@@ -9,8 +8,8 @@
   var time = Sereno.time;
   var domainPolicy = Sereno.domainPolicy;
   var admin = Sereno.administrationService;
+  var accountService = Sereno.accountService;
   var store = Sereno.stateStore.open();
-  // The composition root: policies, cache and metrics go through its data port.
   var services = Sereno.services;
 
   var NOTICE_MS = 2600;
@@ -18,14 +17,14 @@
   var App = {
     initialized: false,
     state: null,
+    authorization: "checking",
     section: "metricas",
     showAllQueries: false,
     addPolicy: domainPolicy.DEFAULT_POLICY,
-    // Backend-owned data, as the data port returned it, and the load state of each section.
     metrics: null,
     cache: null,
     domainsStored: [],
-    domainsDraft: null,
+    domainsDraft: [],
     load: {
       metricas: { status: "loading" },
       dominios: { status: "loading" },
@@ -36,9 +35,35 @@
     cacheNotice: "",
     cacheError: ""
   };
-  var loadStarted = false;
 
   var root = null;
+  var verificationSequence = 0;
+  var dataSequence = 0;
+  var observedSessionKey = null;
+  var authorizedSessionKey = null;
+
+  function sessionKey(session) {
+    if (!session) {
+      return "signed-out";
+    }
+    return [session.username, session.role, session.token || "", session.loginAt || ""].join("|");
+  }
+
+  function resetPrivilegedState() {
+    App.metrics = null;
+    App.cache = null;
+    App.domainsStored = [];
+    App.domainsDraft = [];
+    App.domainsBanner = false;
+    App.domainsError = "";
+    App.cacheNotice = "";
+    App.cacheError = "";
+    App.load = {
+      metricas: { status: "loading" },
+      dominios: { status: "loading" },
+      cache: { status: "loading" }
+    };
+  }
 
   function render() {
     if (!App.initialized || !root || !App.state) {
@@ -49,7 +74,6 @@
     restoreFocus();
   }
 
-  /* A notice that hides itself after NOTICE_MS; showing it again restarts the timer. */
   function timedNotice(field, hiddenValue) {
     var timer = null;
     return function show(value) {
@@ -73,7 +97,6 @@
     return input ? input.value : "";
   }
 
-  /* Normalized domain typed in the named input, or "" after flagging the input as invalid. */
   function readDomain(name) {
     var input = root.querySelector('[name="' + name + '"]');
     var domain = domainPolicy.normalizeDomain(input ? input.value : "");
@@ -88,46 +111,109 @@
     return time.isoDay(new Date());
   }
 
-  /* ---------------- loading ---------------- */
+  function authorizedSnapshot() {
+    var key = sessionKey(App.state && App.state.session);
+    if (App.authorization !== "authorized" || !Sereno.account.isAdmin(App.state && App.state.session) || key !== authorizedSessionKey) {
+      return null;
+    }
+    return { sequence: dataSequence, sessionKey: key };
+  }
 
-  /* Loads one section through the port; the others keep what they show. */
-  async function loadSection(id) {
+  function snapshotIsCurrent(snapshot) {
+    return !!snapshot && snapshot.sequence === dataSequence && snapshot.sessionKey === authorizedSessionKey && !!authorizedSnapshot();
+  }
+
+  async function loadSection(id, snapshot) {
+    var access = snapshot || authorizedSnapshot();
+    if (!snapshotIsCurrent(access)) {
+      return;
+    }
     App.load[id] = { status: "loading" };
     render();
     var result;
     if (id === "dominios") {
       result = await admin.loadDomains(services);
-      if (result.ok) {
-        App.domainsStored = result.domains;
-        App.domainsDraft = result.domains.map(domainPolicy.toRow);
-      }
     } else if (id === "cache") {
       result = await admin.loadCache(services);
-      if (result.ok) {
-        App.cache = result.cache;
-      }
     } else {
       result = await admin.loadMetrics(services);
-      if (result.ok) {
-        App.metrics = result.metrics;
-      }
+    }
+    if (!snapshotIsCurrent(access)) {
+      return;
+    }
+    if (result.ok && id === "dominios") {
+      App.domainsStored = result.domains;
+      App.domainsDraft = result.domains.map(domainPolicy.toRow);
+    } else if (result.ok && id === "cache") {
+      App.cache = result.cache;
+    } else if (result.ok) {
+      App.metrics = result.metrics;
     }
     App.load[id] = result.ok ? { status: "ready" } : { status: "error", message: result.message };
     render();
   }
 
-  /* The panel is for administrators: nothing is requested before one is signed in. */
   function loadAll() {
-    if (loadStarted || !Sereno.account.isAdmin(App.state && App.state.session)) {
+    var snapshot = authorizedSnapshot();
+    if (!snapshot) {
       return;
     }
-    loadStarted = true;
-    ["metricas", "dominios", "cache"].forEach(loadSection);
+    ["metricas", "dominios", "cache"].forEach(function (id) {
+      loadSection(id, snapshot);
+    });
   }
 
-  /* ---------------- actions ---------------- */
+  async function verifySession(state) {
+    var attempt = ++verificationSequence;
+    dataSequence += 1;
+    authorizedSessionKey = null;
+    App.state = state;
+    App.authorization = "checking";
+    resetPrivilegedState();
+    render();
+
+    var result;
+    try {
+      result = await accountService.currentSession(services, store);
+    } catch (error) {
+      result = null;
+    }
+    if (attempt !== verificationSequence) {
+      return;
+    }
+
+    var session = result && result.ok ? result.session : null;
+    App.state = Object.assign({}, state, { session: session });
+    observedSessionKey = sessionKey(session);
+    if (!result || !result.ok || !result.verified || !Sereno.account.isAdmin(session)) {
+      App.authorization = "denied";
+      resetPrivilegedState();
+      render();
+      return;
+    }
+
+    App.authorization = "authorized";
+    authorizedSessionKey = observedSessionKey;
+    render();
+    loadAll();
+  }
+
+  function observeState(state) {
+    var nextKey = sessionKey(state && state.session);
+    App.state = state;
+    if (nextKey === observedSessionKey) {
+      render();
+      return;
+    }
+    observedSessionKey = nextKey;
+    verifySession(state);
+  }
 
   async function addDomain() {
+    var access = authorizedSnapshot();
+    if (!access) {
+      return;
+    }
     var domain = readDomain("newDomain");
     if (!domain) {
       return;
@@ -142,6 +228,9 @@
     App.domainsDraft = outcome.rows;
     render();
     var result = await admin.addDomain(services, outcome.added);
+    if (!snapshotIsCurrent(access)) {
+      return;
+    }
     if (result.ok) {
       App.domainsStored = result.domains;
     } else {
@@ -151,10 +240,17 @@
   }
 
   async function saveDomains() {
+    var access = authorizedSnapshot();
+    if (!access) {
+      return;
+    }
     var next = domainPolicy.stampChanges(App.domainsDraft || [], App.domainsStored, today());
     App.domainsDraft = next;
     App.domainsError = "";
     var result = await admin.saveDomains(services, next);
+    if (!snapshotIsCurrent(access)) {
+      return;
+    }
     if (result.ok) {
       App.domainsStored = next;
       showDomainsBanner(true);
@@ -165,8 +261,15 @@
   }
 
   async function saveTtl() {
+    var access = authorizedSnapshot();
+    if (!access) {
+      return;
+    }
     App.cacheError = "";
     var result = await admin.saveTtl(services, readValue("ttlPhishingDays"), readValue("ttlLegitHours"));
+    if (!snapshotIsCurrent(access)) {
+      return;
+    }
     if (result.ok) {
       App.cache = result.cache;
       showCacheNotice("TTL guardado.");
@@ -177,12 +280,19 @@
   }
 
   async function invalidateDomain() {
+    var access = authorizedSnapshot();
+    if (!access) {
+      return;
+    }
     var domain = readDomain("invalidateDomain");
     if (!domain) {
       return;
     }
     App.cacheError = "";
     var result = await admin.invalidateDomain(services, domain);
+    if (!snapshotIsCurrent(access)) {
+      return;
+    }
     if (result.ok) {
       App.cache = result.cache;
       showCacheNotice(domain + " se invalidó. La siguiente consulta irá al modelo.");
@@ -192,22 +302,33 @@
     render();
   }
 
-  /* Command table: data-action name -> handler(target). */
   var ACTIONS = {
     nav: function (target) {
+      if (!authorizedSnapshot()) {
+        return;
+      }
       App.section = target.getAttribute("data-section") || "metricas";
       render();
     },
     "toggle-queries": function () {
+      if (!authorizedSnapshot()) {
+        return;
+      }
       App.showAllQueries = !App.showAllQueries;
       render();
     },
     "pick-add-policy": function (target) {
+      if (!authorizedSnapshot()) {
+        return;
+      }
       App.addPolicy = domainPolicy.policyOrDefault(target.getAttribute("data-policy"));
       render();
     },
     "add-domain": addDomain,
     "pick-row-policy": function (target) {
+      if (!authorizedSnapshot()) {
+        return;
+      }
       var policy = target.getAttribute("data-policy");
       if (!domainPolicy.isPolicy(policy)) {
         return;
@@ -216,6 +337,9 @@
       render();
     },
     "remove-domain": function (target) {
+      if (!authorizedSnapshot()) {
+        return;
+      }
       App.domainsDraft = domainPolicy.without(App.domainsDraft || [], target.getAttribute("data-domain"));
       render();
     },
@@ -224,13 +348,10 @@
     "invalidate-domain": invalidateDomain,
     retry: function (target) {
       loadSection(target.getAttribute("data-section") || "metricas");
-    },
-    "open-demo": function () {
-      Sereno.browser.openPage("app/demo-store/store.html");
     }
   };
 
-  function init() {
+  async function init() {
     if (App.initialized) {
       return;
     }
@@ -240,16 +361,10 @@
     }
     App.initialized = true;
     Sereno.ui.delegateActions(root, ACTIONS);
-    store.subscribe(function (state) {
-      App.state = state;
-      loadAll();
-      render();
-    });
-    store.ready().then(function (state) {
-      App.state = state;
-      loadAll();
-      render();
-    });
+    store.subscribe(observeState);
+    var state = await store.ready();
+    observedSessionKey = sessionKey(state.session);
+    await verifySession(state);
   }
 
   Sereno.ui.onReady(init);

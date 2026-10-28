@@ -13,7 +13,7 @@
      GET    /v1/history                                                 -> { entries }
      DELETE /v1/history                                                 -> {}
      GET    /v1/domains                                                 -> { domains }
-     PUT    /v1/domains              { domains }                        -> {}
+     PUT    /v1/domains              { domains }                        -> { domains }
      GET    /v1/cache                                                   -> { cache }
      PUT    /v1/cache/ttl            { ttlPhishingDays, ttlLegitHours } -> { cache }
      POST   /v1/cache/invalidations  { domain }                         -> { cache }
@@ -23,7 +23,8 @@
      POST   /v1/survey               { answers }                        -> {}  409 { error: "already_submitted" }
    Errors: a non-2xx body { error } with a known code is passed through
    ("invalid", "duplicate", "cache_down", "timeout", "offline", "server");
-   "already_submitted" is accepted only from POST /v1/survey.
+   "forbidden" is accepted only from domain-policy requests and
+   "already_submitted" only from POST /v1/survey.
    HTTP 504 maps to "timeout"; any other failure maps to "server".
    create({ baseUrl, timeoutMs, fetch }) never throws to its callers: a network
    failure resolves "offline"; no answer within timeoutMs aborts the request
@@ -139,10 +140,10 @@
           return request("DELETE", "/v1/history");
         },
         getDomainPolicies: function () {
-          return request("GET", "/v1/domains");
+          return request("GET", "/v1/domains", undefined, ["forbidden"]);
         },
         putDomainPolicies: function (domains) {
-          return request("PUT", "/v1/domains", { domains: domains });
+          return request("PUT", "/v1/domains", { domains: domains }, ["forbidden"]);
         },
         getCache: function () {
           return request("GET", "/v1/cache");

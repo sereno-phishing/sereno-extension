@@ -134,6 +134,7 @@
     return (
       '<section class="section section-metricas">' +
       sectionHead("Métricas de operación", '<span class="section-ago">Últimas 24 horas</span>') +
+      '<div class="note-bar">Datos simulados para la demostración; no son métricas personales ni del backend.</div>' +
       '<div class="stat-grid">' + statCards(metrics) + "</div>" +
       chartCard(metrics.hourly) +
       queriesCard(metrics.queries || [], model.showAllQueries) +
@@ -174,7 +175,7 @@
 
   function domainsTable(rows) {
     if (!rows.length) {
-      return '<div class="card panel-status">Todavía no hay dominios en la lista.</div>';
+      return '<div class="card panel-status domains-empty">Todavía no hay dominios en la lista.</div>';
     }
     return ui.tableCard({
       tableCls: "t-policy",
@@ -275,7 +276,7 @@
     var cache = model.cache || {};
     return (
       '<section class="section section-cache">' +
-      describedHead("Caché de veredictos", "Controla cuánto dura cada veredicto guardado y fuerza una nueva evaluación de un dominio.") +
+      describedHead("Caché de veredictos", "Datos y acciones simulados para la demostración; todavía no modifican el backend.") +
       (model.notice ? successBanner(model.notice) : "") +
       (model.error ? errorBanner(model.error) : "") +
       '<div class="cache-grid">' + ttlCard(cache) + invalidateCard() + "</div>" +
