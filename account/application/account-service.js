@@ -21,9 +21,22 @@
     return !!user && typeof user === "object" && typeof user.username === "string" && typeof user.role === "string";
   }
 
+  /* Remote auth owns credentials. Remove legacy mock credentials and sessions
+     before any auth operation, including unsuccessful requests. */
+  async function prepareStore(services, store) {
+    if (services.auth.remote) {
+      await store.update(function (state) {
+        var session = state.session;
+        var legacy = session && (!session.token || String(session.token).indexOf("mock-") === 0);
+        return Object.assign({ users: [] }, legacy ? { session: null } : {});
+      });
+    }
+  }
+
   /* Shared by login and register: both end with a signed-in user. */
   async function signIn(kind, services, store, username, password, now) {
     try {
+      await prepareStore(services, store);
       var valid = account.validateCredentials(username, password);
       if (!valid.ok) {
         return failure(valid.error, kind);
@@ -58,6 +71,7 @@
   async function logout(services, store) {
     var synced = false;
     try {
+      await prepareStore(services, store);
       var answer = await services.auth.logout();
       synced = !!(answer && answer.ok);
     } catch (error) {
@@ -76,6 +90,7 @@
      -> { ok: true, session | null, verified } */
   async function currentSession(services, store) {
     try {
+      await prepareStore(services, store);
       var state = await store.get();
       var local = state.session || null;
       var answer = null;
@@ -93,8 +108,8 @@
         }
         return { ok: true, session: null, verified: true };
       }
-      if (local) {
-        return { ok: true, session: local, verified: true };
+      if (!isUser(answer.session)) {
+        return failure("server");
       }
       var adopted = account.openSession(answer.session, answer.session.token, answer.session.loginAt);
       await store.set({ session: adopted });

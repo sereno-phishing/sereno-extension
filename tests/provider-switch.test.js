@@ -3,7 +3,7 @@
 /* Executable proof of the swap promise. The same scenarios run through the real
    use cases twice, each time in a fresh Sereno namespace built from the real
    scripts: once with provider "mock" and once with provider "remote". The only
-   difference between the two runs is the config values (provider, baseUrl and
+   difference between the two runs is the config values (both provider axes, baseUrl and
    the timeouts); no other script is touched. The remote run reaches a fake
    backend that serves the REST contract documented in
    platform/providers/remote.js through globalThis.fetch, exactly where the
@@ -190,8 +190,8 @@ function fakeBrowser() {
 async function inEnvironment(provider, scenario) {
   const realFetch = globalThis.fetch;
   const edit = provider === "mock"
-    ? { provider: "mock", baseUrl: "", timeoutMs: TIMEOUT_MS, mockDelayMs: 0 }
-    : { provider: "remote", baseUrl: BASE_URL, timeoutMs: TIMEOUT_MS, mockDelayMs: 0 };
+    ? { provider: "mock", authProvider: "mock", baseUrl: "", timeoutMs: TIMEOUT_MS, mockDelayMs: 0 }
+    : { provider: "remote", authProvider: "remote", baseUrl: BASE_URL, timeoutMs: TIMEOUT_MS, mockDelayMs: 0 };
   const Sereno = loadNamespace(edit);
   const backend = provider === "remote" ? fakeBackend(Sereno) : null;
   if (backend) {
@@ -509,8 +509,8 @@ test("swap: the config values are the only difference between the two runs", asy
   assert.equal(mock.env.services.provider, "mock");
   assert.equal(remote.env.services.provider, "remote");
   const differing = Object.keys(remote.env.config).filter((key) => remote.env.config[key] !== mock.env.config[key]);
-  assert.deepEqual(differing.sort(), ["baseUrl", "provider"]);
-  assert.deepEqual(Object.keys(remote.env.config).sort(), ["baseUrl", "mockDelayMs", "provider", "timeoutMs"]);
+  assert.deepEqual(differing.sort(), ["authProvider", "baseUrl", "provider"]);
+  assert.deepEqual(Object.keys(remote.env.config).sort(), ["authProvider", "baseUrl", "mockDelayMs", "provider", "timeoutMs"]);
 });
 
 test("swap: the remote run really goes through the REST contract and the mock run never does", async () => {

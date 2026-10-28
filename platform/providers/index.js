@@ -13,23 +13,36 @@
   function create(options) {
     var settings = options || {};
     var config = settings.config || Sereno.providers.config;
-    var adapter;
-    if (config.provider === "mock") {
-      adapter = Sereno.providers.mock.create({
-        store: settings.store,
-        delayMs: settings.delayMs === undefined ? config.mockDelayMs : settings.delayMs,
-        now: settings.now
-      });
-    } else if (config.provider === "remote") {
-      adapter = Sereno.providers.remote.create({
-        baseUrl: config.baseUrl,
-        timeoutMs: config.timeoutMs,
-        fetch: settings.fetch
-      });
-    } else {
-      throw new Error("Unknown provider in platform/providers/config.js: " + config.provider);
+    var adapters = {};
+    function adapterFor(provider) {
+      if (adapters[provider]) {
+        return adapters[provider];
+      }
+      var adapter;
+      if (provider === "mock") {
+        adapter = Sereno.providers.mock.create({
+          store: settings.store,
+          delayMs: settings.delayMs === undefined ? config.mockDelayMs : settings.delayMs,
+          now: settings.now
+        });
+      } else if (provider === "remote") {
+        adapter = Sereno.providers.remote.create({
+          baseUrl: config.baseUrl,
+          timeoutMs: config.timeoutMs,
+          fetch: settings.fetch
+        });
+      } else {
+        throw new Error("Unknown provider in platform/providers/config.js: " + provider);
+      }
+      adapters[provider] = adapter;
+      return adapter;
     }
-    return { provider: config.provider, verdict: adapter.verdict, auth: adapter.auth, data: adapter.data };
+    var authProvider = config.authProvider === undefined ? config.provider : config.authProvider;
+    if (authProvider !== "mock" && authProvider !== "remote") {
+      throw new Error("Unknown auth provider: " + authProvider);
+    }
+    var adapter = adapterFor(config.provider);
+    return { provider: config.provider, verdict: adapter.verdict, auth: adapterFor(authProvider).auth, data: adapter.data };
   }
 
   Sereno.providers.create = create;

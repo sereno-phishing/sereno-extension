@@ -31,11 +31,11 @@
    is chrome-extension://<id>, so they are cross-origin to the backend. Either
    list the backend origin in manifest.json host_permissions (recommended: no
    CORS needed) or make the backend answer CORS for that origin. Session
-   cookies travel with credentials: "include"; because the extension origin is a
-   different site, the backend will normally need to set them Secure and
-   SameSite=None (browser cookie policy applies; to be confirmed with the real
-   backend).
-   Not exercised against a real backend or in real Chrome. */
+    cookies travel with credentials: "include". Chrome treats host-permitted
+    extension requests as same-site (browser cookie settings still apply), so
+    direct loopback HTTP development can use HttpOnly, SameSite=Lax cookies.
+    Secure/SameSite=None remains the backend default outside its explicit
+    loopback mode. Real Chrome behavior remains unverified. */
 
 (function (Sereno) {
   "use strict";
@@ -114,6 +114,7 @@
         }
       },
       auth: {
+        remote: true,
         login: function (username, password) {
           return request("POST", "/v1/auth/login", { username: username, password: password });
         },

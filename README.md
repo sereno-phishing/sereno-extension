@@ -6,16 +6,17 @@ página http/https que abres y muestra el resultado de tres formas: el badge del
 completo, el panel de administración, la política de privacidad y una tienda de
 demo para probar los flujos.
 
-El front end está terminado y funciona con un proveedor **mock** (datos de
-ejemplo, sin red). Cuando exista el backend, se conecta cambiando el proveedor
-en `platform/providers/config.js` y el origen en `manifest.json`; la sección
-[Conectar el backend](#conectar-el-backend) tiene los pasos.
+Authentication uses the sibling local backend at `http://127.0.0.1:5000`.
+Verdicts, history, metrics, administration and survey data remain **mocked**;
+this is not real phishing protection. Start the backend before signing in;
+[Conectar el backend](#conectar-el-backend) has the local setup.
 
 **Estado de la verificación.** `node --test` cubre dominios, casos de uso,
 vistas (HTML y DOM simulado), el service worker, el content script y la
-equivalencia entre mock y remote. La extensión **nunca se ha cargado en Chrome
-real** durante este desarrollo y no se ha probado contra un backend real. Lo que
-las pruebas automáticas no cubren está en
+equivalencia entre mock y remote. An isolated Node HTTP test also exercises the
+real local backend with throwaway JSON data and the remote auth adapter.
+**Real Chrome cookie behavior remains unverified**; Node supplies its own test
+cookie jar and does not enforce browser cookie policy. Manual checks remain in
 [Verificación manual en Chrome](#verificación-manual-en-chrome).
 
 ## Requisitos
@@ -23,7 +24,7 @@ las pruebas automáticas no cubren está en
 - Google Chrome 102 o superior (Manifest V3, `chrome.storage.session` e
   `inert`). También debería funcionar en navegadores basados en Chromium (Edge,
   Brave, Opera), sin probar.
-- Para usarlo no necesitas Node.js, un servidor ni conexión a internet.
+- Local sign-in requires the sibling Flask backend; verdicts/data need no internet.
 - Para correr las pruebas, Node 18 o superior, sin dependencias.
 - Carga la carpeta tal cual, sin instalar dependencias ni compilar.
 
@@ -42,10 +43,11 @@ las pruebas automáticas no cubren está en
 
 1. Abre el popup de Sereno. La primera vez verás el onboarding de 3 pasos
    (qué hace, qué permiso necesita y cómo leer una alerta). Pulsa **Empezar**.
-2. Inicia sesión con una de las cuentas demo (contraseña `sereno123` para
-   ambas), o crea una cuenta nueva si prefieres ver el historial vacío:
-   - `andres.torres` (rol usuario): historial con datos, pestañas Inicio/Historial.
-   - `admin.sereno` (rol administrador): tarjeta de administración y acceso al panel.
+2. Start the backend and create a throwaway account in the popup. Backend
+   registration assigns the user role; demo credentials and mock administrator
+   accounts do not authenticate against it. For the entirely offline demo only,
+   set `authProvider: "mock"` as described below to use `andres.torres` or
+   `admin.sereno` with password `sereno123`.
 3. Abre la tienda de demo desde el panel de administración (botón
    **Abrir tienda de demo**, abajo a la izquierda) o directamente en
    `chrome-extension://<ID>/app/demo-store/store.html`, reemplazando `<ID>` por el ID de
@@ -120,8 +122,8 @@ se conecte; las vistas no cambian.
 | Onboarding de 3 pasos | HU-03 | Popup, primera apertura | Listo |
 | Sitio seguro | HU-04 | Badge de la pestaña, popup (estado), tooltip de la tienda de demo | Listo con mock; badge real sin probar en Chrome |
 | Advertencia | HU-05 | Modal ámbar en la página y en la tienda de demo | Listo con mock; modal real sin probar en Chrome |
-| Crear cuenta | HU-13 | Popup → Crear cuenta | Listo con mock; backend verifica credenciales |
-| Iniciar sesión | HU-14 | Popup → Iniciar sesión | Listo con mock; backend verifica credenciales |
+| Crear cuenta | HU-13 | Popup → Crear cuenta | Local backend; Chrome verification pending |
+| Iniciar sesión | HU-14 | Popup → Iniciar sesión | Local backend; Chrome verification pending |
 | Cerrar sesión | HU-15 | Popup → menú de cuenta → Cerrar sesión | Listo; sale en local aunque el backend no responda |
 | Historial | HU-17 | Popup → pestaña Historial | Listo con mock; backend guarda las visitas |
 | Filtrar historial | HU-18 | Popup → Historial → chips de filtro | Listo |
@@ -173,7 +175,7 @@ sereno-extension/
 ├── time/                         # Fechas y sellos de tiempo (funciones puras)
 ├── platform/                     # Bordes técnicos
 │   ├── providers/                # La costura del backend (ver «Conectar el backend»)
-│   │   ├── config.js             # El interruptor: provider, baseUrl, timeoutMs
+│   │   ├── config.js             # Independent provider/authProvider axes, baseUrl, timeoutMs
 │   │   ├── ports.js              # Contrato de los puertos (verdict, auth, data)
 │   │   ├── mock.js               # Adaptador con datos de ejemplo
 │   │   ├── remote.js             # Adaptador REST (HTTP + JSON)
@@ -255,7 +257,8 @@ sereno-extension/
   - `tabs`: leer `tab.url` y `changeInfo.url` en el worker. Sin este permiso (ni
     permisos de host) Chrome no entrega la URL. Es el que muestra el aviso de
     «historial de navegación» al instalar.
-  - `host_permissions`: vacío con el mock. Con backend lleva solo su origen.
+  - `host_permissions`: `http://127.0.0.1:5000/*` for local authentication;
+    no wildcard host, HTTPS permission, or `cookies` API permission is added.
   - Sin `activeTab`, `scripting` ni `<all_urls>`: el content script se declara en
     el manifest, que le da acceso a las páginas http/https sin permisos de host.
 - **CSP.** Las páginas de la extensión declaran `script-src 'self'; object-src
@@ -296,61 +299,78 @@ sereno-extension/
 
 ## Conectar el backend
 
-La promesa: el cliente no cambia, cambia el proveedor. Estos son **todos** los
-puntos que se tocan, sin maquillar:
+### Local authentication quick start
 
-| # | Archivo | Qué se edita | Cuándo |
-| --- | --- | --- | --- |
-| 1 | `platform/providers/config.js` | `provider`, `baseUrl`, `timeoutMs` | Siempre |
-| 2 | `manifest.json` | `host_permissions` con el origen del backend | Siempre que el backend esté en otro origen (lo normal) y no responda CORS para la extensión |
-| 3 | `platform/providers/remote.js` | Rutas o formas de respuesta | Solo si la API real difiere del contrato de abajo |
+1. From the sibling `sereno-backend/`, with its existing virtual environment:
 
-Son dos archivos si el backend sigue el contrato, y tres si no. Interfaz,
-contenedores, dominios y casos de uso no se tocan.
+   ```powershell
+   $env:STORAGE_DRIVER = "json"
+   $env:DATA_FILE = "data/db.json"
+   $env:AUTH_LOCAL_HTTP = "1"
+   .venv/Scripts/python.exe -m flask --app app:create_app run --host 127.0.0.1 --port 5000 --no-debugger --no-reload
+   ```
 
-### Pasos
+   Use one process and throwaway accounts only. The backend README covers
+   environment setup and JSON storage limits. Do not expose this server publicly.
 
-1. En `platform/providers/config.js`:
+2. Keep the shipped `platform/providers/config.js` configuration:
 
    ```js
    Sereno.providers.config = {
-     provider: "remote",
-     baseUrl: "https://api.sereno.example",   // origen, sin ruta final
+     provider: "mock",              // Verdict and data only
+     authProvider: "remote",        // Registration, login, session, logout
+     baseUrl: "http://127.0.0.1:5000",
      timeoutMs: 4000,
      mockDelayMs: 700
    };
    ```
 
-2. En `manifest.json`, reemplaza el arreglo vacío:
+   `authProvider` defaults to `provider` when omitted, preserving callers that
+   select one adapter for all ports. Unknown values fail closed. The current
+   backend implements auth only: do not set `provider: "remote"` for this setup.
+   API errors never trigger mock authentication. On remote auth operations,
+   account use cases remove legacy mock users/passwords and mock sessions from
+   local state. Submitted passwords go only to the auth port, not local storage.
+   A successful session check adopts the server identity, replacing stale local
+   roles/tokens. An unreachable backend keeps only a previous nonmock session
+   as unverified; logout clears local session even if server revocation fails.
 
-   ```json
-   "host_permissions": ["https://api.sereno.example/*"],
-   ```
+3. Load/reload the unpacked extension in `chrome://extensions`. Its manifest
+   grants `http://127.0.0.1:5000/*`, matching the local auth origin. Register a
+   new account, close/reopen the popup, log out, and log in again. Backend
+   accounts are not seeded; newly registered users have no administrator role.
+   History and all non-auth data stay in the mock/local state, not backend JSON.
 
-   Es lo recomendado frente a CORS: el origen es fijo y propio, el permiso es
-   estrecho (un solo origen) y no exige configurar `Access-Control-Allow-*` para
-   `chrome-extension://<id>` con credenciales. `optional_host_permissions` no
-   aplica: pedirlo en ejecución necesita un gesto del usuario y código nuevo, y la
-   evaluación corre en segundo plano. Si prefieres CORS, deja `host_permissions`
-   vacío y haz que el backend responda el origen `chrome-extension://<id>`, con
-   preflight y credenciales.
+4. Run `node --test` from this repository. `tests/auth-local-http.test.js` starts
+   the sibling backend on an ephemeral loopback port with temporary JSON, runs
+   the actual remote adapter, then stops the server and deletes its test data.
+   It requires the sibling backend virtual environment; otherwise it reports a
+   skip. It never accesses runtime `data/db.json`. Provider-switch tests still
+   compare full mock/remote adapters using a simulated backend.
 
-   `tests/manifest.test.js` falla si `config.js` dice `remote` y
-   `host_permissions` no contiene exactamente `<baseUrl>/*` (y exige `https`).
-   Así este paso no se olvida.
+### Cookie boundary and other configurations
 
-3. Cookies de sesión: las peticiones usan `credentials: "include"`. Como el
-   origen de la extensión es otro sitio, el backend normalmente tendrá que
-   marcarlas `Secure` y `SameSite=None`. Esto no se ha probado con un backend
-   real.
+The local backend flag explicitly selects host-only, HttpOnly, SameSite=Lax
+cookies without Secure. It rejects non-loopback literal hosts/peers and forwarded
+headers before auth operations. Do not use this mode behind a proxy. Unset
+`AUTH_LOCAL_HTTP` for the unchanged Secure/SameSite=None backend defaults.
 
-4. Recarga la extensión en `chrome://extensions` y revisa la lista de
-   [Verificación manual en Chrome](#verificación-manual-en-chrome).
+Requests from extension pages/service workers use `credentials: "include"`.
+Chrome host permissions permit privileged cross-origin fetch and treat these
+requests as same-site, subject to browser cookie settings. No CORS headers or
+`cookies` API access are added; content scripts do not issue auth requests.
+Real Chrome acceptance, restoration and logout still need manual verification.
+See [network requests](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests),
+[cookies](https://developer.chrome.com/docs/extensions/develop/concepts/storage-and-cookies),
+and [match patterns](https://developer.chrome.com/docs/extensions/develop/concepts/match-patterns).
 
-5. Corre `node --test` desde la raíz. `tests/provider-switch.test.js` ejecuta los
-   mismos escenarios con `mock` y con `remote` (contra un backend simulado) y
-   exige resultados idénticos. Ese archivo es la prueba ejecutable de la promesa;
-   no sustituye probar contra el backend real.
+For an entirely offline demo, set both axes to `"mock"`, clear `baseUrl`, and
+remove `host_permissions`; reload the extension. Previously purged demo users
+require a fresh extension state. Returning to remote auth does not migrate demo
+accounts to the backend. For a future remote deployment, use trusted HTTPS and
+update `baseUrl` and the exact manifest permission together; the manifest test
+allows HTTP only for the documented loopback setup. Production hardening remains
+out of scope, including session expiry, rate limits and CSRF protection.
 
 ### Contrato REST
 
@@ -428,8 +448,9 @@ pasa de 300 ms.
 | `andres.torres` | `sereno123` | usuario, con historial |
 | `admin.sereno` | `sereno123` | administrador |
 
-Con `remote` estas cuentas no existen en el cliente: el backend verifica las
-credenciales.
+These credentials work only with `authProvider: "mock"`. The default remote
+auth configuration requires backend registration and does not provide demo
+administrator access.
 
 ### Verificación manual en Chrome
 
@@ -463,9 +484,12 @@ worker (`chrome://extensions` → «service worker») y revisa:
       `@font-face`), así que el modal usa la fuente sans-serif del sistema.
       Aceptarlo o cargar Inter en el documento.
 - [ ] Un lector de pantalla recorre el modal, los estados de carga y el popup.
-- [ ] Con backend: cookies de sesión (`Secure`, `SameSite=None`), permiso de host
-      en la tarjeta de la extensión, y los cuatro fallos (sin red, tiempo agotado,
-      500, caché caído) muestran el estado degradado sin bloquear.
+- [ ] Local backend auth: confirm the host permission is granted, HttpOnly/Lax
+      cookie acceptance, registration/login, popup-close/reopen restoration and
+      logout/revocation in real Chrome. Wrong credentials and network/500 errors
+      must not sign in using demo accounts. Non-auth data/verdicts stay mocked.
+- [ ] With a future HTTPS backend, verify Secure/None cookies and remote verdict
+      failures (offline, timeout, 500, cache outage) degrade without blocking.
 
 ## Skills obligatorios
 
