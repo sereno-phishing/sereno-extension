@@ -53,6 +53,9 @@ globalThis.chrome = {
     async query() {
       return [{ id: 1 }];
     },
+    async get(tabId) {
+      return { id: tabId, url: "https://pago-servicios-linea.net/checkout" };
+    },
     async sendMessage(tabId, message) {
       messages.push({ tabId, message });
     }
@@ -152,6 +155,14 @@ test("activating and closing a tab use the stored outcome", async () => {
 
   await onRemoved(1, { windowId: 1, isWindowClosing: false });
   assert.equal(sessionData.has("sereno.tab.1"), false);
+});
+
+test("activating an already open tab without a record evaluates its URL", async () => {
+  const [onActivated] = listeners.onActivated;
+  await onActivated({ tabId: 42, windowId: 1 });
+  assert.equal(sessionData.get("sereno.tab.42")?.outcome?.verdict.status, "bloqueo");
+  assert.equal(badges[badges.length - 1].tabId, 42);
+  assert.equal(messages[messages.length - 1].tabId, 42);
 });
 
 test("non web pages and irrelevant tab events are ignored", async () => {

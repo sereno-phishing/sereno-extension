@@ -253,6 +253,9 @@
       var record = await loadRecord(deps, tabId);
       if (record && record.outcome) {
         await present(deps, tabId, record.url, record.outcome, ACTIVATED);
+      } else if (!record && typeof deps.browser.getTabUrl === "function") {
+        var url = await deps.browser.getTabUrl(tabId);
+        await handleNavigation(deps, { tabId: tabId, url: url });
       }
     } catch (error) {
       /* the next navigation or activation repairs the state */

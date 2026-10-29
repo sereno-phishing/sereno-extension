@@ -75,6 +75,11 @@
     return tab && tab.id !== undefined ? tab.id : null;
   }
 
+  async function getTabUrl(tabId) {
+    var tab = await chromeRef()?.tabs?.get?.(tabId);
+    return tab && tab.url;
+  }
+
   /* Content script side. onMessage passes handler the messages the service
      worker sends to this tab (never answers them) and ignores any sender that
      is not this extension. */
@@ -149,6 +154,7 @@
     setBadge: setBadge,
     notifyTab: notifyTab,
     getActiveTabId: getActiveTabId,
+    getTabUrl: getTabUrl,
     onMessage: onMessage,
     sendMessage: sendMessage,
     assetUrl: assetUrl,
