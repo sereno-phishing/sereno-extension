@@ -13,6 +13,7 @@
 
 importScripts(
   "../platform/storage.js",
+  "../platform/i18n.js",
   "../platform/seed.js",
   "../platform/state-store.js",
   "../platform/browser.js",

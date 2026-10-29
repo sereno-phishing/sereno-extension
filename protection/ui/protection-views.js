@@ -10,6 +10,8 @@
   var protection = Sereno.protection;
   var outcomes = Sereno.verdictOutcome;
   var verdict = Sereno.verdict;
+  var local = Sereno.popupI18n || { t: function (text) { return text; }, pill: verdictUi.pill };
+  var t = local.t;
 
   /* Toolbar icon states and the dot colour of each. */
   var ICON_STATES = [
@@ -26,14 +28,14 @@
       return (
         '<div class="protection-card is-degraded" role="status">' + ui.art("warn", "36") +
         '<div class="protection-text"><div class="protection-title">' + ui.esc(notice.title) + "</div>" +
-        '<div class="protection-sub">' + ui.esc(reason ? notice.text : "Algunas comprobaciones no están disponibles.") + "</div></div>" +
+        '<div class="protection-sub">' + ui.esc(reason ? notice.text : t("Algunas comprobaciones no están disponibles.")) + "</div></div>" +
         "</div>"
       );
     }
     return (
       '<div class="protection-card" role="status">' + ui.art("ok", "36") +
-      '<div class="protection-text"><div class="protection-title">Protección activa</div>' +
-      '<div class="protection-sub">Modo por defecto: Advertencia</div></div>' +
+      '<div class="protection-text"><div class="protection-title">' + t("Protección activa") + '</div>' +
+      '<div class="protection-sub">' + t("Modo por defecto: Advertencia") + '</div></div>' +
       "</div>"
     );
   }
@@ -49,20 +51,20 @@
     return (
       '<div class="' + ui.classes(["site-card", degraded ? "is-degraded" : pending && "is-pending"]) + '"' +
       (live ? ' role="status"' : "") + (pending && !degraded ? ' aria-busy="true"' : "") + ">" +
-      '<div class="site-label">Este sitio</div>' +
+      '<div class="site-label">' + t("Este sitio") + '</div>' +
       '<div class="site-row"><div class="site-domain">' + ui.esc(current.domain) + "</div>" +
-      verdictUi.pill(current.status, "md") + "</div>" +
-      (degraded ? '<div class="site-note">No se pudo comprobar este sitio. Evita ingresar datos de pago.</div>' : "") +
+      local.pill(current.status, "md") + "</div>" +
+      (degraded ? '<div class="site-note">' + t("No se pudo comprobar este sitio. Evita ingresar datos de pago.") + '</div>' : "") +
       "</div>"
     );
   }
 
   function iconLegend() {
     return (
-      '<div class="icon-legend"><div class="legend-title">Estados del ícono</div>' +
+      '<div class="icon-legend"><div class="legend-title">' + t("Estados del ícono") + '</div>' +
       '<div class="legend-items">' +
       ICON_STATES.map(function (state) {
-        return ui.legendItem(ui.art("dot-" + state.color, "10"), state.label);
+        return ui.legendItem(ui.art("dot-" + state.color, "10"), t(state.label));
       }).join("") +
       "</div></div>"
     );
@@ -72,8 +74,8 @@
     return (
       '<button type="button" class="notice-card" data-action="dismiss-notice">' + ui.art("brand", "28") +
       '<span class="notice-body">' +
-      '<span class="notice-title">Modelo actualizado a v' + ui.esc(version) + "</span>" +
-      '<span class="notice-text">Se actualizó en el servidor. No tienes que reinstalar nada.</span>' +
+      '<span class="notice-title">' + t("Modelo actualizado a v") + ui.esc(version) + "</span>" +
+      '<span class="notice-text">' + t("Se actualizó en el servidor. No tienes que reinstalar nada.") + '</span>' +
       "</span></button>"
     );
   }
@@ -82,7 +84,7 @@
      unknown, then only "Modelo" shows). The label highlights a fresh update. */
   function modelVersionLabel(state, version) {
     return (
-      '<span class="' + ui.classes(["footer-model", protection.isNoticeVisible(state, version) && "is-updated"]) + '">Modelo' +
+      '<span class="' + ui.classes(["footer-model", protection.isNoticeVisible(state, version) && "is-updated"]) + '">' + t("Modelo") +
       (version ? " v" + ui.esc(version) : "") + "</span>"
     );
   }

@@ -12,14 +12,20 @@
   var onboarding = Sereno.onboarding;
   var preferences = Sereno.preferences;
   var store = Sereno.stateStore.open();
+  var language = Sereno.i18n && Sereno.storage
+    ? Sereno.i18n.create(Sereno.storage.detect(), typeof navigator !== "undefined" ? navigator.language : "es")
+    : null;
   // The composition root: auth, history, survey and model version go through
   // its ports, never to an adapter.
   var services = Sereno.services;
+
+  if (language && Sereno.i18n.use) Sereno.i18n.use(language.get());
 
   var UI_KEY = "sereno.ui.v1";
 
   var App = {
     initialized: false,
+    language: language ? language.get() : "es",
     state: null,
     view: "home",
     onboardingStep: 1,
@@ -41,6 +47,7 @@
     historyEntries: [],
     historyLoading: false,
     historyError: null,
+    historyErrorCode: null,
     modelVersion: null,
     // Account-scoped participation confirmed by the backend for menu visibility.
     surveyMenuStatus: "idle",
@@ -288,19 +295,19 @@
     var run = historyRun;
     var session = App.state && App.state.session;
     if (!session) {
-      setData({ historyEntries: [], historyLoading: false, historyError: null });
+      setData({ historyEntries: [], historyLoading: false, historyError: null, historyErrorCode: null });
       return;
     }
     var showLoading = !silent && !App.historyEntries.length;
-    setData({ historyLoading: showLoading, historyError: silent ? App.historyError : null });
+    setData({ historyLoading: showLoading, historyError: silent ? App.historyError : null, historyErrorCode: silent ? App.historyErrorCode : null });
     var result = await Sereno.historyService.list(services);
     if (run !== historyRun) {
       return;
     }
     if (result.ok) {
-      setData({ historyEntries: result.entries, historyLoading: false, historyError: null });
+      setData({ historyEntries: result.entries, historyLoading: false, historyError: null, historyErrorCode: null });
     } else {
-      setData({ historyLoading: false, historyError: result.message });
+      setData({ historyLoading: false, historyError: result.message, historyErrorCode: result.error || null });
     }
   }
 
@@ -366,8 +373,10 @@
     if (result.ok) {
       App.historyEntries = [];
       App.historyError = null;
+      App.historyErrorCode = null;
     } else {
       App.historyError = result.message;
+      App.historyErrorCode = result.error || null;
     }
     show("history");
     render();
@@ -601,6 +610,33 @@
     restoreUi();
     Sereno.ui.delegateActions(root, ACTIONS);
     root.addEventListener("submit", onSubmit);
+    root.addEventListener("change", function (event) {
+      if (language && event.target && event.target.name === "language" && event.target.type === "radio") {
+        language.set(event.target.value).catch(function () {
+          App.language = language.get();
+          render();
+        });
+      }
+    });
+    if (language) {
+      language.subscribe(function (value) {
+        App.language = value;
+        if (Sereno.i18n.use) Sereno.i18n.use(value);
+        if (document.documentElement) document.documentElement.lang = value;
+        render();
+      });
+      language.ready().then(function (value) {
+        App.language = value;
+        if (Sereno.i18n.use) Sereno.i18n.use(value);
+        if (document.documentElement) document.documentElement.lang = value;
+        render();
+      }).catch(function () {
+        App.language = language.get();
+        if (Sereno.i18n.use) Sereno.i18n.use(App.language);
+        if (document.documentElement) document.documentElement.lang = App.language;
+        render();
+      });
+    }
     document.addEventListener("keydown", onKeydown);
     store.subscribe(function (state) {
       App.state = state;

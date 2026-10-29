@@ -28,6 +28,8 @@ async function popupHarness(extra = {}) {
     querySelectorAll: () => extra.items || []
   };
   const Sereno = {
+    i18n: extra.i18n,
+    storage: extra.storage,
     account: { isAdmin: (session) => !!session && session.role === "administrador" },
     history: { ALL: "all" },
     survey: { draftAnswers: (answers) => [...answers] },
@@ -93,6 +95,56 @@ async function popupHarness(extra = {}) {
     }
   };
 }
+
+test("language selector saves the selected preference", async () => {
+  const selected = [];
+  const language = { get: () => "es", ready: async () => "es", subscribe: () => {}, set: async (value) => { selected.push(value); } };
+  const popup = await popupHarness({ i18n: { create: () => language }, storage: { detect: () => ({}) } });
+  popup.listeners.change({ target: { id: "language-en", name: "language", type: "radio", value: "en" } });
+  await Promise.resolve();
+  assert.deepEqual(selected, ["en"]);
+});
+
+test("menu stays open when language changes and Escape returns focus to the badge", async () => {
+  let notify;
+  const language = { get: () => "es", ready: async () => "es", subscribe: (callback) => { notify = callback; }, set: async (value) => { notify(value); } };
+  for (const role of ["usuario", "administrador"]) {
+    const popup = await popupHarness({ state: { session: { username: "ana", role } }, i18n: { create: () => language }, storage: { detect: () => ({}) } });
+    popup.actions["toggle-menu"]();
+    popup.listeners.change({ target: { id: "language-en", name: "language", type: "radio", value: "en" } });
+    assert.equal(popup.renders.at(-1).language, "en");
+    assert.equal(popup.renders.at(-1).menuOpen, true);
+    popup.documentListeners.keydown({ key: "Escape", target: {} });
+    assert.equal(popup.renders.at(-1).menuOpen, false);
+    assert.equal(popup.focused.at(-1), '[data-action="toggle-menu"]');
+  }
+});
+
+test("radio arrow keys retain native selection behavior", async () => {
+  const popup = await popupHarness();
+  let prevented = false;
+  popup.documentListeners.keydown({ key: "ArrowDown", target: { name: "language", type: "radio" }, preventDefault: () => { prevented = true; } });
+  assert.equal(prevented, false);
+});
+
+test("external language updates rerender the popup without altering backend data", async () => {
+  let notify;
+  const language = { get: () => "es", ready: async () => "es", subscribe: (callback) => { notify = callback; }, set: async () => {} };
+  const popup = await popupHarness({ i18n: { create: () => language }, storage: { detect: () => ({}) } });
+  notify("en");
+  assert.equal(popup.renders.at(-1).language, "en");
+  assert.deepEqual(popup.state, popup.originalState);
+});
+
+test("a failed language write restores the selector without an unhandled rejection", async () => {
+  let attempts = 0;
+  const language = { get: () => "es", ready: async () => "es", subscribe: () => {}, set: async () => { attempts += 1; throw new Error("storage unavailable"); } };
+  const popup = await popupHarness({ i18n: { create: () => language }, storage: { detect: () => ({}) } });
+  popup.listeners.change({ target: { id: "language-en", name: "language", type: "radio", value: "en" } });
+  await settle();
+  assert.equal(attempts, 1);
+  assert.equal(popup.renders.at(-1).language, "es");
+});
 
 test("tab sliding runs once per real tab change, not on initial render, repeat clicks or redraws", async () => {
   const popup = await popupHarness();

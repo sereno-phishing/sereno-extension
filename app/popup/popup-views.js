@@ -14,12 +14,13 @@
   var historyUi = Sereno.historyUi;
   var surveyUi = Sereno.surveyUi;
   var protectionUi = Sereno.protectionUi;
+  var t = Sereno.popupI18n ? Sereno.popupI18n.t : function (text) { return text; };
 
   function header(model, state) {
     var inert = model.confirmOpen ? " inert" : "";
     var left =
       model.view === "detail"
-        ? '<button type="button" class="back-link" data-action="back-history">←  Historial</button>'
+        ? '<button type="button" class="back-link" data-action="back-history">←  ' + t("Historial") + '</button>'
         : '<div class="brand">' + ui.logo("brand-logo", "Sereno") + '<span class="brand-name">Sereno</span></div>';
     var slot = "";
     if (model.view === "onboarding") {
@@ -33,8 +34,9 @@
   function footer(state, model) {
     return (
       '<footer class="app-footer"' + (model.confirmOpen ? " inert" : "") + ">" +
-      '<button type="button" class="footer-link" data-action="open-privacy">Política de privacidad</button>' +
-      protectionUi.modelVersionLabel(state, model.modelVersion) + "</footer>"
+      '<button type="button" class="footer-link" data-action="open-privacy">' + t("Política de privacidad") + '</button>' +
+      protectionUi.modelVersionLabel(state, model.modelVersion) +
+      '</footer>'
     );
   }
 
@@ -54,17 +56,17 @@
   function tabs(homeActive, slide) {
     var active = homeActive ? "home" : "history";
     return (
-      '<div class="tabs tabs-lg" role="tablist" aria-label="Secciones" data-active-tab="' + active + '"' +
+      '<div class="tabs tabs-lg" role="tablist" aria-label="' + t("Secciones") + '" data-active-tab="' + active + '"' +
       (slide === active ? ' data-tab-slide="' + active + '"' : "") + '>' +
-      tab("home", "Inicio", homeActive) + tab("history", "Historial", !homeActive) + "</div>"
+      tab("home", t("Inicio"), homeActive) + tab("history", t("Historial"), !homeActive) + "</div>"
     );
   }
 
   function adminEntryCard() {
     return (
-      '<div class="admin-card"><div class="admin-title">Administración</div>' +
-      '<p class="admin-text">Métricas, política por dominio y caché.</p>' +
-      ui.button({ label: "Abrir panel de administración", variant: "primary", block: true, action: "open-admin" }) +
+      '<div class="admin-card"><div class="admin-title">' + t("Administración") + '</div>' +
+      '<p class="admin-text">' + t("Métricas, política por dominio y caché.") + '</p>' +
+      ui.button({ label: t("Abrir panel de administración"), variant: "primary", block: true, action: "open-admin" }) +
       "</div>"
     );
   }
@@ -94,10 +96,10 @@
         site,
         protectionUi.iconLegend(),
         '<div class="flex-spacer"></div>',
-        '<p class="muted-line">Inicia sesión para guardar tu historial.</p>',
+        '<p class="muted-line">' + t("Inicia sesión para guardar tu historial.") + '</p>',
         '<div class="actions-stack">' +
-          ui.button({ label: "Iniciar sesión", variant: "primary", block: true, action: "go-login" }) +
-          ui.button({ label: "Crear cuenta", variant: "ghost", block: true, action: "go-register" }) +
+          ui.button({ label: t("Iniciar sesión"), variant: "primary", block: true, action: "go-login" }) +
+          ui.button({ label: t("Crear cuenta"), variant: "ghost", block: true, action: "go-register" }) +
           "</div>"
       );
     } else {
@@ -128,7 +130,8 @@
           entries: userEntries(model),
           filter: model.historyFilter,
           loading: model.historyLoading,
-          error: model.historyError
+          error: model.historyError,
+          errorCode: model.historyErrorCode
         });
       case "detail":
         return historyUi.detailView(history.findById(userEntries(model), model.detailId));
@@ -151,8 +154,8 @@
       return "";
     }
     return (
-      '<div class="session-notice" role="status"><span>Sin conexión con el servidor. Usamos tu sesión guardada en este dispositivo.</span>' +
-      '<button type="button" class="link-btn" data-action="retry-session">Reintentar</button></div>'
+      '<div class="session-notice" role="status"><span>' + t("Sin conexión con el servidor. Usamos tu sesión guardada en este dispositivo.") + '</span>' +
+      '<button type="button" class="link-btn" data-action="retry-session">' + t("Reintentar") + '</button></div>'
     );
   }
 
@@ -160,10 +163,10 @@
     return (
       header(model, state) +
       sessionNotice(model, state) +
-      '<main class="app-content" id="content"' + (model.confirmOpen ? " inert" : "") + ">" + content(model, state) + "</main>" +
+      '<main class="app-content" id="content"' + (/^survey/.test(model.view) ? ' lang="es"' : "") + (model.confirmOpen ? " inert" : "") + ">" + content(model, state) + "</main>" +
       footer(state, model) +
       (model.menuOpen && state.session
-        ? accountUi.accountMenu(state.session, { showSurvey: model.surveyMenuStatus !== "loading" && model.surveyMenuStatus !== "submitted" })
+        ? accountUi.accountMenu(state.session, { language: model.language, showSurvey: model.surveyMenuStatus !== "loading" && model.surveyMenuStatus !== "submitted" })
         : "") +
       (model.confirmOpen ? historyUi.clearConfirm() : "")
     );

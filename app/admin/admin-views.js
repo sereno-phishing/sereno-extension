@@ -8,21 +8,40 @@
   var ui = Sereno.ui;
   var account = Sereno.account;
   var administrationUi = Sereno.administrationUi;
+  var i18n = Sereno.i18n;
+  var gateMessages = {
+    "admin.gate.title": { es: "Panel de administración", en: "Administration panel" },
+    "admin.gate.description": { es: "Inicia sesión con una cuenta de administrador desde el popup de Sereno para ver este panel.", en: "Sign in with an administrator account from the Sereno popup to view this panel." },
+    "admin.sections": { es: "Secciones", en: "Sections" },
+    "admin.metrics": { es: "Métricas", en: "Metrics" },
+    "admin.domains": { es: "Política por dominio", en: "Domain policy" },
+    "admin.cache": { es: "Caché", en: "Cache" },
+    "admin.role": { es: "Administrador", en: "Administrator" },
+    "admin.checking": { es: "Verificando la sesión...", en: "Checking the session..." },
+    "admin.skip": { es: "Saltar al contenido", en: "Skip to content" },
+    "admin.title.metrics": { es: "Métricas de operación", en: "Operation metrics" },
+    "admin.title.domains": { es: "Política por dominio", en: "Domain policy" },
+    "admin.title.cache": { es: "Caché de veredictos", en: "Verdict cache" }
+  };
+  if (i18n) i18n.register(gateMessages);
+  function gateText(key) {
+    return i18n ? i18n.t(key) : gateMessages[key].es;
+  }
 
   var SECTIONS = [
-    { id: "metricas", label: "Métricas" },
-    { id: "dominios", label: "Política por dominio" },
-    { id: "cache", label: "Caché" }
+    { id: "metricas", label: "admin.metrics" },
+    { id: "dominios", label: "admin.domains" },
+    { id: "cache", label: "admin.cache" }
   ];
 
   function nav(activeSection) {
     return (
-      '<nav class="sidebar-nav" aria-label="Secciones">' +
+      '<nav class="sidebar-nav" aria-label="' + ui.esc(gateText("admin.sections")) + '">' +
       SECTIONS.map(function (item) {
         var active = activeSection === item.id;
         return (
           '<button type="button" class="' + ui.classes(["nav-item", active && "is-active"]) + '" data-action="nav" ' +
-          'data-section="' + item.id + '" aria-current="' + (active ? "page" : "false") + '">' + ui.esc(item.label) + "</button>"
+          'data-section="' + item.id + '" aria-current="' + (active ? "page" : "false") + '">' + ui.esc(gateText(item.label)) + "</button>"
         );
       }).join("") +
       "</nav>"
@@ -37,29 +56,28 @@
       '<div class="sidebar-foot">' +
       '<div class="sidebar-user"><span class="sidebar-avatar" aria-hidden="true"></span>' +
       '<div><div class="sidebar-username">' + ui.esc(session.username) + "</div>" +
-      '<div class="sidebar-role">' + ui.esc(account.roleTitle(session.role)) + "</div></div></div>" +
+      '<div class="sidebar-role">' + ui.esc(session.role === "administrador" ? gateText("admin.role") : account.roleTitle(session.role)) + "</div></div></div>" +
       "</div></aside>"
     );
   }
 
   function checkingGate() {
-    return '<main class="access-gate" id="main" tabindex="-1"><div class="card panel-status" role="status">Verificando la sesión...</div></main>';
+    return '<main class="access-gate" id="main" tabindex="-1"><div class="card panel-status" role="status">' + ui.esc(gateText("admin.checking")) + '</div></main>';
   }
 
   /* Shown instead of the panel when nobody, or a non-admin user, is signed in. */
   function accessGate() {
     return (
       '<main class="access-gate" id="main" tabindex="-1"><div class="card access-gate-card">' + ui.logo("access-gate-logo", "Sereno") +
-      '<h1 class="access-gate-title">Panel de administración</h1>' +
-      '<p class="access-gate-text">Inicia sesión con una cuenta de administrador desde el popup de Sereno ' +
-      "para ver este panel.</p></div></main>"
+      '<h1 class="access-gate-title">' + ui.esc(gateText("admin.gate.title")) + '</h1>' +
+      '<p class="access-gate-text">' + ui.esc(gateText("admin.gate.description")) + "</p></div></main>"
     );
   }
 
   var TITLES = {
-    metricas: "Métricas de operación",
-    dominios: "Política por dominio",
-    cache: "Caché de veredictos"
+    metricas: "admin.title.metrics",
+    dominios: "admin.title.domains",
+    cache: "admin.title.cache"
   };
 
   /* "loading" or "error" while the section has not loaded; null once it has. */
@@ -68,7 +86,7 @@
     if (!load || load.status === "ready") {
       return null;
     }
-    return administrationUi.statusSection({ id: model.section, title: TITLES[model.section], state: load.status, message: load.message });
+    return administrationUi.statusSection({ id: model.section, title: gateText(TITLES[model.section]), state: load.status, message: administrationUi.errorMessage ? administrationUi.errorMessage((model.loadErrors || {})[model.section], load.message) : load.message });
   }
 
   function section(model) {
@@ -82,10 +100,11 @@
           rows: model.domainsDraft || [],
           addPolicy: model.addPolicy,
           saved: model.domainsBanner,
-          error: model.domainsError
+          error: model.domainsError,
+          errorCode: model.domainsErrorCode
         });
       case "cache":
-        return administrationUi.cacheSection({ cache: model.cache, notice: model.cacheNotice, error: model.cacheError });
+        return administrationUi.cacheSection({ cache: model.cache, notice: model.cacheNotice, error: model.cacheError, errorCode: model.cacheErrorCode });
       default:
         return administrationUi.metricsSection({ metrics: model.metrics, showAllQueries: model.showAllQueries });
     }
@@ -101,7 +120,7 @@
       return accessGate();
     }
     return (
-      '<a class="skip-link" href="#main">Saltar al contenido</a>' + sidebar(model.section, state.session) +
+      '<a class="skip-link" href="#main">' + ui.esc(gateText("admin.skip")) + '</a>' + sidebar(model.section, state.session) +
       '<main class="options-content" id="main" tabindex="-1">' + section(model) + "</main>"
     );
   }

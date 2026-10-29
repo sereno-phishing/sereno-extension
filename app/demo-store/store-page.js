@@ -91,7 +91,7 @@
       detail.hidden = !open;
     }
     if (toggle) {
-      toggle.textContent = open ? "Ocultar detalle" : "Ver detalle";
+      toggle.textContent = verdictModal.text(open ? "hide" : "show");
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
     }
   }
@@ -243,6 +243,7 @@
 
   function init() {
     mountModals();
+    verdictModal.translate(document);
     Sereno.ui.delegateClicks(document, "data-scenario", runScenario);
     Sereno.ui.delegateActions(document, ACTIONS);
     document.addEventListener("keydown", onKeydown);

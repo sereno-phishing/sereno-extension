@@ -15,16 +15,38 @@ function popupViews() {
   const Sereno = {
     ui,
     account: { isAdmin: () => false },
-    accountUi: { accountButton: () => "" },
+    accountUi: load("ui/atoms.js", "account/domain/account.js", "account/ui/account-views.js").accountUi,
     history: { entriesOf: () => [] },
     historyUi: { listView: ({ tabsHtml }) => `<section class="view view-history">${tabsHtml}</section>` },
+    surveyUi: { questionView: () => "Pregunta SUS" },
     protection: { isNoticeVisible: () => false },
-    protectionUi: { protectionCard: () => "", siteCard: () => "", modelVersionLabel: () => "" }
+    protectionUi: { protectionCard: () => "", siteCard: () => "", iconLegend: () => "", modelVersionLabel: () => "" }
   };
   const context = vm.createContext({ Sereno });
   vm.runInContext(fs.readFileSync(path.join(ROOT, "app/popup/popup-views.js"), "utf8"), context);
   return Sereno.popupViews;
 }
+
+test("language selector appears only in the open user or admin account menu", () => {
+  const views = popupViews();
+  for (const session of [{ username: "user", role: "usuario" }, { username: "admin", role: "administrador" }]) {
+    const state = { session, currentSite: {} };
+    assert.doesNotMatch(views.page({ view: "home", language: "en", menuOpen: false }, state), /language-en/);
+    const html = views.page({ view: "home", language: "en", menuOpen: true }, state);
+    assert.match(html, /<div class="account-menu" data-action="menu-content"[\s\S]*<legend>Language<\/legend>/);
+    assert.match(html, /id="language-en" name="language" value="en" checked/);
+    assert.match(html, /id="language-es" name="language" value="es">/);
+    assert.match(html, /data-action="logout"/);
+    if (session.role === "administrador") assert.match(html, /data-action="open-admin"/);
+  }
+  assert.doesNotMatch(views.page({ view: "home", language: "es", menuOpen: true }, { session: null, currentSite: {} }), /language-es/);
+});
+
+test("Spanish survey content declares its language when the popup is English", () => {
+  const views = popupViews();
+  const html = views.page({ view: "survey", language: "en", surveyAnswers: [], surveyIndex: 0 }, { session: null });
+  assert.match(html, /<main[^>]*lang="es"/);
+});
 
 test("home and history use the same large tab variant with only selection state changing", () => {
   const views = popupViews();

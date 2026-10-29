@@ -22,6 +22,23 @@
     source: "Fuente del veredicto"
   };
 
+  if (Sereno.i18n) Sereno.i18n.register({
+    "verdict.status.seguro": { es: "Seguro", en: "Safe" },
+    "verdict.status.advertencia": { es: "Advertencia", en: "Warning" },
+    "verdict.status.bloqueo": { es: "Bloqueado", en: "Blocked" },
+    "verdict.status.pendiente": { es: "Evaluando…", en: "Checking…" },
+    "verdict.fact.risk": { es: FACT_LABELS.risk, en: "Risk level" },
+    "verdict.fact.score": { es: FACT_LABELS.score, en: "Model score" },
+    "verdict.fact.date": { es: FACT_LABELS.date, en: "Classification date" },
+    "verdict.fact.source": { es: FACT_LABELS.source, en: "Verdict source" }
+  });
+  if (Sereno.i18n) Object.keys(FACT_LABELS).forEach(function (key) {
+    Object.defineProperty(FACT_LABELS, key, { enumerable: true, get: function () { return Sereno.i18n.t("verdict.fact." + key); } });
+  });
+  function statusLabel(status) {
+    return Sereno.i18n ? Sereno.i18n.t("verdict.status." + status.id) : status.label;
+  }
+
   function toneColor(tone) {
     return TONE_COLORS[tone];
   }
@@ -40,14 +57,14 @@
     var status = verdict.status(statusId);
     return ui.pill(
       "pill-" + size + " pill-" + status.tone,
-      badge(statusId, size === "sm" ? "12" : "14") + "<span>" + ui.esc(status.label) + "</span>"
+      badge(statusId, size === "sm" ? "12" : "14") + "<span>" + ui.esc(statusLabel(status)) + "</span>"
     );
   }
 
   /* Admin panel pill. */
   function adminPill(statusId) {
     var status = verdict.status(statusId);
-    return ui.pill("pill-" + status.id, ui.icon("admin-pill-" + status.tone, "pill-img") + ui.esc(status.label));
+    return ui.pill("pill-" + status.id, ui.icon("admin-pill-" + status.tone, "pill-img") + ui.esc(statusLabel(status)));
   }
 
   /* Small admin-panel dot for a tone. */

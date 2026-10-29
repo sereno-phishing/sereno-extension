@@ -12,6 +12,8 @@
   var history = Sereno.history;
 
   var FACTS = verdictUi.FACT_LABELS;
+  var local = Sereno.popupI18n || { t: function (text) { return text; }, pill: verdictUi.pill };
+  var t = local.t;
 
   function filterChip(filterId, activeFilter) {
     var all = filterId === history.ALL;
@@ -22,7 +24,7 @@
       data: [["filter", filterId]],
       pressed: active,
       lead: all ? "" : ui.art("dot-" + verdictUi.toneColor(verdict.status(filterId).tone), "8"),
-      label: all ? "Todas" : verdict.status(filterId).label
+      label: t(all ? "Todas" : verdict.status(filterId).label)
     });
   }
 
@@ -47,27 +49,30 @@
       '<button type="button" class="history-item" data-action="open-detail" data-id="' + ui.esc(entry.id) + '">' +
       '<span><span class="history-domain">' + ui.esc(entry.domain) + "</span>" +
       '<span class="history-date">' + ui.esc(listDate(entry.ts)) + "</span></span>" +
-      '<span class="history-right">' + verdictUi.pill(entry.status, "sm") + '<span class="chevron" aria-hidden="true">›</span></span>' +
+      '<span class="history-right">' + local.pill(entry.status, "sm") + '<span class="chevron" aria-hidden="true">›</span></span>' +
       "</button>"
     );
   }
 
-  var EMPTY_STATE =
-    '<div class="empty-state"><span class="empty-circle"></span>' +
-    '<p class="empty-title">Todavía no hay sitios evaluados en esta cuenta.</p>' +
-    '<p class="empty-sub">Cuando navegues, los sitios aparecerán aquí.</p></div>';
-
-  var NO_MATCH = '<p class="filter-empty">No hay sitios con este resultado.</p>';
-
-  var LOADING_STATE =
-    '<div class="empty-state" role="status"><span class="empty-circle"></span>' +
-    '<p class="empty-title">Cargando tu historial...</p></div>';
+  function emptyState() {
+    return '<div class="empty-state"><span class="empty-circle"></span>' +
+      '<p class="empty-title">' + t("Todavía no hay sitios evaluados en esta cuenta.") + '</p>' +
+      '<p class="empty-sub">' + t("Cuando navegues, los sitios aparecerán aquí.") + '</p></div>';
+  }
+  function noMatch() { return '<p class="filter-empty">' + t("No hay sitios con este resultado.") + '</p>'; }
+  function loadingState() {
+    return '<div class="empty-state" role="status"><span class="empty-circle"></span>' +
+      '<p class="empty-title">' + t("Cargando tu historial...") + '</p></div>';
+  }
 
   /* Error text from the data port plus the retry action. */
-  function errorNotice(message) {
+  function errorNotice(message, code) {
+    // Only local provider messages are translated; arbitrary port text stays intact.
+    var errors = Sereno.providers && Sereno.providers.errors;
+    if (errors && errors.CODES.indexOf(code) >= 0 && message === errors.message(code)) message = t(message);
     return (
       ui.banner({ tone: "error", role: "alert", iconHtml: ui.art("bad", "16"), text: message }) +
-      ui.button({ label: "Reintentar", variant: "ghost", action: "retry-history" })
+      ui.button({ label: t("Reintentar"), variant: "ghost", action: "retry-history" })
     );
   }
 
@@ -77,22 +82,22 @@
     var filtered = history.filter(model.entries, model.filter);
     var body;
     if (model.error) {
-      body = errorNotice(model.error) + (model.entries.length ? '<div class="history-list">' + filtered.map(historyItem).join("") + "</div>" : "");
+      body = errorNotice(model.error, model.errorCode) + (model.entries.length ? '<div class="history-list">' + filtered.map(historyItem).join("") + "</div>" : "");
     } else if (model.loading && !model.entries.length) {
-      body = LOADING_STATE;
+      body = loadingState();
     } else if (!model.entries.length) {
-      body = EMPTY_STATE;
+      body = emptyState();
     } else if (!filtered.length) {
-      body = NO_MATCH;
+      body = noMatch();
     } else {
       body = '<div class="history-list">' + filtered.map(historyItem).join("") + "</div>";
     }
     return (
-      '<section class="view view-history"><h1 class="sr-only">Historial</h1>' + model.tabsHtml +
+      '<section class="view view-history"><h1 class="sr-only">' + t("Historial") + '</h1>' + model.tabsHtml +
       '<div class="tab-panel" role="tabpanel" id="tabpanel-history" aria-labelledby="tab-history">' +
       filterChips(model.filter) + body +
       '<div class="flex-spacer"></div>' +
-      (model.entries.length ? ui.button({ label: "Borrar historial", variant: "ghost", cls: "history-delete", action: "confirm-clear" }) : "") +
+      (model.entries.length ? ui.button({ label: t("Borrar historial"), variant: "ghost", cls: "history-delete", action: "confirm-clear" }) : "") +
       "</div></section>"
     );
   }
@@ -107,28 +112,28 @@
 
   function detailView(entry) {
     if (!entry) {
-      return '<section class="view view-detail"><h1 class="sr-only">Detalle del sitio</h1>' + NO_MATCH + "</section>";
+      return '<section class="view view-detail"><h1 class="sr-only">' + t("Detalle del sitio") + '</h1>' + noMatch() + "</section>";
     }
     var status = verdict.status(entry.status);
     var score = Number(entry.score) || 0;
     return (
-      '<section class="view view-detail"><h1 class="sr-only">Detalle de ' + ui.esc(entry.domain) + "</h1>" +
+      '<section class="view view-detail"><h1 class="sr-only">' + t("Detalle de ") + ui.esc(entry.domain) + "</h1>" +
       '<div class="status-card status-card-' + status.id + '">' +
       '<div class="status-head">' + verdictUi.badge(entry.status, "32") +
-      '<span class="status-title status-title-' + status.id + '">' + ui.esc(status.title) + "</span></div>" +
+      '<span class="status-title status-title-' + status.id + '">' + ui.esc(t(status.title)) + "</span></div>" +
       '<div class="status-domain">' + ui.esc(entry.domain) + "</div></div>" +
       '<div class="detail-rows">' +
-      detailRow(FACTS.risk, detailValue(verdict.riskLevel(entry))) +
+      detailRow(t(FACTS.risk), detailValue(t(verdict.riskLevel(entry)))) +
       detailRow(
-        FACTS.score,
+        t(FACTS.score),
         '<span class="detail-score"><span class="score-track" aria-hidden="true"><span class="score-fill score-fill-' + status.id +
           '" style="width:' + verdict.scorePercent(score) + '%"></span></span>' + detailValue(score.toFixed(2)) + "</span>"
       ) +
-      detailRow(FACTS.date, detailValue(time.formatDateTime(entry.ts))) +
-      detailRow(FACTS.source, '<span class="hu-chip">' + ui.esc(verdict.sourceLabel(entry.source)) + "</span>") +
+      detailRow(t(FACTS.date), detailValue(time.formatDateTime(entry.ts))) +
+      detailRow(t(FACTS.source), '<span class="hu-chip">' + ui.esc(t(verdict.sourceLabel(entry.source))) + "</span>") +
       "</div>" +
       '<div class="flex-spacer"></div>' +
-      '<div class="detail-note">Solo se guarda el dominio, no la dirección completa.</div>' +
+      '<div class="detail-note">' + t("Solo se guarda el dominio, no la dirección completa.") + '</div>' +
       "</section>"
     );
   }
@@ -136,11 +141,11 @@
   function clearConfirm() {
     return (
       '<div class="confirm-overlay"><div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">' +
-      '<h2 class="confirm-title" id="confirm-title">¿Borrar tu historial?</h2>' +
-      '<p class="confirm-text" id="confirm-text">Se elimina de tu cuenta. No se puede deshacer.</p>' +
+      '<h2 class="confirm-title" id="confirm-title">' + t("¿Borrar tu historial?") + '</h2>' +
+      '<p class="confirm-text" id="confirm-text">' + t("Se elimina de tu cuenta. No se puede deshacer.") + '</p>' +
       '<div class="confirm-actions">' +
-      ui.button({ label: "No", variant: "ghost", action: "cancel-clear" }) +
-      ui.button({ label: "Sí, borrar", variant: "danger", action: "confirm-clear-yes" }) +
+      ui.button({ label: t("No"), variant: "ghost", action: "cancel-clear" }) +
+      ui.button({ label: t("Sí, borrar"), variant: "danger", action: "confirm-clear-yes" }) +
       "</div></div></div>"
     );
   }

@@ -316,11 +316,20 @@ test("admin inputs have programmatic labels and the chart is exposed as one imag
 
 /* ---------------- standalone pages ---------------- */
 
+const TITLE_PATTERN = /<title(?:\s+[^<>]*)?>\s*[^\s<][^<]*<\/title\s*>/i;
+
+test("title check accepts attributes but rejects empty or missing text", () => {
+  assert.match('<title data-i18n="title">Sereno</title>', TITLE_PATTERN);
+  assert.doesNotMatch('<title data-i18n="title">  </title>', TITLE_PATTERN);
+  assert.doesNotMatch('<title data-i18n="title"></title>', TITLE_PATTERN);
+  assert.doesNotMatch('<title data-i18n="title"><span>Sereno</span></title>', TITLE_PATTERN);
+});
+
 test("static pages declare their language, one h1, a main landmark and no page-wide live region", () => {
   for (const file of ["app/popup/popup.html", "app/admin/admin.html", "app/privacy/privacy.html", "app/demo-store/store.html"]) {
     const html = read(file);
     assert.match(html, /<html lang="es">/, file);
-    assert.match(html, /<title>[^<]+<\/title>/, file);
+    assert.match(html, TITLE_PATTERN, file);
     assert.doesNotMatch(html, /id="app"[^>]*aria-live/, `${file}: a whole-app live region announces every render`);
   }
   const privacy = read("app/privacy/privacy.html");
@@ -389,6 +398,16 @@ test("captureFocus restores focus on the element that matches after a re-render"
   assert.equal(target.focused, true);
   const idle = Sereno.ui.captureFocus(root, { activeElement: { tagName: "BODY", getAttribute: () => null } });
   assert.doesNotThrow(idle);
+});
+
+test("captureFocus restores the selected language radio after a live rerender", () => {
+  const active = { tagName: "INPUT", getAttribute: (name) => ({ id: "language-en", name: "language" })[name] || null };
+  let selector;
+  let focused = false;
+  const root = { contains: (node) => node === active, querySelector: (value) => { selector = value; return { focus: () => { focused = true; } }; } };
+  Sereno.ui.captureFocus(root, { activeElement: active })();
+  assert.equal(selector, 'input[id="language-en"][name="language"]');
+  assert.equal(focused, true);
 });
 
 test("the admin page shows a loading status until its first render replaces it", () => {

@@ -193,6 +193,8 @@ button {
   align-items: center;
   justify-content: space-between;
   flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
   padding: 10px 16px;
   border-top: 1px solid var(--line);
   background: var(--bg);
@@ -1161,6 +1163,64 @@ button {
 .menu-sep {
   height: 1px;
   background: var(--line);
+}
+
+.menu-language {
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px;
+  border: 0;
+}
+
+.menu-language legend {
+  padding: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.menu-language-choices {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.menu-language-option {
+  position: relative;
+  flex: 1;
+  border-radius: 6px;
+}
+
+.menu-language-option:hover {
+  background: var(--soft);
+}
+
+.menu-language-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.menu-language-option label {
+  display: block;
+  padding: 7px 6px;
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.menu-language-option input:checked + label {
+  background: var(--indigo-50);
+  color: var(--indigo-700);
+}
+
+.menu-language-option input:focus-visible + label {
+  outline: 2px solid var(--indigo-600);
+  outline-offset: 2px;
 }
 
 .menu-item {

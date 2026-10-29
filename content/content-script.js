@@ -38,6 +38,11 @@
     var surface = null;
     var state = { id: null, dismissed: false };
     var current = null;
+    var currentOutcome = null;
+    var language = Sereno.i18n && Sereno.storage ? Sereno.i18n.create(
+      env.storage || Sereno.storage.detect(), env.browserLanguage || (typeof navigator !== "undefined" ? navigator.language : "es")
+    ) : null;
+    if (language) Sereno.i18n.use(language.get());
     var activeDialog = null;
     var returnFocus = null;
     var savedOverflow = null;
@@ -74,6 +79,7 @@
       applyStyles(shadow);
       surface = doc.createElement("div");
       surface.setAttribute("class", "sereno-surface");
+      if (language) surface.setAttribute("lang", language.get());
       surface.addEventListener("click", onClick);
       shadow.appendChild(surface);
       doc.documentElement.appendChild(host);
@@ -169,6 +175,7 @@
     }
 
     function show(outcome, acknowledged) {
+      currentOutcome = outcome;
       var decision = overlay.decide(state, outcome, acknowledged === true);
       state = decision.next;
       if (decision.action === "render") {
@@ -219,7 +226,8 @@
       }
       var open = details.hidden === true;
       details.hidden = !open;
-      element.textContent = open ? "Ocultar detalle" : "Ver detalle";
+      element.textContent = Sereno.i18n ? Sereno.i18n.t(open ? "overlay.detail.hide" : "overlay.detail.show") :
+        (open ? "Ocultar detalle" : "Ver detalle");
       element.setAttribute("aria-expanded", open ? "true" : "false");
     }
 
@@ -248,6 +256,26 @@
       }
     }
 
+    /* Update text in place: do not close a dialog, lose focus, reset expanded
+       details, replace its timestamp, or resurrect a dismissed warning. */
+    function updateLanguage(value) {
+      Sereno.i18n.use(value);
+      if (surface) surface.setAttribute("lang", value);
+      if (!surface || !current || state.dismissed || !currentOutcome) return;
+      if (current.type === "modal") {
+        if (Sereno.verdictModal.translate) Sereno.verdictModal.translate(surface);
+        return;
+      }
+      surface.querySelectorAll("[data-overlay-i18n]").forEach(function (node) {
+        node.textContent = Sereno.i18n.t(node.getAttribute("data-overlay-i18n"));
+      });
+      var notice = Sereno.verdictOutcome.notice(currentOutcome);
+      if (notice) surface.querySelectorAll("[data-overlay-notice]").forEach(function (node) {
+        node.textContent = notice[node.getAttribute("data-overlay-notice")];
+      });
+    }
+    if (language) language.subscribe(updateLanguage);
+
     /* ---------------- messages ---------------- */
 
     async function handleMessage(message) {
@@ -267,6 +295,9 @@
        worker for the outcome of a page that finished loading first. */
     async function start() {
       browser.onMessage(handleMessage);
+      if (language) {
+        try { updateLanguage(await language.ready()); } catch (error) { /* keep browser-language fallback */ }
+      }
       await requestCurrent();
     }
 

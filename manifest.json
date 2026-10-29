@@ -4,7 +4,8 @@
   "short_name": "Sereno",
   "version": "0.2.0",
   "minimum_chrome_version": "102",
-  "description": "Detecta sitios de phishing mientras navegas y te avisa antes de que ingreses tus datos en tiendas y servicios en línea.",
+  "default_locale": "es",
+  "description": "__MSG_extensionDescription__",
   "permissions": ["storage", "tabs"],
   "host_permissions": ["http://127.0.0.1:5000/*"],
   "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'self'" },
@@ -14,6 +15,8 @@
       "matches": ["http://*/*", "https://*/*"],
       "js": [
         "platform/browser.js",
+        "platform/storage.js",
+        "platform/i18n.js",
         "time/domain/time.js",
         "verdict/domain/verdict.js",
         "verdict/domain/outcome.js",

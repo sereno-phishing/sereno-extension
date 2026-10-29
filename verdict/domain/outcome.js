@@ -88,11 +88,23 @@
   }
 
   /* Title and text of the degraded warning, null when protection is fine. */
+  if (Sereno.i18n) {
+    Sereno.i18n.register({
+      "notice.title": { es: NOTICE_TITLE, en: "Protection degraded" },
+      "notice.offline": { es: NOTICE_TEXTS.offline, en: "Offline: this site could not be checked. You can continue with caution." },
+      "notice.timeout": { es: NOTICE_TEXTS.timeout, en: "The evaluation took too long. You can continue with caution." },
+      "notice.server": { es: NOTICE_TEXTS.server, en: "The Sereno server did not respond properly. You can continue with caution." },
+      "notice.cache_down": { es: NOTICE_TEXTS.cache_down, en: "The verdict cache is unavailable. You can continue with caution." }
+    });
+  }
+
   function notice(outcome) {
     if (!outcome || outcome.kind !== "degraded") {
       return null;
     }
-    return { title: NOTICE_TITLE, text: NOTICE_TEXTS[degraded(outcome.reason).reason] };
+    var reason = degraded(outcome.reason).reason;
+    return Sereno.i18n ? { title: Sereno.i18n.t("notice.title"), text: Sereno.i18n.t("notice." + reason) } :
+      { title: NOTICE_TITLE, text: NOTICE_TEXTS[reason] };
   }
 
   function domainOf(url) {

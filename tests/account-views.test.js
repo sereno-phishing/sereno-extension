@@ -30,6 +30,20 @@ test("register marks the username field only for a duplicate", () => {
   assert.match(accountUi.registerView({ error: true, errorCode: "invalid" }), /usuario y una contraseña válidos/);
 });
 
+test("language choices are labeled native radios with the current preference for both roles", () => {
+  for (const role of ["usuario", "administrador"]) {
+    for (const language of ["es", "en"]) {
+      const html = accountUi.accountMenu({ username: "ana", role }, { language });
+      assert.doesNotMatch(html, /<select|<option/);
+      assert.match(html, new RegExp('<legend>' + (language === "en" ? "Language" : "Idioma") + '</legend>'));
+      for (const [value, label] of [["es", "Español"], ["en", "English"]]) {
+        assert.match(html, new RegExp('<input[^>]*type="radio"[^>]*id="language-' + value + '"[^>]*name="language"[^>]*value="' + value + '"' + (language === value ? '[^>]*checked' : '(?![^>]*checked)') + '[^>]*>'));
+        assert.match(html, new RegExp('<label[^>]*for="language-' + value + '"[^>]*>' + label + '</label>'));
+      }
+    }
+  }
+});
+
 test("accountMenu keeps its default contract and can omit only the survey entry", () => {
   const user = { username: "ana", role: "usuario" };
   const admin = { username: "admin", role: "administrador" };

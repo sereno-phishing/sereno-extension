@@ -8,6 +8,8 @@
   var verdict = Sereno.verdict;
   var verdictUi = Sereno.verdictUi;
   var onboarding = Sereno.onboarding;
+  var local = Sereno.popupI18n || { t: function (text) { return text; }, pill: verdictUi.pill };
+  var t = local.t;
 
   var PERMISSION_CHECKS = [
     "No leemos el contenido de la página",
@@ -36,8 +38,8 @@
 
   function legendRow(statusId) {
     return (
-      '<div class="legend-row">' + verdictUi.pill(statusId, "md") +
-      '<span class="legend-row-text">' + ui.esc(VERDICT_MEANINGS[statusId]) + "</span></div>"
+      '<div class="legend-row">' + local.pill(statusId, "md") +
+      '<span class="legend-row-text">' + ui.esc(t(VERDICT_MEANINGS[statusId])) + "</span></div>"
     );
   }
 
@@ -45,17 +47,17 @@
     return (
       '<div class="illustration" aria-hidden="true"><span class="illust-logo-wrap">' +
       ui.logo("illust-logo", "") + ui.icon("ok", "illust-badge") + "</span></div>" +
-      title("Revisamos el sitio antes de que pagues") +
-      body("Si el enlace es seguro, sigues navegando. Si parece phishing, te avisamos antes de que ingreses tus datos.")
+      title(t("Revisamos el sitio antes de que pagues")) +
+      body(t("Si el enlace es seguro, sigues navegando. Si parece phishing, te avisamos antes de que ingreses tus datos."))
     );
   }
 
   function stepPermission() {
     return (
       '<div class="illustration" aria-hidden="true">' + ui.logo("illust-logo", "") + "</div>" +
-      title("Qué permiso necesitamos") +
-      body("Solo leemos la dirección de la pestaña actual para evaluarla.") +
-      '<div class="check-list">' + PERMISSION_CHECKS.map(checkItem).join("") + "</div>"
+      title(t("Qué permiso necesitamos")) +
+      body(t("Solo leemos la dirección de la pestaña actual para evaluarla.")) +
+      '<div class="check-list">' + PERMISSION_CHECKS.map(function (text) { return checkItem(t(text)); }).join("") + "</div>"
     );
   }
 
@@ -66,9 +68,9 @@
         return verdictUi.badge(id, "40");
       }).join("") +
       "</div></div>" +
-      title("Cómo leer una alerta") +
+      title(t("Cómo leer una alerta")) +
       '<div class="legend-rows">' + verdict.VERDICTS.map(legendRow).join("") + "</div>" +
-      body("La protección queda activa en modo Advertencia. No tienes que configurar nada.", "onboarding-note")
+      body(t("La protección queda activa en modo Advertencia. No tienes que configurar nada."), "onboarding-note")
     );
   }
 
@@ -84,9 +86,9 @@
     var last = step >= onboarding.STEP_COUNT;
     return (
       '<div class="onboarding-controls">' + progressDots(step) + '<div class="onboarding-buttons">' +
-      (step > 1 ? ui.button({ label: "Atrás", variant: "ghost", action: "onboarding-back" }) : "") +
+      (step > 1 ? ui.button({ label: t("Atrás"), variant: "ghost", action: "onboarding-back" }) : "") +
       ui.button({
-        label: last ? "Empezar" : "Siguiente",
+        label: t(last ? "Empezar" : "Siguiente"),
         variant: "primary",
         action: last ? "onboarding-start" : "onboarding-next"
       }) +
@@ -102,7 +104,7 @@
 
   /* Header counter, e.g. "2 de 3". */
   function stepCounter(step) {
-    return '<span class="step-counter"><span class="sr-only">Paso </span>' + step + " de " + onboarding.STEP_COUNT + "</span>";
+    return '<span class="step-counter"><span class="sr-only">' + t("Paso ") + '</span>' + step + t(" de ") + onboarding.STEP_COUNT + "</span>";
   }
 
   Sereno.onboardingUi = {

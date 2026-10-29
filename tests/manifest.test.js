@@ -77,11 +77,14 @@ test("the content script and the views it loads never name an extension URL or t
 test("the store listing identity is final: product name, a real description, a release version", () => {
   assert.equal(manifest.name, "Sereno");
   assert.equal(manifest.short_name, "Sereno");
-  [manifest.name, manifest.short_name, manifest.description].forEach((text) => {
-    assert.doesNotMatch(text, /prototipo|sprint|demo|sin backend/i, text);
-  });
-  assert.equal(typeof manifest.description, "string");
-  assert.ok(manifest.description.length >= 40 && manifest.description.length <= 132, "description length " + manifest.description.length);
+  assert.equal(manifest.default_locale, "es");
+  assert.equal(manifest.description, "__MSG_extensionDescription__");
+  for (const locale of ["es", "en"]) {
+    const messages = JSON.parse(fs.readFileSync(path.join(ROOT, "_locales", locale, "messages.json"), "utf8"));
+    const description = messages.extensionDescription.message;
+    assert.doesNotMatch(description, /prototipo|sprint|demo|sin backend/i);
+    assert.ok(description.length >= 40 && description.length <= 132, `${locale} description length ${description.length}`);
+  }
   assert.match(manifest.version, /^\d+\.\d+\.\d+$/);
   assert.notEqual(manifest.version, "0.1.0");
 });

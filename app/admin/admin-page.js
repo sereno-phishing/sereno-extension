@@ -11,6 +11,27 @@
   var accountService = Sereno.accountService;
   var store = Sereno.stateStore.open();
   var services = Sereno.services;
+  var language = Sereno.i18n && Sereno.storage ? Sereno.i18n.create(Sereno.storage.detect(), typeof navigator !== "undefined" ? navigator.language : "es") : null;
+  var pageMessages = {
+    "admin.page.title": { es: "Sereno — Administración", en: "Sereno — Administration" },
+    "admin.page.loading": { es: "Cargando el panel...", en: "Loading the panel..." }
+  };
+  if (Sereno.i18n) Sereno.i18n.register(pageMessages);
+
+  function applyLanguage(value) {
+    if (Sereno.i18n && Sereno.i18n.use) Sereno.i18n.use(value);
+    if (document.documentElement) document.documentElement.lang = value;
+    document.title = Sereno.i18n ? Sereno.i18n.t("admin.page.title") : pageMessages["admin.page.title"].es;
+    if (!App.state && root) root.innerHTML = '<div class="card panel-status" role="status">' + Sereno.ui.esc(Sereno.i18n ? Sereno.i18n.t("admin.page.loading") : pageMessages["admin.page.loading"].es) + '</div>';
+    if (App.state && root) {
+      var inputs = root.querySelectorAll ? Array.prototype.map.call(root.querySelectorAll("input[name]"), function (input) { return { name: input.name, value: input.value }; }) : [];
+      render();
+      inputs.forEach(function (saved) {
+        var input = root.querySelector('[name="' + saved.name + '"]');
+        if (input) input.value = saved.value;
+      });
+    }
+  }
 
   var NOTICE_MS = 2600;
 
@@ -37,8 +58,11 @@
     },
     domainsBanner: false,
     domainsError: "",
+    domainsErrorCode: null,
     cacheNotice: "",
-    cacheError: ""
+    cacheError: "",
+    cacheErrorCode: null,
+    loadErrors: {}
   };
 
   var root = null;
@@ -61,8 +85,11 @@
     App.domainsDraft = [];
     App.domainsBanner = false;
     App.domainsError = "";
+    App.domainsErrorCode = null;
     App.cacheNotice = "";
     App.cacheError = "";
+    App.cacheErrorCode = null;
+    App.loadErrors = {};
     App.load = {
       metricas: { status: "loading" },
       dominios: { status: "loading" },
@@ -134,6 +161,7 @@
       return;
     }
     App.load[id] = { status: "loading" };
+    delete App.loadErrors[id];
     render();
     var result;
     if (id === "dominios") {
@@ -155,6 +183,7 @@
       App.metrics = result.metrics;
     }
     App.load[id] = result.ok ? { status: "ready" } : { status: "error", message: result.message };
+    App.loadErrors[id] = result.ok ? null : result.error;
     render();
   }
 
@@ -226,6 +255,7 @@
     var outcome = domainPolicy.addRow(App.domainsDraft || [], domain, App.addPolicy, today());
     App.addPolicy = domainPolicy.DEFAULT_POLICY;
     App.domainsError = "";
+    App.domainsErrorCode = null;
     if (!outcome.added) {
       render();
       return;
@@ -240,6 +270,7 @@
       App.domainsStored = result.domains;
     } else {
       App.domainsError = result.message;
+      App.domainsErrorCode = result.error;
     }
     render();
   }
@@ -252,6 +283,7 @@
     var next = domainPolicy.stampChanges(App.domainsDraft || [], App.domainsStored, today());
     App.domainsDraft = next;
     App.domainsError = "";
+    App.domainsErrorCode = null;
     var result = await admin.saveDomains(services, next);
     if (!snapshotIsCurrent(access)) {
       return;
@@ -261,6 +293,7 @@
       showDomainsBanner(true);
     } else {
       App.domainsError = result.message;
+      App.domainsErrorCode = result.error;
     }
     render();
   }
@@ -271,6 +304,7 @@
       return;
     }
     App.cacheError = "";
+    App.cacheErrorCode = null;
     var result = await admin.saveTtl(services, readValue("ttlPhishingDays"), readValue("ttlLegitHours"));
     if (!snapshotIsCurrent(access)) {
       return;
@@ -280,6 +314,7 @@
       showCacheNotice("TTL guardado.");
     } else {
       App.cacheError = result.message;
+      App.cacheErrorCode = result.error;
     }
     render();
   }
@@ -294,15 +329,17 @@
       return;
     }
     App.cacheError = "";
+    App.cacheErrorCode = null;
     var result = await admin.invalidateDomain(services, domain);
     if (!snapshotIsCurrent(access)) {
       return;
     }
     if (result.ok) {
       App.cache = result.cache;
-      showCacheNotice(domain + " se invalidó. La siguiente consulta irá al modelo.");
+      showCacheNotice({ domain: domain });
     } else {
       App.cacheError = result.message;
+      App.cacheErrorCode = result.error;
     }
     render();
   }
@@ -369,6 +406,16 @@
       return;
     }
     App.initialized = true;
+    if (language) {
+      language.subscribe(applyLanguage);
+      applyLanguage(language.get());
+      try {
+        await language.ready();
+        applyLanguage(language.get());
+      } catch (error) {
+        applyLanguage(language.get());
+      }
+    }
     window.addEventListener("hashchange", function () {
       if (window.location.hash === "#main") {
         return;

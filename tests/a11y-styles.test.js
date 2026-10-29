@@ -126,6 +126,13 @@ test("the helper classes the views use are defined once in the shared tokens", (
   assert.match(read("app/admin/admin.html"), /tokens\.css/);
 });
 
+test("language choices have integrated selected, hover and visible focus styles", () => {
+  const css = read("app/popup/popup.css");
+  assert.match(css, /\.menu-language-option:hover\s*\{[^}]*background:\s*var\(--soft\)/);
+  assert.match(css, /\.menu-language-option input:checked \+ label\s*\{[^}]*background:\s*var\(--indigo-50\)/);
+  assert.match(css, /\.menu-language-option input:focus-visible \+ label\s*\{[^}]*outline:/);
+});
+
 /* ---------------- contrast ---------------- */
 
 test("the contrast helper matches published WCAG reference ratios", () => {

@@ -39,6 +39,16 @@ cookie jar and does not enforce browser cookie policy. Manual checks remain in
 6. Si cambias código, pulsa **Recargar** en la tarjeta de la extensión. El
    service worker no se actualiza solo.
 
+## Idioma
+
+Con sesión iniciada, abre el menú de cuenta desde el badge de usuario o administrador
+para elegir español o inglés. La preferencia se
+comparte entre las vistas y se conserva en el almacenamiento local de la extensión;
+si aún no existe, se usa el idioma del navegador (español para idiomas no admitidos).
+La encuesta SUS permanece en español hasta validar su versión en inglés. Los datos
+devueltos por el backend no se traducen. La descripción que Chrome muestra en la
+lista de extensiones usa el idioma del navegador, independientemente del selector.
+
 ## Cómo probar la demo
 
 1. Abre el popup de Sereno. La primera vez verás el onboarding de 3 pasos
@@ -72,8 +82,11 @@ semilla.
 
 ### En pestañas reales (proveedor mock)
 
-El service worker evalúa cada navegación http/https con el mismo proveedor. El
-mock solo conoce los dominios de los escenarios y los hosts de prueba
+El service worker evalúa cada navegación http/https con el mismo proveedor. Al
+activar una pestaña ya abierta sin resultado guardado, también evalúa su URL sin
+necesidad de refrescarla. Si la página se abrió antes de cargar la extensión,
+el aviso dentro de la página puede requerir una recarga para instalar el content
+script; el badge y el popup no la requieren. El mock solo conoce los dominios de los escenarios y los hosts de prueba
 `*.localhost`; cualquier otro dominio da «seguro».
 
 | Dominio | Veredicto del mock |

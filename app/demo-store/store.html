@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tienda de demo — Sereno</title>
+  <title data-i18n="demo.title">Tienda de demo — Sereno</title>
   <link rel="stylesheet" href="../../ui/tokens.css">
   <link rel="stylesheet" href="../../ui/verdict-modal.css">
   <link rel="stylesheet" href="store.css">
@@ -43,15 +43,15 @@
   </div>
 
   <!-- Safe-site tooltip (HU-04). Shown transiently by the simulator. -->
-  <div class="demo-tooltip" id="safe-tooltip" role="status">Sereno: sitio seguro</div>
+  <div class="demo-tooltip" id="safe-tooltip" role="status" data-i18n="demo.tooltip">Sereno: sitio seguro</div>
 
   <!-- Pending-evaluation toast (HU-25). Shown transiently. -->
   <aside class="demo-toast" id="pending-toast" role="status" aria-live="polite">
     <img class="demo-toast-icon" src="../../assets/icons/toast-pending-32.svg" width="32" height="32" alt="">
     <div class="demo-toast-body">
-      <p class="demo-toast-title">Evaluación pendiente</p>
-      <p class="demo-toast-text">Aún no pudimos revisar este sitio. Evita ingresar datos de pago hasta que termine.</p>
-      <p class="demo-toast-retry">Reintentando automáticamente...</p>
+      <p class="demo-toast-title" data-i18n="demo.pendingTitle">Evaluación pendiente</p>
+      <p class="demo-toast-text" data-i18n="demo.pendingBody">Aún no pudimos revisar este sitio. Evita ingresar datos de pago hasta que termine.</p>
+      <p class="demo-toast-retry" data-i18n="demo.retry">Reintentando automáticamente...</p>
     </div>
   </aside>
 
@@ -63,29 +63,30 @@
   <!-- Demo control panel: runs the four scenarios against the shared store.
        The simulated page above is decorative, so the panel is the main content. -->
   <main id="main">
-  <h1 class="sr-only">Tienda de demo de Sereno</h1>
-  <aside class="demo-panel" id="demo-panel" aria-label="Simulador de demo">
-    <p class="demo-panel-title">Simulador de demo</p>
-    <p class="demo-panel-sub">Así se ve Sereno en una tienda real.</p>
+  <h1 class="sr-only" data-i18n="demo.heading">Tienda de demo de Sereno</h1>
+  <aside class="demo-panel" id="demo-panel" aria-label="Simulador de demo" data-i18n-aria="demo.panel">
+    <p class="demo-panel-title" data-i18n="demo.panel">Simulador de demo</p>
+    <p class="demo-panel-sub" data-i18n="demo.subtitle">Así se ve Sereno en una tienda real.</p>
     <div class="demo-panel-actions">
       <button type="button" class="demo-scenario" data-scenario="seguro">
-        <span class="demo-dot demo-dot-seguro" aria-hidden="true"></span>Sitio seguro
+        <span class="demo-dot demo-dot-seguro" aria-hidden="true"></span><span data-i18n="demo.safe">Sitio seguro</span>
       </button>
       <button type="button" class="demo-scenario" data-scenario="advertencia">
-        <span class="demo-dot demo-dot-advertencia" aria-hidden="true"></span>Advertencia
+        <span class="demo-dot demo-dot-advertencia" aria-hidden="true"></span><span data-i18n="demo.warning">Advertencia</span>
       </button>
       <button type="button" class="demo-scenario" data-scenario="bloqueo">
-        <span class="demo-dot demo-dot-bloqueo" aria-hidden="true"></span>Bloqueo
+        <span class="demo-dot demo-dot-bloqueo" aria-hidden="true"></span><span data-i18n="demo.block">Bloqueo</span>
       </button>
       <button type="button" class="demo-scenario" data-scenario="pendiente">
-        <span class="demo-dot demo-dot-pendiente" aria-hidden="true"></span>Pendiente
+        <span class="demo-dot demo-dot-pendiente" aria-hidden="true"></span><span data-i18n="demo.pending">Pendiente</span>
       </button>
     </div>
-    <p class="demo-panel-hint">Cuentas demo: andres.torres · admin.sereno / sereno123</p>
+    <p class="demo-panel-hint" data-i18n="demo.accounts">Cuentas demo: andres.torres · admin.sereno / sereno123</p>
   </aside>
   </main>
 
   <script src="../../platform/storage.js"></script>
+  <script src="../../platform/i18n.js"></script>
   <script src="../../platform/seed.js"></script>
   <script src="../../platform/state-store.js"></script>
   <script src="../../platform/browser.js"></script>
@@ -106,6 +107,7 @@
   <script src="../../protection/application/protection-service.js"></script>
   <script src="../../demo-store/domain/scenarios.js"></script>
   <script src="../../demo-store/ui/verdict-modal.js"></script>
+  <script src="store-language.js"></script>
   <script src="store-page.js"></script>
 </body>
 </html>

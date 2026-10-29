@@ -27,6 +27,17 @@
     retry: "Reintentando automáticamente..."
   };
 
+  if (Sereno.i18n) Sereno.i18n.register({
+    "overlay.pending.title": { es: PENDING_COPY.title, en: "Pending evaluation" },
+    "overlay.pending.text": { es: PENDING_COPY.text, en: "We haven't checked this site yet. Avoid entering payment details until the check finishes." },
+    "overlay.pending.retry": { es: PENDING_COPY.retry, en: "Retrying automatically..." },
+    "overlay.dismiss": { es: "Entendido", en: "Got it" },
+    "overlay.detail.show": { es: "Ver detalle", en: "Show details" },
+    "overlay.detail.hide": { es: "Ocultar detalle", en: "Hide details" }
+  });
+
+  function text(key, fallback) { return Sereno.i18n ? Sereno.i18n.t(key) : fallback; }
+
   var NONE = { type: "none", id: null, key: null, html: "", closable: false, canContinue: false, status: null };
 
   function idOf(outcome) {
@@ -51,9 +62,9 @@
       '<aside class="sereno-toast" role="status" aria-live="polite">\n' +
       ui.sizedIcon("toast-pending-32", "sereno-toast-icon", 32) + "\n" +
       '<div class="sereno-toast-body">\n' +
-      '<p class="sereno-toast-title">' + ui.esc(PENDING_COPY.title) + "</p>\n" +
-      '<p class="sereno-toast-text">' + ui.esc(PENDING_COPY.text) + "</p>\n" +
-      '<p class="sereno-toast-retry">' + ui.esc(PENDING_COPY.retry) + "</p>\n" +
+      '<p class="sereno-toast-title" data-overlay-i18n="overlay.pending.title">' + ui.esc(text("overlay.pending.title", PENDING_COPY.title)) + "</p>\n" +
+      '<p class="sereno-toast-text" data-overlay-i18n="overlay.pending.text">' + ui.esc(text("overlay.pending.text", PENDING_COPY.text)) + "</p>\n" +
+      '<p class="sereno-toast-retry" data-overlay-i18n="overlay.pending.retry">' + ui.esc(text("overlay.pending.retry", PENDING_COPY.retry)) + "</p>\n" +
       "</div>\n</aside>"
     );
   }
@@ -63,10 +74,10 @@
       '<aside class="sereno-notice" role="status" aria-live="polite">\n' +
       ui.sizedIcon("alert-warn-14", "sereno-notice-icon", 16) + "\n" +
       '<div class="sereno-notice-body">\n' +
-      '<p class="sereno-notice-title">' + ui.esc(notice.title) + "</p>\n" +
-      '<p class="sereno-notice-text">' + ui.esc(notice.text) + "</p>\n" +
+      '<p class="sereno-notice-title" data-overlay-notice="title">' + ui.esc(notice.title) + "</p>\n" +
+      '<p class="sereno-notice-text" data-overlay-notice="text">' + ui.esc(notice.text) + "</p>\n" +
       "</div>\n" +
-      '<button type="button" class="sereno-notice-close" data-action="dismiss">Entendido</button>\n' +
+      '<button type="button" class="sereno-notice-close" data-action="dismiss" data-overlay-i18n="overlay.dismiss">' + ui.esc(text("overlay.dismiss", "Entendido")) + '</button>\n' +
       "</aside>"
     );
   }

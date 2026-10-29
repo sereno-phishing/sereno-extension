@@ -34,13 +34,41 @@
     }
   };
 
+  var MESSAGES = {
+    titleWarning: { es: "Este sitio puede ser phishing", en: "This site may be phishing" },
+    textWarning: { es: "El dominio imita a un sitio de pagos conocido. Si ingresas tus datos aquí, podrían robarlos.", en: "The domain imitates a known payment site. If you enter your data here, it could be stolen." },
+    titleBlock: { es: "Sitio bloqueado", en: "Site blocked" },
+    textBlock: { es: "Este dominio está clasificado como phishing y la política no permite continuar. Tus datos no se enviaron.", en: "This domain is classified as phishing and the policy does not allow you to continue. Your data was not sent." },
+    back: { es: "Volver", en: "Go back" }, continue: { es: "Continuar bajo riesgo", en: "Continue at your own risk" },
+    safe: { es: "Volver a un sitio seguro", en: "Return to a safe site" },
+    risk: { es: "Nivel de riesgo", en: "Risk level" }, score: { es: "Score del modelo", en: "Model score" },
+    date: { es: "Fecha de clasificación", en: "Classification date" }, source: { es: "Fuente del veredicto", en: "Verdict source" },
+    brand: { es: "Protegido por Sereno", en: "Protected by Sereno" }, show: { es: "Ver detalle", en: "Show details" },
+    hide: { es: "Ocultar detalle", en: "Hide details" }, open: { es: "Abrir detalle en Sereno", en: "Open details in Sereno" },
+    riskPrefix: { es: "Riesgo ", en: "Risk " },
+    riskHigh: { es: "Alto", en: "High" }, riskHighLower: { es: "alto", en: "high" },
+    riskMedium: { es: "Medio", en: "Medium" }, riskMediumLower: { es: "medio", en: "medium" },
+    riskLow: { es: "Bajo", en: "Low" }, riskLowLower: { es: "bajo", en: "low" },
+    riskUnknown: { es: "—", en: "—" }, sourceCache: { es: "Caché", en: "Cache" },
+    sourceModel: { es: "Modelo", en: "Model" }
+  };
+  var entries = {};
+  Object.keys(MESSAGES).forEach(function (key) { entries["modal." + key] = MESSAGES[key]; });
+  if (Sereno.i18n) Sereno.i18n.register(entries);
+  function text(key) { return Sereno.i18n ? Sereno.i18n.t("modal." + key) : MESSAGES[key].es; }
+  function marked(key) { return '<span data-modal-i18n="' + key + '">' + ui.esc(text(key)) + '</span>'; }
+  function translate(root) {
+    root.querySelectorAll("[data-modal-i18n]").forEach(function (node) { node.textContent = text(node.getAttribute("data-modal-i18n")); });
+    root.querySelectorAll('[data-action="toggle-detail"]').forEach(function (node) { node.textContent = text(node.getAttribute("aria-expanded") === "true" ? "hide" : "show"); });
+  }
+
   function sizedIcon(name, cls, size) {
     return ui.sizedIcon(name, cls, size);
   }
 
   function detailRow(label, valueHtml) {
     return (
-      '\n<div class="verdict-detail-row">\n<span class="verdict-detail-label">' + ui.esc(label) + "</span>\n" +
+      '\n<div class="verdict-detail-row">\n<span class="verdict-detail-label">' + marked(label) + "</span>\n" +
       valueHtml + "\n</div>"
     );
   }
@@ -71,23 +99,27 @@
     var copy = COPY[scenario.status];
     var tone = verdict.status(scenario.status).tone;
     var key = copy.key;
-    var facts = verdictUi.FACT_LABELS;
+    var facts = { risk: "risk", score: "score", date: "date", source: "source" };
+    var warning = scenario.status === "advertencia";
     var risk = verdict.riskLevel(scenario);
+    var riskKey = { Alto: "riskHigh", Medio: "riskMedium", Bajo: "riskLow" }[risk] || "riskUnknown";
+    var lowerRiskKey = riskKey === "riskUnknown" ? riskKey : riskKey + "Lower";
+    var sourceKey = scenario.source === "cache" ? "sourceCache" : "sourceModel";
     var percent = verdict.scorePercent(scenario.score);
     return (
       '<section class="verdict-modal"' +
       (settings.dialogRole ? ' role="dialog" aria-modal="true" aria-labelledby="' + key + '-title"' : "") + ">\n" +
       '<header class="verdict-band verdict-band-' + tone + '">\n' +
       sizedIcon("alert-" + tone + "-44", "verdict-icon", 44) + "\n" +
-      '<h2 class="verdict-title verdict-title-' + tone + '" id="' + key + '-title">' + ui.esc(copy.title) + "</h2>\n" +
+      '<h2 class="verdict-title verdict-title-' + tone + '" id="' + key + '-title">' + marked(warning ? "titleWarning" : "titleBlock") + "</h2>\n" +
       "</header>\n" +
       '<div class="verdict-body">\n' +
       '<div class="verdict-domain-row">\n<span class="verdict-domain">' + ui.esc(scenario.domain) + "</span>\n" +
       '<span class="verdict-pill verdict-pill-' + tone + '">' + sizedIcon("alert-" + tone + "-14", "", 14) +
-      "Riesgo " + ui.esc(risk.toLowerCase()) + "</span>\n</div>\n" +
-      '<p class="verdict-text" id="' + key + '-text">' + ui.esc(copy.text) + "</p>\n" +
+      marked("riskPrefix") + marked(lowerRiskKey) + "</span>\n</div>\n" +
+      '<p class="verdict-text" id="' + key + '-text">' + marked(warning ? "textWarning" : "textBlock") + "</p>\n" +
       '<div class="verdict-details" id="' + key + '-details" hidden>' +
-      detailRow(facts.risk, detailValue(risk)) +
+      detailRow(facts.risk, '<span class="verdict-detail-value">' + marked(riskKey) + '</span>') +
       detailRow(
         facts.score,
         '<span class="verdict-score">\n<span class="verdict-score-track"><span class="verdict-score-fill verdict-score-fill-' + tone +
@@ -95,20 +127,20 @@
           detailValue(Number(scenario.score).toFixed(2)) + "\n</span>"
       ) +
       detailRow(facts.date, detailValue("—", key + "-stamp")) +
-      detailRow(facts.source, '<span class="verdict-source">' + ui.esc(verdict.sourceLabel(scenario.source)) + "</span>") +
+      detailRow(facts.source, '<span class="verdict-source">' + marked(sourceKey) + "</span>") +
       (settings.openDetail
-        ? '\n<button type="button" class="verdict-toggle verdict-open-detail" data-action="open-detail">Abrir detalle en Sereno</button>'
+        ? '\n<button type="button" class="verdict-toggle verdict-open-detail" data-action="open-detail">' + marked("open") + '</button>'
         : "") +
       "\n</div>\n" +
       '<div class="verdict-actions">\n' +
       copy.actions.map(function (item) {
-        return '<button type="button" class="verdict-btn ' + item.cls + '" data-action="' + item.action + '">' + ui.esc(item.label) + "</button>";
+        return '<button type="button" class="verdict-btn ' + item.cls + '" data-action="' + item.action + '">' + marked(item.action === "continuar" ? "continue" : warning ? "back" : "safe") + "</button>";
       }).join("\n") +
       "\n</div>\n</div>\n" +
       '<footer class="verdict-foot">\n' +
-      '<span class="verdict-brand">' + ui.logo("verdict-logo", "") + "Protegido por Sereno</span>\n" +
+      '<span class="verdict-brand">' + ui.logo("verdict-logo", "") + marked("brand") + "</span>\n" +
       '<button type="button" class="verdict-toggle" data-action="toggle-detail" data-detail="' + key + '" aria-expanded="false" ' +
-      'aria-controls="' + key + '-details">Ver detalle</button>\n' +
+      'aria-controls="' + key + '-details">' + text("show") + '</button>\n' +
       "</footer>\n</section>"
     );
   }
@@ -131,6 +163,8 @@
   }
 
   Sereno.verdictModal = {
+    translate: translate,
+    text: text,
     keyOf: keyOf,
     isClosable: isClosable,
     canContinue: canContinue,
