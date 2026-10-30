@@ -64,7 +64,7 @@ test("remote registration keeps verdict and data local and never stores submitte
   const calls = [];
   const services = compose(store, async (url, init) => {
     calls.push({ url, init });
-    return { ok: true, status: 201, json: async () => ({ user: { username: "fresh", role: "usuario", createdAt: "today" }, token: "remote-token" }) };
+    return { ok: true, status: 201, json: async () => ({ user: { username: "fresh", isAdmin: false, createdAt: "today" }, token: "remote-token" }) };
   });
   const result = await Sereno.accountService.register(services, store, "fresh", "private-input", new Date());
   assert.equal(result.ok, true);
@@ -97,8 +97,8 @@ for (const error of ["offline", "server", "invalid"]) {
 
 test("successful restoration replaces a stale local identity with the server session", async () => {
   const store = openStore();
-  await store.set({ session: { username: "stale-admin", role: "administrador", token: "old" } });
-  const session = { username: "actual", role: "usuario", token: "new", loginAt: "2026-10-27T12:00" };
+  await store.set({ session: { username: "stale-admin", isAdmin: true, token: "old" } });
+  const session = { username: "actual", isAdmin: false, token: "new", loginAt: "2026-10-27T12:00" };
   const services = compose(store, async () => ({ ok: true, status: 200, json: async () => ({ session }) }));
   const result = await Sereno.accountService.currentSession(services, store);
   assert.deepEqual(result, { ok: true, session, verified: true });
@@ -107,7 +107,7 @@ test("successful restoration replaces a stale local identity with the server ses
 
 test("remote restoration drops legacy mock sessions even when offline", async () => {
   const store = openStore();
-  await store.set({ session: { username: "admin.sereno", role: "administrador", token: "mock-legacy" } });
+  await store.set({ session: { username: "admin.sereno", isAdmin: true, token: "mock-legacy" } });
   const services = compose(store, async () => { throw new TypeError("offline"); });
   assert.deepEqual(await Sereno.accountService.currentSession(services, store), { ok: true, session: null, verified: false });
   assert.equal((await store.get()).session, null);

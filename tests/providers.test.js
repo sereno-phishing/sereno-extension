@@ -136,7 +136,7 @@ Object.keys(ADAPTERS).forEach((name) => {
     assert.deepEqual(await auth.login("andres.torres", "bad"), { ok: false, error: "invalid" });
     const login = await auth.login("admin.sereno", "sereno123");
     assert.equal(login.ok, true);
-    assert.equal(login.user.role, "administrador");
+    assert.equal(login.user.isAdmin, true);
     assert.equal(typeof login.token, "string");
     assert.ok(login.token.length > 0);
     assert.equal("password" in login.user, false);
@@ -148,7 +148,7 @@ Object.keys(ADAPTERS).forEach((name) => {
     const created = await auth.register("nuevo.usuario", "x");
     assert.equal(created.ok, true);
     assert.equal(created.user.username, "nuevo.usuario");
-    assert.equal(created.user.role, "usuario");
+    assert.equal(created.user.isAdmin, false);
     assert.equal(typeof created.token, "string");
     assert.equal("password" in created.user, false);
     assert.equal((await auth.session()).session.username, "nuevo.usuario");

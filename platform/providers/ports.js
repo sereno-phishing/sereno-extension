@@ -18,10 +18,10 @@
                                  user's history; clients never write history.
 
    auth port
-     login(username, password)    -> { ok, user: { username, role, createdAt }, token }
-     register(username, password) -> { ok, user: { username, role, createdAt }, token }   (signs the new user in)
+     login(username, password)    -> { ok, user: { username, isAdmin, createdAt }, token }
+     register(username, password) -> { ok, user: { username, isAdmin, createdAt }, token }   (signs the new user in)
      logout()                     -> { ok }
-     session()                    -> { ok, session: { username, role, loginAt, token? } | null }
+     session()                    -> { ok, session: { username, isAdmin, loginAt, token? } | null }
      The token is opaque; the backend verifies credentials, clients never do.
 
    data port (history is scoped to the signed-in user)

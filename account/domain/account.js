@@ -1,4 +1,4 @@
-/* Account: roles, session shape, credential FORMAT rules and error messages.
+/* Account: admin flag, session shape, credential FORMAT rules and error messages.
    Classic script that registers Sereno.account. Pure and password-free: the
    domain never compares or stores a password, the auth provider (the backend)
    verifies credentials. Callers pass the current stamp; nothing here reads
@@ -6,8 +6,6 @@
 
 (function (Sereno) {
   "use strict";
-
-  var ROLES = { USER: "usuario", ADMIN: "administrador" };
 
   /* Every failure an account use case can report. */
   var ERRORS = ["invalid", "duplicate", "timeout", "offline", "server"];
@@ -33,22 +31,22 @@
 
   /* Whitelist copy: whatever else a record carries never leaves through here. */
   function publicUser(user) {
-    return { username: user.username, role: user.role, createdAt: user.createdAt };
+    return { username: user.username, isAdmin: user.isAdmin === true, createdAt: user.createdAt };
   }
 
   /* The stored session: sanitized user plus the opaque token the provider issued. */
   function openSession(user, token, stamp) {
     return {
       username: user.username,
-      role: user.role,
+      isAdmin: user.isAdmin === true,
       loginAt: stamp,
       token: typeof token === "string" && token ? token : null
     };
   }
 
-  /* A new account always gets the plain user role. */
+  /* A new account is never an administrator. */
   function newUser(username, stamp) {
-    return { username: username, role: ROLES.USER, createdAt: stamp };
+    return { username: username, isAdmin: false, createdAt: stamp };
   }
 
   /* Format only (non-empty strings); the provider decides if they are right.
@@ -70,11 +68,7 @@
   }
 
   function isAdmin(session) {
-    return !!(session && session.role === ROLES.ADMIN);
-  }
-
-  function roleTitle(role) {
-    return role === ROLES.ADMIN ? "Administrador" : role;
+    return !!(session && session.isAdmin === true);
   }
 
   /* Two-letter avatar text: first letters of the first two name parts. */
@@ -93,7 +87,6 @@
   }
 
   Sereno.account = {
-    ROLES: ROLES,
     ERRORS: ERRORS,
     findUser: findUser,
     publicUser: publicUser,
@@ -102,7 +95,6 @@
     validateCredentials: validateCredentials,
     errorMessage: errorMessage,
     isAdmin: isAdmin,
-    roleTitle: roleTitle,
     initials: initials
   };
 })(globalThis.Sereno = globalThis.Sereno || {});

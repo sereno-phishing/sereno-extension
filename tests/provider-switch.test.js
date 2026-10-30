@@ -239,7 +239,7 @@ function failureOf(answer) {
 }
 
 function sessionShape(session) {
-  return session ? { username: session.username, role: session.role, hasToken: typeof session.token === "string" && session.token.length > 0 } : null;
+  return session ? { username: session.username, isAdmin: session.isAdmin, hasToken: typeof session.token === "string" && session.token.length > 0 } : null;
 }
 
 function entryShape(entry) {
@@ -269,7 +269,7 @@ const SCENARIOS = {
     const out = {};
     out.badLogin = failureOf(await accountService.login(env.services, store, "andres.torres", "mala", env.now));
     const good = await accountService.login(env.services, store, "admin.sereno", "sereno123", env.now);
-    out.goodLogin = { ok: good.ok, username: good.user.username, role: good.user.role, hasToken: typeof good.token === "string" && good.token.length > 0, leaksPassword: "password" in good.user };
+    out.goodLogin = { ok: good.ok, username: good.user.username, isAdmin: good.user.isAdmin, hasToken: typeof good.token === "string" && good.token.length > 0, leaksPassword: "password" in good.user };
     const current = await accountService.currentSession(env.services, store);
     out.session = { ok: current.ok, verified: current.verified, session: sessionShape(current.session) };
     out.logout = await accountService.logout(env.services, store);
@@ -277,7 +277,7 @@ const SCENARIOS = {
     out.afterLogout = { verified: after.verified, session: after.session };
     out.duplicate = failureOf(await accountService.register(env.services, store, "andres.torres", "x", env.now));
     const created = await accountService.register(env.services, store, "cuenta.nueva", "x", env.now);
-    out.register = { ok: created.ok, username: created.user.username, role: created.user.role, hasToken: created.token.length > 0 };
+    out.register = { ok: created.ok, username: created.user.username, isAdmin: created.user.isAdmin, hasToken: created.token.length > 0 };
     return out;
   },
 
@@ -393,14 +393,14 @@ Object.assign(SCENARIOS, NAVIGATION);
 const EXPECTED = {
   "login, session, logout and register": (r) => {
     assert.equal(r.badLogin.error, "invalid");
-    assert.equal(r.goodLogin.role, "administrador");
+    assert.equal(r.goodLogin.isAdmin, true);
     assert.equal(r.goodLogin.hasToken, true);
     assert.equal(r.goodLogin.leaksPassword, false);
-    assert.deepEqual(r.session.session, { username: "admin.sereno", role: "administrador", hasToken: true });
+    assert.deepEqual(r.session.session, { username: "admin.sereno", isAdmin: true, hasToken: true });
     assert.equal(r.session.verified, true);
     assert.equal(r.afterLogout.session, null);
     assert.equal(r.duplicate.error, "duplicate");
-    assert.equal(r.register.role, "usuario");
+    assert.equal(r.register.isAdmin, false);
   },
   "evaluate a safe site": (r) => assert.equal(r.verdict.status, "seguro"),
   "evaluate a warning site": (r) => assert.equal(r.verdict.status, "advertencia"),

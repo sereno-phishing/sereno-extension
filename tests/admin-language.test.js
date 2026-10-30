@@ -26,9 +26,17 @@ test("English admin sections translate labels while preserving domain and policy
   assert.match(html, /shop.example/);
   assert.match(Sereno.administrationUi.statusSection({ id: "cache", title: "Cache", state: "loading" }), /Loading/);
   assert.match(Sereno.administrationUi.statusSection({ id: "cache", title: "Cache", state: "error", message: "failure" }), /Retry/);
-  const pending = Sereno.adminViews.page({ authorization: "authorized", section: "cache", load: { cache: { status: "error", message: "Sin conexión. Revisa tu red e inténtalo de nuevo." } }, loadErrors: { cache: "offline" } }, { session: { role: "administrador", username: "admin" } });
+  const pending = Sereno.adminViews.page({ authorization: "authorized", section: "cache", load: { cache: { status: "error", message: "Sin conexión. Revisa tu red e inténtalo de nuevo." } }, loadErrors: { cache: "offline" } }, { session: { isAdmin: true, username: "admin" } });
   assert.match(pending, /Offline\. Check your network/);
   assert.match(pending, /aria-label="Sections"/);
+});
+
+test("admin sidebar translates the role label from the isAdmin flag", () => {
+  const model = { authorization: "authorized", section: "cache", load: {} };
+  Sereno.i18n.use("en");
+  assert.match(Sereno.adminViews.page(model, { session: { username: "admin", isAdmin: true } }), /<div class="sidebar-role">Administrator<\/div>/);
+  Sereno.i18n.use("es");
+  assert.match(Sereno.adminViews.page(model, { session: { username: "admin", isAdmin: true } }), /<div class="sidebar-role">Administrador<\/div>/);
 });
 
 test("admin observes stored language and rerenders with document language", async () => {

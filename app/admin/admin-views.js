@@ -17,6 +17,7 @@
     "admin.domains": { es: "Política por dominio", en: "Domain policy" },
     "admin.cache": { es: "Caché", en: "Cache" },
     "admin.role": { es: "Administrador", en: "Administrator" },
+    "admin.role.user": { es: "Usuario", en: "User" },
     "admin.checking": { es: "Verificando la sesión...", en: "Checking the session..." },
     "admin.skip": { es: "Saltar al contenido", en: "Skip to content" },
     "admin.title.metrics": { es: "Métricas de operación", en: "Operation metrics" },
@@ -56,7 +57,7 @@
       '<div class="sidebar-foot">' +
       '<div class="sidebar-user"><span class="sidebar-avatar" aria-hidden="true"></span>' +
       '<div><div class="sidebar-username">' + ui.esc(session.username) + "</div>" +
-      '<div class="sidebar-role">' + ui.esc(session.role === "administrador" ? gateText("admin.role") : account.roleTitle(session.role)) + "</div></div></div>" +
+      '<div class="sidebar-role">' + ui.esc(session.isAdmin === true ? gateText("admin.role") : gateText("admin.role.user")) + "</div></div></div>" +
       "</div></aside>"
     );
   }

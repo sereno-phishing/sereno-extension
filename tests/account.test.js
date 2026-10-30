@@ -6,15 +6,15 @@ const { load } = require("./load");
 
 const { account } = load("account/domain/account.js");
 
-const ADMIN = { username: "admin.sereno", role: "administrador", createdAt: "2026-09-01T10:00:00" };
-const USER = { username: "andres.torres", role: "usuario", createdAt: "2026-09-01T10:00:00" };
+const ADMIN = { username: "admin.sereno", isAdmin: true, createdAt: "2026-09-01T10:00:00" };
+const USER = { username: "andres.torres", isAdmin: false, createdAt: "2026-09-01T10:00:00" };
 
 test("the domain handles no passwords: no credential comparison, no stored secret", () => {
   assert.equal(account.authenticate, undefined);
   assert.equal(account.createUser, undefined);
   assert.deepEqual(account.newUser("nuevo", "2026-09-21T10:00"), {
     username: "nuevo",
-    role: "usuario",
+    isAdmin: false,
     createdAt: "2026-09-21T10:00"
   });
 });
@@ -31,7 +31,7 @@ test("validateCredentials checks only the format of username and password", () =
 test("session carries the sanitized user and the opaque token", () => {
   assert.deepEqual(account.openSession(ADMIN, "tok-1", "2026-09-21T10:00"), {
     username: "admin.sereno",
-    role: "administrador",
+    isAdmin: true,
     loginAt: "2026-09-21T10:00",
     token: "tok-1"
   });
@@ -42,11 +42,13 @@ test("session carries the sanitized user and the opaque token", () => {
 });
 
 test("roles and lookup", () => {
-  assert.equal(account.isAdmin({ role: "administrador" }), true);
-  assert.equal(account.isAdmin({ role: "usuario" }), false);
+  assert.equal(account.isAdmin({ isAdmin: true }), true);
+  assert.equal(account.isAdmin({ isAdmin: false }), false);
   assert.equal(account.isAdmin(null), false);
-  assert.equal(account.roleTitle("administrador"), "Administrador");
-  assert.equal(account.roleTitle("usuario"), "usuario");
+  assert.equal(account.isAdmin({ isAdmin: "true" }), false);
+  assert.equal(account.isAdmin({ role: "admin" }), false);
+  assert.equal(account.roleTitle, undefined);
+  assert.equal(account.ROLES, undefined);
   assert.equal(account.findUser([USER, ADMIN], "ghost"), null);
   assert.equal(account.findUser([USER, ADMIN], "admin.sereno"), ADMIN);
 });

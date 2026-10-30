@@ -18,7 +18,7 @@
   }
 
   function isUser(user) {
-    return !!user && typeof user === "object" && typeof user.username === "string" && typeof user.role === "string";
+    return !!user && typeof user === "object" && typeof user.username === "string" && typeof user.isAdmin === "boolean";
   }
 
   /* Remote auth owns credentials. Remove legacy mock credentials and sessions

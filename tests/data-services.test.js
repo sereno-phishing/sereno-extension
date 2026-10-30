@@ -183,21 +183,21 @@ Object.keys(SETUPS).forEach((name) => {
   test(name + ": protectionService.loadModelVersion reads the version from the port", async () => {
     const { services, store } = SETUPS[name]();
     assert.deepEqual(await protectionService.loadModelVersion(services), { ok: true, version: "1.3" });
-    await store.set({ session: { username: "andres.torres", role: "usuario", loginAt: "t", token: "x" } });
+    await store.set({ session: { username: "andres.torres", isAdmin: false, loginAt: "t", token: "x" } });
     assert.deepEqual(await protectionService.loadModelVersion(services), { ok: true, version: "1.3" });
   });
 });
 
 test("surveyService.saveDraft stores partial answers for the signed-in account without completing the survey", async () => {
   const store = openStore();
-  await store.set({ session: { username: "andres.torres", role: "usuario", token: "remote" } });
+  await store.set({ session: { username: "andres.torres", isAdmin: false, token: "remote" } });
   assert.deepEqual(await surveyService.saveDraft(store, "andres.torres", [4, null]), { ok: true });
   assert.deepEqual((await store.get()).survey, { byUser: { "andres.torres": { answers: [4, null], completedAt: null } } });
 });
 
 test("failures are normalized with a Spanish message and nothing throws", async () => {
   const store = openStore();
-  await store.set({ session: { username: "andres.torres", role: "usuario", token: "remote" } });
+  await store.set({ session: { username: "andres.torres", isAdmin: false, token: "remote" } });
   const answers = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
   const cases = [
     ["offline", failingServices(OFFLINE)],
@@ -217,7 +217,7 @@ test("failures are normalized with a Spanish message and nothing throws", async 
 
 test("a failing survey submission leaves no completion stamp and broken ports do not throw", async () => {
   const store = openStore();
-  await store.set({ session: { username: "andres.torres", role: "usuario", token: "remote" } });
+  await store.set({ session: { username: "andres.torres", isAdmin: false, token: "remote" } });
   const throwing = {
     data: { listHistory: () => { throw new Error("boom"); }, deleteHistory: async () => null, getModelVersion: async () => ({ ok: true }) },
     survey: { submit: async () => { throw new Error("boom"); } }
@@ -401,7 +401,7 @@ test("malformed administration answers and broken ports read as a server failure
   assert.deepEqual(await administrationService.loadMetrics({ data: { getMetrics: () => { throw new Error("boom"); } } }), server);
 });
 
-const ADMIN_STATE = { session: { username: "admin.sereno", role: "administrador", loginAt: "t", token: "x" } };
+const ADMIN_STATE = { session: { username: "admin.sereno", isAdmin: true, loginAt: "t", token: "x" } };
 const LOADED = {
   metricas: { status: "ready" },
   dominios: { status: "ready" },

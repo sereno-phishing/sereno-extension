@@ -29,7 +29,7 @@ function popupViews() {
 
 test("language selector appears only in the open user or admin account menu", () => {
   const views = popupViews();
-  for (const session of [{ username: "user", role: "usuario" }, { username: "admin", role: "administrador" }]) {
+  for (const session of [{ username: "user", isAdmin: false }, { username: "admin", isAdmin: true }]) {
     const state = { session, currentSite: {} };
     assert.doesNotMatch(views.page({ view: "home", language: "en", menuOpen: false }, state), /language-en/);
     const html = views.page({ view: "home", language: "en", menuOpen: true }, state);
@@ -37,7 +37,7 @@ test("language selector appears only in the open user or admin account menu", ()
     assert.match(html, /id="language-en" name="language" value="en" checked/);
     assert.match(html, /id="language-es" name="language" value="es">/);
     assert.match(html, /data-action="logout"/);
-    if (session.role === "administrador") assert.match(html, /data-action="open-admin"/);
+    if (session.isAdmin === true) assert.match(html, /data-action="open-admin"/);
   }
   assert.doesNotMatch(views.page({ view: "home", language: "es", menuOpen: true }, { session: null, currentSite: {} }), /language-es/);
 });
@@ -50,7 +50,7 @@ test("Spanish survey content declares its language when the popup is English", (
 
 test("home and history use the same large tab variant with only selection state changing", () => {
   const views = popupViews();
-  const state = { session: { username: "user", role: "user" }, history: {} };
+  const state = { session: { username: "user", isAdmin: false }, history: {} };
   const tablists = ["home", "history"].map((view) => {
     const html = views.page({ view, historyFilter: "all" }, state);
     const tablist = html.match(/<div class="tabs tabs-lg" role="tablist"[^>]*>.*?<\/div>/);
@@ -66,7 +66,7 @@ test("home and history use the same large tab variant with only selection state 
 
 test("tab indicator requests animation only for the destination of an explicit tab change", () => {
   const views = popupViews();
-  const state = { session: { username: "user", role: "user" }, history: {} };
+  const state = { session: { username: "user", isAdmin: false }, history: {} };
   for (const view of ["home", "history"]) {
     const html = views.page({ view, tabSlide: view }, state);
     assert.match(html, new RegExp(`data-active-tab="${view}" data-tab-slide="${view}"`));
@@ -105,7 +105,7 @@ test("home and history keep their scrollbar gutter and administrator tabs aligne
 
 test("the offline session notice is a polite live region with a retry action", () => {
   const views = popupViews();
-  const state = { session: { username: "user", role: "user" }, history: {} };
+  const state = { session: { username: "user", isAdmin: false }, history: {} };
   const html = views.page({ view: "home", sessionOffline: true }, state);
   assert.match(html, /<div class="session-notice" role="status">/);
   assert.match(html, /data-action="retry-session"/);

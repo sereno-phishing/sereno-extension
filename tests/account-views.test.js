@@ -31,9 +31,9 @@ test("register marks the username field only for a duplicate", () => {
 });
 
 test("language choices are labeled native radios with the current preference for both roles", () => {
-  for (const role of ["usuario", "administrador"]) {
+  for (const isAdmin of [false, true]) {
     for (const language of ["es", "en"]) {
-      const html = accountUi.accountMenu({ username: "ana", role }, { language });
+      const html = accountUi.accountMenu({ username: "ana", isAdmin }, { language });
       assert.doesNotMatch(html, /<select|<option/);
       assert.match(html, new RegExp('<legend>' + (language === "en" ? "Language" : "Idioma") + '</legend>'));
       for (const [value, label] of [["es", "Español"], ["en", "English"]]) {
@@ -45,8 +45,8 @@ test("language choices are labeled native radios with the current preference for
 });
 
 test("accountMenu keeps its default contract and can omit only the survey entry", () => {
-  const user = { username: "ana", role: "usuario" };
-  const admin = { username: "admin", role: "administrador" };
+  const user = { username: "ana", isAdmin: false };
+  const admin = { username: "admin", isAdmin: true };
   const defaultMenu = accountUi.accountMenu(user);
   assert.equal(accountUi.accountMenu(user, {}), defaultMenu);
   assert.match(defaultMenu, /data-action="open-survey"[^>]*>Encuesta de opinión/);

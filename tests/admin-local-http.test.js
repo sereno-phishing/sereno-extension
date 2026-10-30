@@ -72,15 +72,16 @@ test("remote domain policies enforce live roles, persist CRUD and never fall bac
   const remote = Sereno.providers.remote.create({ baseUrl, timeoutMs: 500, fetch: cookieFetch });
   const registered = await remote.auth.register("policy-user", "throwaway-password");
   assert.equal(registered.ok, true);
-  assert.equal(registered.user.role, "usuario");
+  assert.equal(registered.user.isAdmin, false);
+  assert.equal("role" in registered.user, false);
 
   const initialBytes = fs.readFileSync(policyFile);
   assert.deepEqual(await remote.data.getDomainPolicies(), { ok: false, error: "forbidden" });
   assert.deepEqual(await remote.data.putDomainPolicies([]), { ok: false, error: "forbidden" });
   assert.deepEqual(fs.readFileSync(policyFile), initialBytes, "user rejections do not mutate policy storage");
 
-  replaceRole(dataFile, "policy-user", "administrador");
-  assert.equal((await remote.auth.session()).session.role, "administrador");
+  replaceRole(dataFile, "policy-user", "admin");
+  assert.equal((await remote.auth.session()).session.isAdmin, true);
   const rows = [
     { domain: "  Shop.Example.COM  ", policy: "bloqueo", updatedAt: "2026-10-27" },
     { domain: "login.example.com", policy: "advertencia", updatedAt: "2026-10-28" }
@@ -98,8 +99,8 @@ test("remote domain policies enforce live roles, persist CRUD and never fall bac
   assert.deepEqual(await remote.data.putDomainPolicies(invalid), { ok: false, error: "invalid" });
   assert.deepEqual(fs.readFileSync(policyFile), validBytes, "invalid writes do not mutate policy storage");
 
-  replaceRole(dataFile, "policy-user", "usuario");
-  assert.equal((await remote.auth.session()).session.role, "usuario");
+  replaceRole(dataFile, "policy-user", "user");
+  assert.equal((await remote.auth.session()).session.isAdmin, false);
   assert.deepEqual(await remote.data.putDomainPolicies([]), { ok: false, error: "forbidden" });
   assert.deepEqual(fs.readFileSync(policyFile), validBytes, "demoted writes do not mutate policy storage");
 

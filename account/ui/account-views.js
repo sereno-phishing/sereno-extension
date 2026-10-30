@@ -18,6 +18,7 @@
     passwordHelp: ["Se guarda cifrada. No pedimos tu correo.", "It is stored encrypted. We do not ask for your email."],
     createAccount: ["Crear cuenta", "Create account"], hasAccount: ["¿Ya tienes cuenta?", "Already have an account?"],
     accountOf: ["Cuenta de ", "Account of "], account: ["Cuenta", "Account"], role: ["Rol: ", "Role: "],
+    roleAdmin: ["Administrador", "Administrator"], roleUser: ["Usuario", "User"],
     survey: ["Encuesta de opinión", "Feedback survey"], admin: ["Panel de administración", "Administration panel"],
     logout: ["Cerrar sesión", "Sign out"],
     invalid: ["Usuario o contraseña incorrectos.", "Incorrect username or password."],
@@ -144,7 +145,7 @@
       '<div class="menu-overlay" data-action="close-menu">' +
       '<div class="account-menu" data-action="menu-content" role="menu" aria-label="' + ui.esc(t("account")) + '">' +
       '<div class="menu-head"><div class="menu-user">' + ui.esc(session.username) + "</div>" +
-      '<div class="menu-role">' + t("role") + ui.esc(session.role) + "</div></div>" +
+      '<div class="menu-role">' + t("role") + t(account.isAdmin(session) ? "roleAdmin" : "roleUser") + "</div></div>" +
       (account.isAdmin(session) ? menuItem("open-admin", t("admin")) : "") +
       surveyEntry +
       SEPARATOR + '<div role="none"><fieldset class="menu-language">' +

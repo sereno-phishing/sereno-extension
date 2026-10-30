@@ -42,7 +42,7 @@ function openStore(defaults = Sereno.seed.defaultState) {
 }
 
 async function signIn(store, username) {
-  await store.set({ session: { username, role: "usuario", token: "remote-token" } });
+  await store.set({ session: { username, isAdmin: false, token: "remote-token" } });
 }
 
 test("survey is a remote-only status and submit port while verdict and data remain mocked", async () => {
@@ -74,7 +74,7 @@ test("survey is a remote-only status and submit port while verdict and data rema
 
 test("survey status validates the backend response and never trusts a local completion marker", async () => {
   const store = openStore({
-    session: { username: "ana", role: "usuario", token: "remote-token" },
+    session: { username: "ana", isAdmin: false, token: "remote-token" },
     survey: { byUser: { ana: { answers: ANSWERS, completedAt: "2026-09-20T10:00" } } }
   });
   const services = { survey: { status: async () => ({ ok: true, submitted: false }) } };
@@ -90,7 +90,7 @@ test("survey status validates the backend response and never trusts a local comp
 
 test("drafts and completion markers are isolated by authenticated username and legacy global survey data is ignored", async () => {
   const store = openStore({
-    session: { username: "ana", role: "usuario", token: "remote-token" },
+    session: { username: "ana", isAdmin: false, token: "remote-token" },
     survey: { answers: [4, 4, 4], completedAt: "legacy", byUser: {} }
   });
   const services = { survey: { submit: async () => ({ ok: true }) } };

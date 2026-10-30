@@ -98,11 +98,11 @@ Object.keys(ADAPTERS).forEach((name) => {
     const store = frontStore();
     const result = await accountService.login(services(), store, "admin.sereno", "sereno123", NOW);
     assert.equal(result.ok, true);
-    assert.deepEqual(result.user, { username: "admin.sereno", role: "administrador", createdAt: "2026-09-01T10:00:00" });
+    assert.deepEqual(result.user, { username: "admin.sereno", isAdmin: true, createdAt: "2026-09-01T10:00:00" });
     assert.equal(typeof result.token, "string");
     assert.ok(result.token.length > 0);
     const state = await store.get();
-    assert.deepEqual(state.session, { username: "admin.sereno", role: "administrador", loginAt: "2026-09-21T11:30", token: result.token });
+    assert.deepEqual(state.session, { username: "admin.sereno", isAdmin: true, loginAt: "2026-09-21T11:30", token: result.token });
     assert.equal(JSON.stringify(state).includes("password"), false);
     assert.equal(JSON.stringify(result).includes("sereno123"), false);
   });
@@ -126,7 +126,7 @@ Object.keys(ADAPTERS).forEach((name) => {
     const created = await accountService.register(svc, store, "nuevo.usuario", "clave-1", NOW);
     assert.equal(created.ok, true);
     assert.equal(created.user.username, "nuevo.usuario");
-    assert.equal(created.user.role, "usuario");
+    assert.equal(created.user.isAdmin, false);
     const state = await store.get();
     assert.equal(state.session.username, "nuevo.usuario");
     assert.equal(state.session.token, created.token);
@@ -215,7 +215,7 @@ test("a password in the port answer never reaches the store", async () => {
   const store = frontStore();
   const leaky = {
     auth: {
-      login: async () => ({ ok: true, token: "t-1", user: { username: "u", role: "usuario", createdAt: "c", password: "leak" } })
+      login: async () => ({ ok: true, token: "t-1", user: { username: "u", isAdmin: false, createdAt: "c", password: "leak" } })
     }
   };
   const result = await accountService.login(leaky, store, "u", "p", NOW);
@@ -226,7 +226,7 @@ test("a password in the port answer never reaches the store", async () => {
 
 test("logout clears the local session even when the port fails", async () => {
   const store = frontStore();
-  await store.set({ session: { username: "u", role: "usuario", loginAt: "s", token: "t" } });
+  await store.set({ session: { username: "u", isAdmin: false, loginAt: "s", token: "t" } });
   const down = { auth: { logout: async () => ({ ok: false, error: "offline" }) } };
   assert.deepEqual(await accountService.logout(down, store), { ok: true, synced: false });
   assert.equal((await store.get()).session, null);
@@ -236,14 +236,14 @@ test("logout clears the local session even when the port fails", async () => {
 
 test("currentSession keeps the local session offline and drops it when the backend says signed out", async () => {
   const store = frontStore();
-  const local = { username: "u", role: "usuario", loginAt: "s", token: "t" };
+  const local = { username: "u", isAdmin: false, loginAt: "s", token: "t" };
   await store.set({ session: local });
   const offline = { auth: { session: async () => ({ ok: false, error: "offline" }) } };
   assert.deepEqual(await accountService.currentSession(offline, store), { ok: true, session: local, verified: false });
   const expired = { auth: { session: async () => ({ ok: true, session: null }) } };
   assert.deepEqual(await accountService.currentSession(expired, store), { ok: true, session: null, verified: true });
   assert.equal((await store.get()).session, null);
-  const cookie = { auth: { session: async () => ({ ok: true, session: { username: "c", role: "usuario", loginAt: "x" } }) } };
+  const cookie = { auth: { session: async () => ({ ok: true, session: { username: "c", isAdmin: false, loginAt: "x" } }) } };
   const adopted = await accountService.currentSession(cookie, store);
   assert.equal(adopted.session.username, "c");
   assert.equal((await store.get()).session.username, "c");

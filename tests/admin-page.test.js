@@ -21,7 +21,7 @@ async function adminHarness(administrationService, session, currentSession, init
   let hashchange = () => {};
   let actions;
   let subscriber = () => {};
-  let state = { session: session === undefined ? { username: "admin", role: "administrador" } : session };
+  let state = { session: session === undefined ? { username: "admin", isAdmin: true } : session };
   let input = { value: "" };
   const root = {
     set innerHTML(_html) { input = { value: "" }; },
@@ -35,7 +35,7 @@ async function adminHarness(administrationService, session, currentSession, init
     accountService: {
       currentSession: currentSession || (async () => ({ ok: true, session: state.session, verified: true }))
     },
-    account: { isAdmin: (current) => !!current && current.role === "administrador" },
+    account: { isAdmin: (current) => !!current && current.isAdmin === true },
     stateStore: { open: () => ({
       subscribe: (listener) => { subscriber = listener; },
       ready: () => Promise.resolve(state)
@@ -129,10 +129,10 @@ test("a cached administrator cannot load or render privileged data before backen
     loadCache: async () => { calls.push("cache"); return { ok: true, cache: CACHE }; },
     loadMetrics: async () => { calls.push("metrics"); return { ok: true, metrics: { analyzed: 1 } }; }
   });
-  const harness = await adminHarness(spy, { username: "cached", role: "administrador" }, () => verification.promise);
+  const harness = await adminHarness(spy, { username: "cached", isAdmin: true }, () => verification.promise);
   assert.deepEqual(calls, []);
   assert.equal(harness.renders.at(-1).authorization, "checking");
-  verification.resolve({ ok: true, session: { username: "verified", role: "administrador" }, verified: true });
+  verification.resolve({ ok: true, session: { username: "verified", isAdmin: true }, verified: true });
   await settle();
   assert.deepEqual(calls.sort(), ["cache", "domains", "metrics"]);
   assert.equal(harness.renders.at(-1).renderedSession.username, "verified");
@@ -141,12 +141,12 @@ test("a cached administrator cannot load or render privileged data before backen
 test("signed-out, demoted or unreachable sessions cannot authorize from a cached administrator", async () => {
   for (const answer of [
     { ok: true, session: null, verified: true },
-    { ok: true, session: { username: "cached", role: "usuario" }, verified: true },
-    { ok: true, session: { username: "cached", role: "administrador" }, verified: false }
+    { ok: true, session: { username: "cached", isAdmin: false }, verified: true },
+    { ok: true, session: { username: "cached", isAdmin: true }, verified: false }
   ]) {
     const calls = [];
     const spy = service({ loadMetrics: async () => { calls.push("metrics"); return { ok: true, metrics: {} }; } });
-    const harness = await adminHarness(spy, { username: "cached", role: "administrador" }, async () => answer);
+    const harness = await adminHarness(spy, { username: "cached", isAdmin: true }, async () => answer);
     assert.deepEqual(calls, []);
     assert.equal(harness.renders.at(-1).authorization, "denied");
   }
@@ -192,7 +192,7 @@ test("a demotion blocks UI policy writes and ignores stale privileged responses"
     loadDomains: () => domains.promise,
     saveDomains: async () => { writes += 1; return { ok: true }; }
   }));
-  harness.emit({ username: "admin", role: "usuario" });
+  harness.emit({ username: "admin", isAdmin: false });
   await settle();
   harness.actions["save-domains"]();
   domains.resolve({ ok: true, domains: ROWS });

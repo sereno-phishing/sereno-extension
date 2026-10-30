@@ -54,7 +54,7 @@ lista de extensiones usa el idioma del navegador, independientemente del selecto
 1. Abre el popup de Sereno. La primera vez verás el onboarding de 3 pasos
    (qué hace, qué permiso necesita y cómo leer una alerta). Pulsa **Empezar**.
 2. Start the backend and create a throwaway account in the popup. Backend
-   registration always assigns `usuario`; demo credentials and mock administrator
+   registration always creates a regular user (`isAdmin: false`); demo credentials and mock administrator
    accounts do not authenticate against it. To test the administrator panel,
    promote the throwaway account offline as documented in [Conectar el backend](#conectar-el-backend).
    For the entirely offline demo only,
@@ -350,18 +350,18 @@ sereno-extension/
    account use cases remove legacy mock users/passwords and mock sessions from
    local state. Submitted passwords go only to the auth port, not local storage.
    A successful session check adopts the server identity, replacing stale local
-   roles/tokens. An unreachable backend keeps only a previous nonmock session
+   admin flags/tokens. An unreachable backend keeps only a previous nonmock session
    as unverified; logout clears local session even if server revocation fails.
 
 3. Load/reload the unpacked extension in `chrome://extensions`. Its manifest
    grants `http://127.0.0.1:5000/*`, matching the local auth origin. Register a
    new account, close/reopen the popup, log out, and log in again. Backend
-   accounts are not seeded; newly registered users have role `usuario`. To promote
+   accounts are not seeded; newly registered users have `isAdmin: false`. To promote
    a throwaway account, stop the server and follow the sibling
    [`sereno-backend/README.md`](../sereno-backend/README.md): back up its temporary
-   auth JSON, replace that user's exact role with `administrador` (never `admin`),
+   auth JSON, change that user's stored role from `user` to `admin` (never a Spanish value),
    and restart. Never edit the runtime JSON while the server is running. Existing
-   server sessions reload the current role on each request, so promotion or demotion
+   server sessions reload the current role (exposed as `isAdmin`) on each request, so promotion or demotion
    takes effect without logging in again. El historial, los veredictos, la caché y
    las métricas permanecen en el estado mock/local. Las respuestas SUS se agregan al JSON aislado del backend y la
    participación se registra por separado para impedir envíos repetidos. El estado
@@ -430,9 +430,9 @@ añade).
 Formas:
 
 - `status`: `"seguro"`, `"advertencia"` o `"bloqueo"`. `source`: `"cache"` o `"modelo"`.
-- `user`: `{ username, role, createdAt }`, con `role` `"usuario"` o `"administrador"`.
+- `user`: `{ username, isAdmin, createdAt }`, con `isAdmin` booleano (la etiqueta del rol se traduce en el front).
   Nunca lleva la contraseña. `token` es opaco.
-- `session`: `{ username, role, loginAt, token? }`.
+- `session`: `{ username, isAdmin, loginAt, token? }`.
 - `entries`: `[{ id, domain, status, score, source, ts, latencyMs }]`, del usuario con sesión.
 - `domains`: `[{ domain, policy, updatedAt }]` con `policy` `"advertencia"` o `"bloqueo"`.
   `PUT` reemplaza la lista completa.

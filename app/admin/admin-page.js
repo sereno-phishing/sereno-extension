@@ -75,7 +75,7 @@
     if (!session) {
       return "signed-out";
     }
-    return [session.username, session.role, session.token || "", session.loginAt || ""].join("|");
+    return [session.username, session.isAdmin === true, session.token || "", session.loginAt || ""].join("|");
   }
 
   function resetPrivilegedState() {

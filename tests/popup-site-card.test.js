@@ -21,8 +21,8 @@ const Sereno = load(
 const { popupViews } = Sereno;
 
 const SITE = { domain: "tienda-servicios.pe", status: "seguro", score: 0.04, source: "modelo", ts: "2026-09-21T09:12:00" };
-const USER = { username: "ana", role: "usuario" };
-const ADMIN = { username: "admin", role: "administrador" };
+const USER = { username: "ana", isAdmin: false };
+const ADMIN = { username: "admin", isAdmin: true };
 const BASE = { view: "home", historyFilter: Sereno.history.ALL, onboardingStep: 1, surveyIndex: 0, surveyAnswers: [] };
 const render = (session, extra = {}, model = {}) =>
   popupViews.page({ ...BASE, modelVersion: "1.3", ...model }, { session, currentSite: SITE, lastSeenModelVersion: "1.2", ...extra });

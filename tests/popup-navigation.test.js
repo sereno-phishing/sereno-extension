@@ -30,7 +30,7 @@ async function popupHarness(extra = {}) {
   const Sereno = {
     i18n: extra.i18n,
     storage: extra.storage,
-    account: { isAdmin: (session) => !!session && session.role === "administrador" },
+    account: { isAdmin: (session) => !!session && session.isAdmin === true },
     history: { ALL: "all" },
     survey: { draftAnswers: (answers) => [...answers] },
     onboarding: { isDone: () => true },
@@ -108,8 +108,8 @@ test("language selector saves the selected preference", async () => {
 test("menu stays open when language changes and Escape returns focus to the badge", async () => {
   let notify;
   const language = { get: () => "es", ready: async () => "es", subscribe: (callback) => { notify = callback; }, set: async (value) => { notify(value); } };
-  for (const role of ["usuario", "administrador"]) {
-    const popup = await popupHarness({ state: { session: { username: "ana", role } }, i18n: { create: () => language }, storage: { detect: () => ({}) } });
+  for (const isAdmin of [false, true]) {
+    const popup = await popupHarness({ state: { session: { username: "ana", isAdmin } }, i18n: { create: () => language }, storage: { detect: () => ({}) } });
     popup.actions["toggle-menu"]();
     popup.listeners.change({ target: { id: "language-en", name: "language", type: "radio", value: "en" } });
     assert.equal(popup.renders.at(-1).language, "en");
@@ -242,12 +242,12 @@ for (const kind of ["login", "register"]) {
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-const USER = { username: "ana", role: "usuario" };
+const USER = { username: "ana", isAdmin: false };
 
 test("administrator can load and open personal history", async () => {
   const entries = [{ id: "admin-entry", domain: "example.com" }];
   const popup = await popupHarness({
-    state: { session: { username: "admin", role: "administrador" } },
+    state: { session: { username: "admin", isAdmin: true } },
     historyService: { list: async () => ({ ok: true, entries }), clear: async () => ({ ok: true }) }
   });
   await new Promise((resolve) => setImmediate(resolve));
@@ -467,7 +467,7 @@ test("switching accounts clears survey UI and loads only the target account draf
   await settle();
   assert.deepEqual(popup.renders.at(-1).surveyAnswers.slice(0, 2), [4, 2]);
   popup.actions.answer({ getAttribute: () => "3" });
-  popup.emitState({ session: { username: "bea", role: "usuario" } });
+  popup.emitState({ session: { username: "bea", isAdmin: false } });
   const switched = popup.renders.at(-1);
   assert.deepEqual(switched.surveyAnswers.slice(0, 2), [1, 5]);
   assert.equal(switched.surveyIndex, 0);
@@ -486,7 +486,7 @@ test("a late background survey status cannot hide the new account survey entry",
     state: { session: USER, survey: { byUser: {} } },
     services: { survey: { status: () => (++checks === 1 ? ana : bea), submit: async () => ({ ok: true }) } }
   });
-  popup.emitState({ session: { username: "bea", role: "usuario" }, survey: { byUser: {} } });
+  popup.emitState({ session: { username: "bea", isAdmin: false }, survey: { byUser: {} } });
   releaseBea({ ok: true, submitted: false });
   await settle();
   assert.equal(popup.renders.at(-1).surveyMenuStatus, "available");
@@ -526,7 +526,7 @@ test("a late survey status response after an account switch cannot reveal the ol
     services: { survey: { status: () => (++checks === 1 ? ana : bea), submit: async () => ({ ok: true }) } }
   });
   popup.actions["open-survey"]();
-  popup.emitState({ session: { username: "bea", role: "usuario" }, survey: { byUser: {} } });
+  popup.emitState({ session: { username: "bea", isAdmin: false }, survey: { byUser: {} } });
   releaseBea({ ok: true, submitted: true });
   await settle();
   releaseAna({ ok: true, submitted: false });
@@ -550,7 +550,7 @@ test("a late survey response after an account switch cannot clear the new accoun
     popup.actions["survey-next"]();
   }
   popup.emitState({
-    session: { username: "bea", role: "usuario" },
+    session: { username: "bea", isAdmin: false },
     survey: { byUser: { ana: { answers: Array(10).fill(3), completedAt: null }, bea: { answers: [2], completedAt: null } } }
   });
   release({ ok: true });
@@ -564,8 +564,8 @@ test("a late survey response after an account switch cannot clear the new accoun
 test("boot renders at once and then refreshes the session through the auth port", async () => {
   const seen = [];
   const popup = await popupHarness({
-    state: { session: { username: "ana", role: "user" } },
-    accountService: { currentSession: async (services, store) => { seen.push([services, store]); return { ok: true, session: { username: "ana", role: "user" }, verified: true }; } }
+    state: { session: { username: "ana", isAdmin: false } },
+    accountService: { currentSession: async (services, store) => { seen.push([services, store]); return { ok: true, session: { username: "ana", isAdmin: false }, verified: true }; } }
   });
   assert.equal(popup.root.innerHTML, "home", "the first view does not wait for the backend");
   await new Promise((resolve) => setImmediate(resolve));
@@ -576,8 +576,8 @@ test("boot renders at once and then refreshes the session through the auth port"
 
 test("an unreachable backend keeps the local session and shows a notice instead of blocking", async () => {
   const popup = await popupHarness({
-    state: { session: { username: "ana", role: "user" } },
-    accountService: { currentSession: async () => ({ ok: true, session: { username: "ana", role: "user" }, verified: false }) }
+    state: { session: { username: "ana", isAdmin: false } },
+    accountService: { currentSession: async () => ({ ok: true, session: { username: "ana", isAdmin: false }, verified: false }) }
   });
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(popup.renders.at(-1).sessionOffline, true);
@@ -588,7 +588,7 @@ test("an unreachable backend keeps the local session and shows a notice instead 
 test("a failing session refresh never throws and leaves the popup usable", async () => {
   for (const currentSession of [async () => { throw new Error("boom"); }, async () => ({ ok: false, error: "server" }), undefined]) {
     const popup = await popupHarness({
-      state: { session: { username: "ana", role: "user" } },
+      state: { session: { username: "ana", isAdmin: false } },
       accountService: { currentSession }
     });
     await new Promise((resolve) => setImmediate(resolve));
@@ -597,14 +597,14 @@ test("a failing session refresh never throws and leaves the popup usable", async
 });
 
 test("retry-session asks again and clears the notice when the backend answers", async () => {
-  let answer = { ok: true, session: { username: "ana", role: "user" }, verified: false };
+  let answer = { ok: true, session: { username: "ana", isAdmin: false }, verified: false };
   const popup = await popupHarness({
-    state: { session: { username: "ana", role: "user" } },
+    state: { session: { username: "ana", isAdmin: false } },
     accountService: { currentSession: async () => answer }
   });
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(popup.renders.at(-1).sessionOffline, true);
-  answer = { ok: true, session: { username: "ana", role: "user" }, verified: true };
+  answer = { ok: true, session: { username: "ana", isAdmin: false }, verified: true };
   popup.actions["retry-session"]();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(popup.renders.at(-1).sessionOffline, false);

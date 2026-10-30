@@ -81,8 +81,8 @@ const count = (html, pattern) => (html.match(pattern) || []).length;
 
 /* ---------------- sample data ---------------- */
 
-const USER = { username: "ana", role: "usuario" };
-const ADMIN = { username: "admin", role: "administrador" };
+const USER = { username: "ana", isAdmin: false };
+const ADMIN = { username: "admin", isAdmin: true };
 const ENTRIES = Sereno.seed.defaultState.history["andres.torres"];
 const BASE = { historyFilter: Sereno.history.ALL, onboardingStep: 1, surveyIndex: 0, surveyAnswers: [3], historyEntries: ENTRIES, detailId: "h-000001" };
 

@@ -48,12 +48,15 @@ test("account forms follow the selected language and fall back to Spanish", () =
   assert.match(app.accountUi.loginView({ error: false }), /Sign in/);
   assert.match(app.accountUi.loginView({ error: true, errorCode: "offline" }), /Offline\. Check your connection/);
   assert.match(app.accountUi.registerView({ error: true, errorCode: "duplicate" }), /Choose another username/);
-  const menu = app.accountUi.accountMenu({ username: "<example>", role: "usuario" });
+  const menu = app.accountUi.accountMenu({ username: "<example>", isAdmin: false });
   assert.match(menu, /&lt;example&gt;/);
-  assert.match(menu, /Role: usuario/);
+  assert.match(menu, /Role: User/);
+  assert.match(app.accountUi.accountMenu({ username: "a", isAdmin: true }), /Role: Administrator/);
   assert.match(menu, /Sign out/);
   app.i18n.use("es");
   assert.match(app.accountUi.loginView({ error: false }), /Inicia sesión/);
+  assert.match(app.accountUi.accountMenu({ username: "a", isAdmin: true }), /Rol: Administrador/);
+  assert.match(app.accountUi.accountMenu({ username: "a", isAdmin: false }), /Rol: Usuario/);
 });
 
 test("onboarding, protection and history localize without changing backend values", () => {
