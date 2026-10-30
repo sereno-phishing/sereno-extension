@@ -69,7 +69,7 @@ function ruleColors(css, selector, palette) {
 
 test("every stylesheet that animates or transitions honors prefers-reduced-motion", () => {
   const sheets = stylesheets();
-  assert.ok(sheets.length >= 7, "found the stylesheets");
+  assert.ok(sheets.length >= 6, "found the stylesheets");
   const animating = sheets.filter((file) => /@keyframes|\banimation\s*:|\btransition\s*:|scroll-behavior/.test(fs.readFileSync(file, "utf8")));
   assert.ok(animating.length >= 3, "at least popup, store and content animate");
   for (const file of animating) {

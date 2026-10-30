@@ -146,7 +146,7 @@ se conecte; las vistas no cambian.
 | Detalle del veredicto | HU-20 | Popup → detalle del historial y «Ver detalle» del aviso | Listo |
 | Política por dominio | HU-21 | Panel de administración → Política por dominio | Backend local; solo administrador; Chrome pendiente |
 | Bloqueo | HU-22 | Modal rojo en la página y en la tienda de demo | Listo con mock; modal real sin probar en Chrome |
-| Política de privacidad | HU-23 | `app/privacy/privacy.html`, enlace del pie del popup | Listo |
+| Política de privacidad | HU-23 | `privacy/ui/privacy-views.js`, vista dentro del popup desde el enlace del pie | Listo |
 | Estado de la protección | HU-24 | Popup → tarjeta «Protección activa» y estado del sitio | Listo |
 | Evaluación pendiente | HU-25 | Badge `…`, toast en página, estado «Evaluando…» | Listo con mock |
 | Protección degradada | HU-26 | Badge `?`, aviso en página, tarjeta ámbar del popup | Listo; el popup no explica la causa (ver abajo) |
@@ -174,8 +174,7 @@ sereno-extension/
 ├── app/                          # Raíces de composición: una carpeta por página
 │   ├── popup/                    # popup.html/.css, popup-views.js (plantilla), popup-page.js (contenedor)
 │   ├── admin/                    # admin.html/.css, admin-views.js (plantilla), admin-page.js (contenedor)
-│   ├── demo-store/               # store.html/.css, store-page.js (contenedor del simulador)
-│   └── privacy/                  # privacy.html/.css (página estática)
+│   └── demo-store/               # store.html/.css, store-page.js (contenedor del simulador)
 ├── background/                   # service-worker.js: escucha las pestañas y delega en navigation-service
 ├── content/                      # content-script.js (contenedor del aviso en página), content.css y content-assets.generated.js (estilos e íconos empaquetados; no se edita)
 ├── tools/                        # build-content-assets.js: genera content-assets.generated.js (paso de desarrollo)
@@ -183,6 +182,7 @@ sereno-extension/
 ├── account/                      # Usuarios, sesión con token, roles; formularios y menú de cuenta
 ├── history/                      # Historial: deduplicación 60 s, tope 200, filtros; lista y detalle
 ├── survey/                       # Encuesta SUS: escala y puntaje; vistas bilingües de la encuesta
+├── privacy/                      # Política de privacidad: vista bilingüe dentro del popup
 ├── onboarding/                   # Recorrido de 3 pasos
 ├── protection/                   # Sitio actual, nivel de protección, versión del modelo; navigation-service (navegación → veredicto, badge, mensaje)
 ├── administration/               # Política por dominio y caché (reglas, casos de uso, secciones del panel)

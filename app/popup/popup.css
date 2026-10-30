@@ -1124,6 +1124,70 @@ button {
   color: var(--muted);
 }
 
+.privacy-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.privacy-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.privacy-logo {
+  display: block;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+}
+
+.privacy-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.privacy-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.privacy-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.privacy-check {
+  display: block;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+}
+
+.privacy-text {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.privacy-item-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.privacy-item-body {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .survey-actions {
   display: flex;
   align-items: flex-start;

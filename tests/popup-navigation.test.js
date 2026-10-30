@@ -69,6 +69,7 @@ async function popupHarness(extra = {}) {
       register: () => { calls.push(["register"]); return Promise.resolve({ ok: false }); },
       ...(extra.accountService || {})
     },
+    browser: { openPage: (...args) => { calls.push(["openPage", ...args]); } },
     popupViews: { page: (model) => { renders.push({ ...model, surveyAnswers: [...model.surveyAnswers] }); return model.view; } },
     ui: {
       captureFocus: () => () => {},
@@ -780,4 +781,43 @@ test("a failed or empty history load does not request the stagger", async () => 
   });
   await settle();
   assert.ok(failed.renders.every((model) => model.enter !== "history"));
+});
+
+test("the footer privacy link opens the in-popup view without opening a tab, once and without motion hooks", async () => {
+  const popup = await popupHarness();
+  const rendersBefore = popup.renders.length;
+  popup.actions["open-privacy"]();
+  assert.equal(popup.renders.length, rendersBefore + 1);
+  assert.equal(popup.renders.at(-1).view, "privacy");
+  assert.equal(popup.root.innerHTML, "privacy");
+  assert.equal(popup.focused.at(-1), '[data-action="privacy-close"]');
+  assert.ok(popup.calls.every(([call]) => call !== "openPage"));
+  assert.ok(popup.renders.every((model) => model.enter === null && model.tabSlide === null));
+});
+
+test("closing the privacy view returns to home or to the history tab it was opened from", async () => {
+  const popup = await popupHarness({ state: { session: USER } });
+  popup.actions["open-privacy"]();
+  popup.actions["privacy-close"]();
+  assert.equal(popup.renders.at(-1).view, "home");
+  assert.equal(popup.focused.at(-1), '[data-action="open-privacy"]');
+  popup.actions.tab({ getAttribute: () => "history" });
+  popup.actions["open-privacy"]();
+  assert.equal(popup.renders.at(-1).tab, "history");
+  popup.actions["privacy-close"]();
+  assert.equal(popup.renders.at(-1).view, "history");
+  assert.equal(popup.renders.at(-1).tab, "history");
+  assert.ok(popup.calls.every(([call]) => call !== "openPage"));
+});
+
+test("the privacy link inside the privacy view keeps the original way back and closes an open menu", async () => {
+  const popup = await popupHarness({ state: { session: USER } });
+  popup.actions["toggle-menu"]();
+  popup.actions["open-privacy"]();
+  assert.equal(popup.renders.at(-1).menuOpen, false);
+  const rendersBefore = popup.renders.length;
+  popup.actions["open-privacy"]();
+  assert.equal(popup.renders.length, rendersBefore);
+  popup.actions["privacy-close"]();
+  assert.equal(popup.renders.at(-1).view, "home");
 });

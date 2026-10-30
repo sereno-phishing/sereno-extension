@@ -1,5 +1,5 @@
 /* Sereno design tokens + base component classes.
-   Loaded by popup.html, options.html and privacidad.html so every page shares
+   Loaded by popup.html, admin.html and store.html so every page shares
    the same palette and controls. Mobile-first, no external resources. */
 
 @font-face {
@@ -39,7 +39,7 @@
 
   --dark: #111827;
 
-  /* Extra Figma shades shared by popup, options, privacy and demo pages. */
+  /* Extra Figma shades shared by popup, admin and demo pages. */
   --slate-50: #F8FAFC;
   --slate-100: #F1F5F9;
   --slate-300: #CBD5E1;

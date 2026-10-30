@@ -63,7 +63,7 @@ const reduced = (file) => mediaBodies(read(file), "prefers-reduced-motion: reduc
 
 test("no stylesheet transitions every property, uses ease-in or starts from scale(0)", () => {
   const files = stylesheets(ROOT);
-  assert.ok(files.length >= 7, "found the stylesheets");
+  assert.ok(files.length >= 6, "found the stylesheets");
   files.forEach((file) => {
     const css = fs.readFileSync(file, "utf8");
     assert.doesNotMatch(css, /transition:\s*all/, file);

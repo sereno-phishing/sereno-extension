@@ -35,6 +35,8 @@
     enter: null,
     // Previous question index for the render that follows a change of question.
     surveyFrom: null,
+    // The view the privacy policy was opened from, so closing it returns there.
+    privacyFrom: "home",
     historyFilter: history.ALL,
     detailId: null,
     surveyIndex: 0,
@@ -477,7 +479,19 @@
       Sereno.browser.openPage("app/admin/admin.html");
     },
     "open-privacy": function () {
-      Sereno.browser.openPage("app/privacy/privacy.html");
+      if (App.view === "privacy") {
+        return;
+      }
+      App.menuOpen = false;
+      App.privacyFrom = App.view;
+      App.view = "privacy";
+      render();
+      focusFirst('[data-action="privacy-close"]');
+    },
+    "privacy-close": function () {
+      App.view = App.privacyFrom;
+      render();
+      focusFirst('[data-action="open-privacy"]');
     },
     "open-survey": function () {
       App.menuOpen = false;

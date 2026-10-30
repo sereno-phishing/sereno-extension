@@ -13,6 +13,7 @@
   var accountUi = Sereno.accountUi;
   var historyUi = Sereno.historyUi;
   var surveyUi = Sereno.surveyUi;
+  var privacyUi = Sereno.privacyUi;
   var protectionUi = Sereno.protectionUi;
   var t = Sereno.popupI18n ? Sereno.popupI18n.t : function (text) { return text; };
 
@@ -136,6 +137,8 @@
         });
       case "detail":
         return historyUi.detailView(history.findById(userEntries(model), model.detailId));
+      case "privacy":
+        return privacyUi.view();
       case "surveyStatus":
         return surveyUi.statusView({ state: model.surveyStatus, error: model.surveyStatusError });
       case "survey":

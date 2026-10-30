@@ -18,7 +18,7 @@ const Sereno = load(
   "onboarding/domain/onboarding.js", "protection/domain/protection.js",
   "administration/domain/domain-policy.js", "administration/domain/verdict-cache.js",
   "verdict/ui/verdict-ui.js", "onboarding/ui/onboarding-view.js", "account/ui/account-views.js",
-  "history/ui/history-views.js", "survey/ui/survey-views.js", "protection/ui/protection-views.js",
+  "history/ui/history-views.js", "survey/ui/survey-views.js", "privacy/ui/privacy-views.js", "protection/ui/protection-views.js",
   "administration/ui/administration-views.js", "app/popup/popup-views.js", "app/admin/admin-views.js"
 );
 
@@ -105,6 +105,8 @@ function popupCases() {
   add("survey result accepted", { view: "surveyResult", surveySubmission: "accepted" }, USER);
   add("survey result duplicate", { view: "surveyResult", surveySubmission: "already" }, USER);
   add("survey result error", { view: "surveyResult", surveySubmission: "error", surveyError: "No se pudo enviar." }, USER);
+  add("privacy signed out", { view: "privacy" }, null);
+  add("privacy user", { view: "privacy" }, USER);
   add("login", { view: "login" }, null);
   add("login error", { view: "login", loginError: true, loginErrorCode: "invalid", draftUsername: "x", draftPassword: "y" }, null);
   add("register", { view: "register" }, null);
@@ -326,16 +328,12 @@ test("title check accepts attributes but rejects empty or missing text", () => {
 });
 
 test("static pages declare their language, one h1, a main landmark and no page-wide live region", () => {
-  for (const file of ["app/popup/popup.html", "app/admin/admin.html", "app/privacy/privacy.html", "app/demo-store/store.html"]) {
+  for (const file of ["app/popup/popup.html", "app/admin/admin.html", "app/demo-store/store.html"]) {
     const html = read(file);
     assert.match(html, /<html lang="es">/, file);
     assert.match(html, TITLE_PATTERN, file);
     assert.doesNotMatch(html, /id="app"[^>]*aria-live/, `${file}: a whole-app live region announces every render`);
   }
-  const privacy = read("app/privacy/privacy.html");
-  assert.equal(count(privacy, /<h1\b/g), 1);
-  assert.match(privacy, /<article class="privacy-card" aria-labelledby="privacy-title">/);
-  assert.deepEqual(problems(privacy), []);
   const store = read("app/demo-store/store.html");
   assert.equal(count(store, /<h1\b/g), 1);
   assert.equal(count(store, /<main\b/g), 1);
@@ -412,4 +410,22 @@ test("captureFocus restores the selected language radio after a live rerender", 
 
 test("the admin page shows a loading status until its first render replaces it", () => {
   assert.match(read("app/admin/admin.html"), /<div id="app" class="options-shell">[\s\S]*<p class="sr-only" role="status">Cargando el panel\.\.\.<\/p>[\s\S]*<\/div>\s*<script/);
+});
+
+test("the privacy view is a labelled article with a back button and its own page chrome", () => {
+  const html = popupViews.page({ ...BASE, view: "privacy" }, { session: null, currentSite: {} });
+  assert.match(html, /<article class="privacy-card" aria-labelledby="privacy-title">/);
+  assert.match(html, /<h1 class="privacy-title" id="privacy-title">/);
+  assert.match(html, /<button type="button" class="back-link" data-action="privacy-close">/);
+  assert.match(html, /data-action="open-privacy"/);
+  assert.deepEqual(problems(html), []);
+});
+
+test("the privacy view is a labelled article with a back button and its own page chrome", () => {
+  const html = popupViews.page({ ...BASE, view: "privacy" }, { session: null, currentSite: {} });
+  assert.match(html, /<article class="privacy-card" aria-labelledby="privacy-title">/);
+  assert.match(html, /<h1 class="privacy-title" id="privacy-title">/);
+  assert.match(html, /<button type="button" class="back-link" data-action="privacy-close">/);
+  assert.match(html, /data-action="open-privacy"/);
+  assert.deepEqual(problems(html), []);
 });
