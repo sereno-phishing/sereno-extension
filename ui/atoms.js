@@ -174,6 +174,13 @@
     );
   }
 
+  /* Decorative loading placeholder (see tokens.css). options: { shape: line|circle|pill|rect, cls }
+     The caller's class sets its size; the loading text lives in a separate sr-only element. */
+  function skeleton(options) {
+    var opts = options || {};
+    return '<span class="' + classes(["skeleton", "skeleton-" + (opts.shape || "line"), opts.cls]) + '" aria-hidden="true"></span>';
+  }
+
   Sereno.ui = {
     esc: esc,
     asset: asset,
@@ -190,6 +197,7 @@
     chip: chip,
     pill: pill,
     input: input,
-    banner: banner
+    banner: banner,
+    skeleton: skeleton
   };
 })(globalThis.Sereno = globalThis.Sereno || {});

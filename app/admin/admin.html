@@ -8,7 +8,16 @@
 </head>
 <body>
   <div id="app" class="options-shell">
-    <div class="card panel-status" role="status">Cargando el panel...</div>
+    <aside class="sidebar" aria-hidden="true">
+      <div class="sidebar-brand"><span class="skeleton skeleton-circle skeleton-logo" aria-hidden="true"></span><span class="skeleton skeleton-line skeleton-name" aria-hidden="true"></span></div>
+      <div class="sidebar-nav"><span class="skeleton skeleton-rect skeleton-nav-item" aria-hidden="true"></span><span class="skeleton skeleton-rect skeleton-nav-item" aria-hidden="true"></span><span class="skeleton skeleton-rect skeleton-nav-item" aria-hidden="true"></span></div>
+      <div class="sidebar-foot"><div class="sidebar-user"><span class="skeleton skeleton-circle skeleton-avatar" aria-hidden="true"></span><div class="skeleton-user-lines"><span class="skeleton skeleton-line skeleton-user-name" aria-hidden="true"></span><span class="skeleton skeleton-line skeleton-user-role" aria-hidden="true"></span></div></div></div>
+    </aside>
+    <main class="options-content" id="main">
+      <p class="sr-only" role="status">Cargando el panel...</p>
+      <span class="skeleton skeleton-rect skeleton-page-title" aria-hidden="true"></span>
+      <span class="skeleton skeleton-rect skeleton-page-card" aria-hidden="true"></span>
+    </main>
   </div>
   <script src="../../platform/storage.js"></script>
   <script src="../../platform/i18n.js"></script>

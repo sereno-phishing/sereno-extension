@@ -86,5 +86,6 @@ test("the popup ships a loading skeleton that the first render replaces", () => 
   const html = read("app/popup/popup.html");
   assert.match(html, /<div id="app"[^>]*aria-busy="true"[^>]*>[\s\S]*boot-skeleton[\s\S]*<\/div>\s*<script/);
   assert.match(html, /Cargando/);
+  assert.match(html, /class="skeleton /);
   assert.match(read("app/popup/popup.css"), /\.boot-skeleton/);
 });

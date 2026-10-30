@@ -49,7 +49,7 @@ test("admin observes stored language and rerenders with document language", asyn
     storage: { detect: () => ({}) }, i18n: { create: () => language, use: () => {}, register: () => {}, t: (key) => key },
     stateStore: { open: () => ({ subscribe: () => {}, ready: async () => ({ session: null }) }) },
     accountService: { currentSession: async () => ({ ok: true, verified: true, session: null }) },
-    account: { isAdmin: () => false }, adminViews: { page: () => "page" },
+    account: { isAdmin: () => false }, adminViews: { page: () => "page", loadingPage: () => "loading" },
     ui: { esc: (value) => value, captureFocus: () => () => {}, delegateActions: () => {}, onReady: (fn) => fn() }
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../app/admin/admin-page.js"), "utf8"), { Sereno: S, document, navigator: { language: "en-US" }, window: { location: { hash: "" }, addEventListener: () => {} }, setTimeout, clearTimeout });

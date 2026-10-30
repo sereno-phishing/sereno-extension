@@ -22,7 +22,7 @@
     if (Sereno.i18n && Sereno.i18n.use) Sereno.i18n.use(value);
     if (document.documentElement) document.documentElement.lang = value;
     document.title = Sereno.i18n ? Sereno.i18n.t("admin.page.title") : pageMessages["admin.page.title"].es;
-    if (!App.state && root) root.innerHTML = '<div class="card panel-status" role="status">' + Sereno.ui.esc(Sereno.i18n ? Sereno.i18n.t("admin.page.loading") : pageMessages["admin.page.loading"].es) + '</div>';
+    if (!App.state && root) root.innerHTML = Sereno.adminViews.loadingPage(Sereno.i18n ? Sereno.i18n.t("admin.page.loading") : pageMessages["admin.page.loading"].es);
     if (App.state && root) {
       var inputs = root.querySelectorAll ? Array.prototype.map.call(root.querySelectorAll("input[name]"), function (input) { return { name: input.name, value: input.value }; }) : [];
       render();

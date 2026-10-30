@@ -205,6 +205,170 @@ p {
   font-size: 13px;
 }
 
+/* ---------------- Loading skeletons ---------------- */
+
+/* Sizes mirror the loaded elements (text line box = block + margins). */
+.skeleton-logo {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+}
+
+.skeleton-name {
+  width: 72px;
+  height: 14px;
+  margin: 2px 0;
+}
+
+.skeleton-nav-item {
+  height: 36px;
+  border-radius: 8px;
+}
+
+.skeleton-avatar {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+}
+
+.skeleton-user-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.skeleton-user-name {
+  width: 96px;
+  height: 11px;
+}
+
+.skeleton-user-role {
+  width: 72px;
+  height: 10px;
+}
+
+.skeleton-page-title {
+  width: 280px;
+  max-width: 100%;
+  height: 24px;
+  margin: 2px 0 20px;
+}
+
+.skeleton-page-card {
+  width: 100%;
+  height: 240px;
+}
+
+.skeleton-ago {
+  width: 120px;
+  height: 12px;
+  margin: 1.5px 0;
+}
+
+.skeleton-sub {
+  width: 360px;
+  max-width: 100%;
+  height: 12px;
+  margin: 2.5px 0;
+}
+
+.skeleton-note {
+  width: 100%;
+  height: 36px;
+  border-radius: 8px;
+}
+
+.skeleton-stat-label {
+  width: 96px;
+  height: 12px;
+  margin: 1.5px 0;
+}
+
+.skeleton-stat-value {
+  width: 120px;
+  height: 24px;
+  margin: 3.5px 0;
+}
+
+.skeleton-stat-sub {
+  width: 150px;
+  height: 12px;
+  margin: 1.5px 0;
+}
+
+.skeleton-stat-bars {
+  width: 200px;
+  height: 36px;
+  border-radius: 2px;
+}
+
+.skeleton-title {
+  width: 180px;
+  height: 14px;
+  margin: 1.5px 0;
+}
+
+.skeleton-legend {
+  width: 190px;
+  height: 12px;
+}
+
+.skeleton-chart {
+  width: 100%;
+  height: 110px;
+  border-radius: 2px;
+}
+
+.skeleton-table-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-sizing: border-box;
+  height: 37px;
+  padding: 0 16px;
+  border-top: 1px solid var(--line);
+}
+
+.skeleton-cell {
+  flex: 1 1 0;
+  height: 12px;
+}
+
+.skeleton-cell-short {
+  flex: 0 0 80px;
+}
+
+.skeleton-field {
+  width: 100%;
+  height: 38px;
+  border-radius: 8px;
+}
+
+.add-domain .skeleton-field {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.skeleton-choices {
+  flex: 0 0 auto;
+  width: 210px;
+  height: 34px;
+}
+
+.skeleton-button {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 38px;
+  border-radius: var(--radius-md);
+}
+
+.skeleton-save-note {
+  width: 300px;
+  max-width: 100%;
+  height: 12px;
+}
+
 .banner-img {
   display: block;
   flex: 0 0 auto;

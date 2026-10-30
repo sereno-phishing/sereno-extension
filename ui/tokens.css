@@ -57,6 +57,10 @@
   --radius-pill: 999px;
   --shadow-soft: 0 1px 2px rgba(17, 24, 39, 0.06);
   --shadow-pop: 0 10px 24px rgba(17, 24, 39, 0.14);
+
+  /* Motion curves: ease-out for entrances and feedback, ease-in-out for loops. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 * {
@@ -369,6 +373,53 @@
 .footnote {
   font-size: 11px;
   color: var(--muted);
+}
+
+/* ---------- Loading skeletons ---------- */
+
+/* Decorative placeholder that mirrors the loaded layout. The caller sizes it
+   with its own class; one soft highlight sweeps across using transform only. */
+.skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: var(--slate-100);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+  transform: translateX(-100%);
+  animation: skeleton-sweep 1.6s var(--ease-in-out) infinite;
+}
+
+@keyframes skeleton-sweep {
+  to { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+}
+
+.skeleton-line {
+  height: 14px;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-circle {
+  border-radius: 50%;
+}
+
+.skeleton-pill {
+  border-radius: var(--radius-pill);
+}
+
+.skeleton-rect {
+  border-radius: var(--radius-lg);
 }
 
 /* ---------- Accessibility helpers ---------- */

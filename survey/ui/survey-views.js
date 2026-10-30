@@ -89,6 +89,11 @@
     );
   }
 
+  /* A skeleton line the size of the note it stands in for; the text is for assistive technology only. */
+  function loadingNote(text) {
+    return '<p class="sus-note" role="status"><span class="sr-only">' + text + "</span>" + ui.skeleton({ cls: "sus-skeleton" }) + "</p>";
+  }
+
   /* model: { state: "loading" | "error", error? }; error is a code (timeout, offline, server, cache_down). */
   function statusView(model) {
     var failed = model.state === "error";
@@ -97,7 +102,7 @@
       (failed
         ? ui.banner({ tone: "error", role: "alert", iconHtml: ui.art("bad", "16"), text: errorText(model.error) }) +
           ui.button({ label: t("retry"), variant: "ghost", action: "survey-status-retry" })
-        : '<p class="sus-note" role="status">' + t("loading") + '</p>') +
+        : loadingNote(t("loading"))) +
       ui.button({ label: t("close"), variant: "primary", cls: "sus-close", action: "survey-close" }) +
       "</div></section>"
     );
@@ -107,7 +112,7 @@
   function resultView(model) {
     var body = "";
     if (model.state === "submitting") {
-      body = '<p class="sus-note" role="status">' + t("submitting") + "</p>";
+      body = loadingNote(t("submitting"));
     } else if (model.state === "accepted" || model.state === "already") {
       body = '<h1 role="status">' + t("thanks") + "</h1>";
     } else {

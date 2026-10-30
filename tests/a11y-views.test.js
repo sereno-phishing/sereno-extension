@@ -411,5 +411,5 @@ test("captureFocus restores the selected language radio after a live rerender", 
 });
 
 test("the admin page shows a loading status until its first render replaces it", () => {
-  assert.match(read("app/admin/admin.html"), /<div id="app" class="options-shell">\s*<div class="card panel-status" role="status">Cargando el panel\.\.\.<\/div>\s*<\/div>/);
+  assert.match(read("app/admin/admin.html"), /<div id="app" class="options-shell">[\s\S]*<p class="sr-only" role="status">Cargando el panel\.\.\.<\/p>[\s\S]*<\/div>\s*<script/);
 });

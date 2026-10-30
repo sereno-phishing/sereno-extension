@@ -811,6 +811,42 @@ button {
   color: var(--red-600);
 }
 
+/* Loading rows: same padding, divider and text height as .history-item. */
+.history-skeleton-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.history-skeleton-text {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.history-skeleton-domain {
+  width: 55%;
+  height: 10px;
+  margin: 3px 0;
+}
+
+.history-skeleton-date {
+  width: 38%;
+  height: 9px;
+  margin: 3px 0;
+}
+
+.history-skeleton-pill {
+  flex: 0 0 auto;
+  width: 76px;
+  height: 19px;
+}
+
 .filter-empty {
   margin: 0 4px;
   font-size: 12.5px;
@@ -1108,6 +1144,11 @@ button {
   color: var(--muted);
 }
 
+.sus-skeleton {
+  width: 200px;
+  height: 15px;
+}
+
 .sus-close {
   width: 100%;
 }
@@ -1318,34 +1359,10 @@ button {
   padding: 24px 20px;
 }
 
-.boot-skeleton-line {
-  display: block;
-  height: 14px;
-  border-radius: var(--radius-sm);
-  background: var(--slate-100);
-}
-
 .boot-skeleton-title {
   height: 56px;
-  border-radius: var(--radius-lg);
 }
 
 .boot-skeleton-short {
   width: 60%;
-}
-
-.boot-skeleton-label {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .boot-skeleton-line {
-    animation: boot-pulse 1.2s ease-in-out infinite alternate;
-  }
-
-  @keyframes boot-pulse {
-    from { opacity: 0.55; }
-    to { opacity: 1; }
-  }
 }

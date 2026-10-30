@@ -86,9 +86,8 @@ test("the demo store turns its fade animations and transitions off for reduced m
   assert.match(block[1], /\.demo-panel[\s\S]*transition: none/);
 });
 
-test("the popup skeleton pulse runs only when motion is allowed", () => {
+test("the popup turns its tab slide off for reduced motion", () => {
   const css = read("app/popup/popup.css");
-  assert.match(css, /@media \(prefers-reduced-motion: no-preference\)\s*\{\s*\.boot-skeleton-line\s*\{\s*animation:/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.app-shell \.tabs\[data-tab-slide\]::before/);
 });
 

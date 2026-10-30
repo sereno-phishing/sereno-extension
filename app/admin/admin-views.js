@@ -62,6 +62,21 @@
     );
   }
 
+  /* First paint, before the session and the section are known: the sidebar and a
+     generic content block as skeletons. admin.html ships the same markup. */
+  function loadingPage(text) {
+    var skel = ui.skeleton;
+    return (
+      '<aside class="sidebar" aria-hidden="true">' +
+      '<div class="sidebar-brand">' + skel({ shape: "circle", cls: "skeleton-logo" }) + skel({ cls: "skeleton-name" }) + "</div>" +
+      '<div class="sidebar-nav">' + new Array(4).join(skel({ shape: "rect", cls: "skeleton-nav-item" })) + "</div>" +
+      '<div class="sidebar-foot"><div class="sidebar-user">' + skel({ shape: "circle", cls: "skeleton-avatar" }) +
+      '<div class="skeleton-user-lines">' + skel({ cls: "skeleton-user-name" }) + skel({ cls: "skeleton-user-role" }) + "</div></div></div></aside>" +
+      '<main class="options-content" id="main"><p class="sr-only" role="status">' + ui.esc(text) + "</p>" +
+      skel({ shape: "rect", cls: "skeleton-page-title" }) + skel({ shape: "rect", cls: "skeleton-page-card" }) + "</main>"
+    );
+  }
+
   function checkingGate() {
     return '<main class="access-gate" id="main" tabindex="-1"><div class="card panel-status" role="status">' + ui.esc(gateText("admin.checking")) + '</div></main>';
   }
@@ -127,6 +142,7 @@
   }
 
   Sereno.adminViews = {
-    page: page
+    page: page,
+    loadingPage: loadingPage
   };
 })(globalThis.Sereno = globalThis.Sereno || {});

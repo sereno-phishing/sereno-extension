@@ -80,12 +80,68 @@
     return ui.banner({ tone: "error", cls: "section-banner", role: "alert", iconHtml: ui.icon("bad", "banner-img"), text: text });
   }
 
-  /* A section that has no data to show: "loading", "error" (message + retry)
+  /* ---------------- loading skeletons ---------------- */
+
+  /* Placeholders reuse the containers of the loaded section (stat-grid, chart-card,
+     table-card...) so nothing moves when the data arrives. */
+  function skel(shape, cls) {
+    return ui.skeleton({ shape: shape, cls: cls });
+  }
+
+  function skelRows(count) {
+    return new Array(count + 1).join('<div class="skeleton-table-row">' + skel("line", "skeleton-cell") + skel("line", "skeleton-cell skeleton-cell-short") + "</div>");
+  }
+
+  function skelTable(withHead, rows) {
+    return '<div class="card table-card">' + (withHead ? '<div class="card-head">' + skel("line", "skeleton-title") + "</div>" : "") + skelRows(rows) + "</div>";
+  }
+
+  function skelStatCard() {
+    return (
+      '<div class="stat-card">' + skel("line", "skeleton-stat-label") + skel("line", "skeleton-stat-value") +
+      skel("line", "skeleton-stat-sub") + skel("rect", "skeleton-stat-bars") + "</div>"
+    );
+  }
+
+  function skelCacheCard() {
+    return '<div class="card cache-card">' + skel("line", "skeleton-title") + skel("line", "skeleton-sub") + skel("rect", "skeleton-field") + skel("rect", "skeleton-button") + "</div>";
+  }
+
+  function loadingBody(id) {
+    if (id === "dominios") {
+      return (
+        '<div class="card add-domain">' + skel("rect", "skeleton-field") + skel("pill", "skeleton-choices") + skel("rect", "skeleton-button") + "</div>" +
+        skelTable(false, 4) + skel("rect", "skeleton-note") +
+        '<div class="save-row">' + skel("line", "skeleton-save-note") + skel("rect", "skeleton-button") + "</div>"
+      );
+    }
+    if (id === "cache") {
+      return '<div class="cache-grid">' + skelCacheCard() + skelCacheCard() + "</div>" + skelTable(true, 3);
+    }
+    return (
+      skel("rect", "skeleton-note") +
+      '<div class="stat-grid">' + new Array(5).join(skelStatCard()) + "</div>" +
+      '<div class="card chart-card"><div class="card-head">' + skel("line", "skeleton-title") + skel("line", "skeleton-legend") + "</div>" + skel("rect", "skeleton-chart") + "</div>" +
+      skelTable(true, 3)
+    );
+  }
+
+  function loadingSection(model) {
+    var head = model.id === "metricas"
+      ? sectionHead(model.title, skel("line", "section-ago skeleton-ago"))
+      : '<div class="section-head"><div><h1 class="section-title">' + ui.esc(model.title) + "</h1>" + skel("line", "skeleton-sub") + "</div></div>";
+    return (
+      '<section class="section section-' + ui.esc(model.id) + '">' + head +
+      '<p class="sr-only" role="status">' + ui.esc(tr("Cargando...")) + "</p>" + loadingBody(model.id) + "</section>"
+    );
+  }
+
+  /* A section that has no data to show: "loading" (skeleton), "error" (message + retry)
      or "empty". model: { id, title, state, message } */
   function statusSection(model) {
     var body;
     if (model.state === "loading") {
-      body = '<div class="card panel-status" role="status">' + ui.esc(tr("Cargando...")) + '</div>';
+      return loadingSection(model);
     } else if (model.state === "error") {
       body =
         '<div class="card panel-status">' + errorBanner(model.message) +

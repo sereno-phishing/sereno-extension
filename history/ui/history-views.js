@@ -60,9 +60,20 @@
       '<p class="empty-sub">' + t("Cuando navegues, los sitios aparecerán aquí.") + '</p></div>';
   }
   function noMatch() { return '<p class="filter-empty">' + t("No hay sitios con este resultado.") + '</p>'; }
+  /* Placeholder rows shaped like historyItem; the loading text is for assistive technology only. */
+  var LOADING_ROWS = 5;
+  function loadingRow() {
+    return (
+      '<div class="history-skeleton-row"><div class="history-skeleton-text">' +
+      ui.skeleton({ cls: "history-skeleton-domain" }) + ui.skeleton({ cls: "history-skeleton-date" }) + "</div>" +
+      ui.skeleton({ shape: "pill", cls: "history-skeleton-pill" }) + "</div>"
+    );
+  }
   function loadingState() {
-    return '<div class="empty-state" role="status"><span class="empty-circle"></span>' +
-      '<p class="empty-title">' + t("Cargando tu historial...") + '</p></div>';
+    return (
+      '<div class="history-list" role="status"><span class="sr-only">' + t("Cargando tu historial...") + "</span>" +
+      new Array(LOADING_ROWS + 1).join(loadingRow()) + "</div>"
+    );
   }
 
   /* Error text from the data port plus the retry action. */
