@@ -109,18 +109,9 @@ p {
   padding: 8px 4px;
 }
 
-.sidebar-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.sidebar-user .avatar {
   flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
-  border-radius: 16px;
-  background: var(--indigo-50);
-  color: var(--indigo-600);
-  font-size: 12px;
-  font-weight: 600;
+  cursor: default;
 }
 
 .sidebar-username {
