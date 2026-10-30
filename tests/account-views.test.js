@@ -61,3 +61,12 @@ test("accountMenu keeps its default contract and can omit only the survey entry"
   assert.match(completedAdmin, /data-action="open-admin"[^>]*>Panel de administración/);
   assert.match(completedAdmin, /data-action="logout"[^>]*>Cerrar sesión/);
 });
+
+test("the header button is an initials avatar for every role", () => {
+  for (const isAdmin of [false, true]) {
+    const html = accountUi.accountButton({ username: "ana maria", isAdmin }, false);
+    assert.match(html, /class="avatar"/);
+    assert.match(html, />AM<\/button>/);
+    assert.doesNotMatch(html, /admin-pill/);
+  }
+});

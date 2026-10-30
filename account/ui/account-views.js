@@ -116,13 +116,10 @@
     });
   }
 
-  /* Header button that opens the account menu: "Admin" pill or the user's initials.
+  /* Header button that opens the account menu: the user's initials, for every role.
      open: whether the menu is showing (aria-expanded). */
   function accountButton(session, open) {
     var expanded = ' aria-expanded="' + !!open + '"';
-    if (account.isAdmin(session)) {
-      return '<button type="button" class="admin-pill" data-action="toggle-menu" aria-haspopup="menu"' + expanded + ">Admin</button>";
-    }
     return (
       '<button type="button" class="avatar" data-action="toggle-menu" aria-haspopup="menu"' + expanded + ' ' +
       'aria-label="' + ui.esc(t("accountOf") + session.username) + '">' + ui.esc(account.initials(session.username)) + "</button>"
