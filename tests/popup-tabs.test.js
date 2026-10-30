@@ -42,10 +42,10 @@ test("language selector appears only in the open user or admin account menu", ()
   assert.doesNotMatch(views.page({ view: "home", language: "es", menuOpen: true }, { session: null, currentSite: {} }), /language-es/);
 });
 
-test("Spanish survey content declares its language when the popup is English", () => {
+test("survey content follows the popup language without a language override", () => {
   const views = popupViews();
   const html = views.page({ view: "survey", language: "en", surveyAnswers: [], surveyIndex: 0 }, { session: null });
-  assert.match(html, /<main[^>]*lang="es"/);
+  assert.doesNotMatch(html, /<main[^>]*lang=/);
 });
 
 test("home and history use the same large tab variant with only selection state changing", () => {

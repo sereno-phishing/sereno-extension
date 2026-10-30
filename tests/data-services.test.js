@@ -267,7 +267,7 @@ test("survey views never expose the SUS score and distinguish pending, accepted,
   assert.match(surveyUi.questionView({ index: 0, selected: null }), /Tus respuestas no incluyen tu usuario/);
   assert.doesNotMatch(duplicate, /survey-retry|\/ 100/);
 
-  const failed = surveyUi.resultView({ state: "error", error: "Sin conexión. Revisa tu red e inténtalo de nuevo." });
+  const failed = surveyUi.resultView({ state: "error", error: "offline" });
   assert.match(failed, /role="alert"/);
   assert.match(failed, /Sin conexión/);
   assert.match(failed, /data-action="survey-retry"/);
@@ -279,7 +279,7 @@ test("survey status loading and failure do not render questions", () => {
   assert.match(loading, /Cargando/);
   assert.match(loading, /role="status"/);
   assert.doesNotMatch(loading, /Pregunta 1|data-action="answer"/);
-  const failed = Sereno.surveyUi.statusView({ state: "error", error: "Sin conexión." });
+  const failed = Sereno.surveyUi.statusView({ state: "error", error: "offline" });
   assert.match(failed, /role="alert"/);
   assert.match(failed, /data-action="survey-status-retry"/);
   assert.doesNotMatch(failed, /Pregunta 1|data-action="answer"/);

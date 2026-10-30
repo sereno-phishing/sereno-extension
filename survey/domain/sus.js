@@ -1,46 +1,38 @@
-/* Survey: the System Usability Scale (SUS) questionnaire and its scoring.
+/* Survey: the System Usability Scale (SUS) scale and its scoring.
+   Language-neutral: all user-visible text lives in survey/ui/survey-views.js.
    Classic script that registers Sereno.survey. Pure. */
 
 (function (Sereno) {
   "use strict";
 
-  var QUESTIONS = [
-    "Creo que me gustaría usar Sereno con frecuencia.",
-    "Encontré que Sereno era innecesariamente complejo.",
-    "Me pareció que Sereno era fácil de usar.",
-    "Creo que necesitaría apoyo técnico para poder usar Sereno.",
-    "Encontré que las distintas funciones de Sereno estaban bien integradas.",
-    "Encontré que Sereno era demasiado inconsistente.",
-    "Imagino que la mayoría de la gente aprendería a usar Sereno muy rápido.",
-    "Encontré que Sereno era muy engorroso de usar.",
-    "Me sentí muy seguro/a usando Sereno.",
-    "Necesité aprender muchas cosas antes de poder empezar a usar Sereno."
-  ];
+  var QUESTION_COUNT = 10;
 
   /* Likert scale values, 1 = strongly disagree, 5 = strongly agree. */
   var SCALE = [1, 2, 3, 4, 5];
 
   /* Lowest score of each band, highest band first. */
   var BANDS = [
-    { min: 85, id: "excelente", label: "Excelente" },
-    { min: 70, id: "bueno", label: "Bueno" },
-    { min: 50, id: "aceptable", label: "Aceptable" },
-    { min: -Infinity, id: "mejorar", label: "A mejorar" }
+    { min: 85, id: "excelente" },
+    { min: 70, id: "bueno" },
+    { min: 50, id: "aceptable" },
+    { min: -Infinity, id: "mejorar" }
   ];
 
   /* One slot per question; missing answers become null. */
   function draftAnswers(stored) {
     var source = stored || [];
-    return QUESTIONS.map(function (question, index) {
-      return source[index] || null;
-    });
+    var drafts = [];
+    for (var index = 0; index < QUESTION_COUNT; index += 1) {
+      drafts.push(source[index] || null);
+    }
+    return drafts;
   }
 
   /* Standard SUS: odd items score (value - 1), even items (5 - value), the
      sum times 2.5. Unanswered items count as 0. */
   function score(answers) {
     var total = 0;
-    for (var index = 0; index < QUESTIONS.length; index += 1) {
+    for (var index = 0; index < QUESTION_COUNT; index += 1) {
       var value = Number(answers[index]) || 0;
       total += index % 2 === 0 ? value - 1 : 5 - value;
     }
@@ -48,15 +40,15 @@
     var band = BANDS.filter(function (candidate) {
       return result >= candidate.min;
     })[0];
-    return { score: result, band: band.label, bandId: band.id };
+    return { score: result, bandId: band.id };
   }
 
   function isLastQuestion(index) {
-    return index >= QUESTIONS.length - 1;
+    return index >= QUESTION_COUNT - 1;
   }
 
   Sereno.survey = {
-    QUESTIONS: QUESTIONS,
+    QUESTION_COUNT: QUESTION_COUNT,
     SCALE: SCALE,
     draftAnswers: draftAnswers,
     score: score,

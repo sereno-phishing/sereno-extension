@@ -45,7 +45,8 @@ Con sesión iniciada, abre el menú de cuenta desde el badge de usuario o admini
 para elegir español o inglés. La preferencia se
 comparte entre las vistas y se conserva en el almacenamiento local de la extensión;
 si aún no existe, se usa el idioma del navegador (español para idiomas no admitidos).
-La encuesta SUS permanece en español hasta validar su versión en inglés. Los datos
+La encuesta SUS también sigue el selector de idioma (las respuestas guardadas son enteros 1-5 y no
+dependen del idioma). Los datos
 devueltos por el backend no se traducen. La descripción que Chrome muestra en la
 lista de extensiones usa el idioma del navegador, independientemente del selector.
 
@@ -181,7 +182,7 @@ sereno-extension/
 ├── verdict/                      # Veredicto y su resultado normalizado (outcome), caso de uso verdict-service, aviso en página, pills y badge
 ├── account/                      # Usuarios, sesión con token, roles; formularios y menú de cuenta
 ├── history/                      # Historial: deduplicación 60 s, tope 200, filtros; lista y detalle
-├── survey/                       # Encuesta SUS: preguntas y puntaje; vistas de la encuesta
+├── survey/                       # Encuesta SUS: escala y puntaje; vistas bilingües de la encuesta
 ├── onboarding/                   # Recorrido de 3 pasos
 ├── protection/                   # Sitio actual, nivel de protección, versión del modelo; navigation-service (navegación → veredicto, badge, mensaje)
 ├── administration/               # Política por dominio y caché (reglas, casos de uso, secciones del panel)

@@ -82,7 +82,7 @@ test("onboarding, protection and history localize without changing backend value
   assert.match(app.onboardingUi.view(1), /Revisamos el sitio/);
 });
 
-test("popup localizes surrounding UI while keeping SUS Spanish", () => {
+test("popup localizes the surrounding UI and the SUS survey", () => {
   const app = load("survey/domain/sus.js", "survey/ui/survey-views.js", "app/popup/popup-views.js");
   app.i18n.use("en");
   const state = { session: null, currentSite: { domain: "example.es", status: "seguro" } };
@@ -91,7 +91,7 @@ test("popup localizes surrounding UI while keeping SUS Spanish", () => {
   assert.match(home, /This site/);
   assert.match(home, /example\.es/);
   const survey = app.popupViews.page({ view: "survey", language: "en", surveyIndex: 0, surveyAnswers: [] }, state);
-  assert.match(survey, /<main[^>]*lang="es"/);
-  assert.match(survey, /Totalmente en desacuerdo/);
+  assert.doesNotMatch(survey, /<main[^>]*lang=/);
+  assert.match(survey, /Strongly disagree/);
   assert.match(survey, /Privacy policy/);
 });

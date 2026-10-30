@@ -350,7 +350,7 @@ test("a failed survey status is honest and retry can reveal the questionnaire", 
   await settle();
   assert.equal(popup.renders.at(-1).view, "surveyStatus");
   assert.equal(popup.renders.at(-1).surveyStatus, "error");
-  assert.match(popup.renders.at(-1).surveyStatusError, /Sin conexión/);
+  assert.equal(popup.renders.at(-1).surveyStatusError, "offline");
   offline = false;
   popup.actions["survey-status-retry"]();
   await settle();

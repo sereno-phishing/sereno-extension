@@ -162,7 +162,7 @@
     if (!result.ok) {
       App.surveyMenuStatus = "error";
       App.surveyStatus = "error";
-      App.surveyStatusError = result.message;
+      App.surveyStatusError = result.error;
       App.view = "surveyStatus";
     } else if (result.submitted) {
       App.surveyMenuStatus = "submitted";
@@ -202,7 +202,7 @@
       App.surveySubmission = "already";
     } else {
       App.surveySubmission = "error";
-      App.surveyError = result.message;
+      App.surveyError = result.error;
     }
     render();
   }

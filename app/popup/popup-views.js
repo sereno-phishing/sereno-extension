@@ -163,7 +163,7 @@
     return (
       header(model, state) +
       sessionNotice(model, state) +
-      '<main class="app-content" id="content"' + (/^survey/.test(model.view) ? ' lang="es"' : "") + (model.confirmOpen ? " inert" : "") + ">" + content(model, state) + "</main>" +
+      '<main class="app-content" id="content"' + (model.confirmOpen ? " inert" : "") + ">" + content(model, state) + "</main>" +
       footer(state, model) +
       (model.menuOpen && state.session
         ? accountUi.accountMenu(state.session, { language: model.language, showSurvey: model.surveyMenuStatus !== "loading" && model.surveyMenuStatus !== "submitted" })
