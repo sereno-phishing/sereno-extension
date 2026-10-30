@@ -61,15 +61,25 @@
     );
   }
 
-  /* model: { index, selected }. All text comes from the survey.* catalog. */
+  /* Share of the survey done at a question index, in percent. */
+  function progressOf(index) {
+    return Math.round(((index + 1) / survey.QUESTION_COUNT) * 100);
+  }
+
+  /* model: { index, selected, from? }. All text comes from the survey.* catalog.
+     from is the previous index and is set only for the render that follows a
+     change of question: it asks for the one-shot entrance and the fill advancing
+     from where it was. The fill is a full-width bar shifted left by what is left. */
   function questionView(model) {
     var total = survey.QUESTION_COUNT;
-    var progress = Math.round(((model.index + 1) / total) * 100);
+    var progress = progressOf(model.index);
+    var moved = typeof model.from === "number";
+    var fillStyle = "transform:translateX(" + (progress - 100) + "%)" + (moved ? ";--progress-from:" + (progressOf(model.from) - 100) + "%" : "");
     return (
-      '<section class="view view-survey">' +
+      '<section class="view view-survey"' + (moved ? " data-enter" : "") + ">" +
       '<button type="button" class="back-link" data-action="survey-close">← ' + t("back") + '</button>' +
       '<div class="survey-meta">' + fill(t("progress"), { n: model.index + 1, total: total }) + "</div>" +
-      '<div class="progress-track" role="progressbar" aria-label="' + t("progressLabel") + '" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + progress + '"><div class="progress-fill" style="width:' + progress + '%"></div></div>' +
+      '<div class="progress-track" role="progressbar" aria-label="' + t("progressLabel") + '" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + progress + '"><div class="progress-fill" style="' + fillStyle + '"></div></div>' +
       '<h1 class="survey-question">' + ui.esc(t("q" + (model.index + 1))) + "</h1>" +
       '<div class="scale" role="group" aria-label="' + fill(t("scaleLabel"), { min: survey.SCALE[0], max: survey.SCALE[survey.SCALE.length - 1] }) + '">' + survey.SCALE.map(function (value) {
         return scaleButton(value, model.selected);
@@ -108,13 +118,14 @@
     );
   }
 
-  /* model.state: "submitting" | "accepted" | "already" | "error"; error is a code as in statusView. */
+  /* model.state: "submitting" | "accepted" | "already" | "error"; error is a code as in statusView.
+     model.enter asks for the thank-you entrance and applies to "accepted" only. */
   function resultView(model) {
     var body = "";
     if (model.state === "submitting") {
       body = loadingNote(t("submitting"));
     } else if (model.state === "accepted" || model.state === "already") {
-      body = '<h1 role="status">' + t("thanks") + "</h1>";
+      body = '<h1 role="status"' + (model.state === "accepted" && model.enter ? " data-enter" : "") + ">" + t("thanks") + "</h1>";
     } else {
       body = '<h1>' + t("failed") + "</h1>" +
         ui.banner({ tone: "error", role: "alert", iconHtml: ui.art("bad", "16"), text: errorText(model.error) }) +

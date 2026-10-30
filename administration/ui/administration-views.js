@@ -195,12 +195,13 @@
     );
   }
 
-  function chartCard(hourly) {
+  /* enter: the metrics have just loaded, so the bars rise once (one-shot entrance). */
+  function chartCard(hourly, enter) {
     return (
       '<div class="card chart-card">' + cardHead(tr("Consultas por hora"), chartLegend()) +
-      '<div class="chart" role="img" aria-label="' + ui.esc(tr("Gráfico de barras de consultas por hora en las últimas 24 horas, por resultado")) + '">' +
-      (hourly || []).map(function (hour) {
-        return '<span class="chart-bar level-' + ui.esc(hour.level) + '" style="height:' + hour.height + 'px"></span>';
+      '<div class="chart"' + (enter ? " data-enter" : "") + ' role="img" aria-label="' + ui.esc(tr("Gráfico de barras de consultas por hora en las últimas 24 horas, por resultado")) + '">' +
+      (hourly || []).map(function (hour, index) {
+        return '<span class="chart-bar level-' + ui.esc(hour.level) + '" style="height:' + hour.height + 'px' + (enter ? ";--i:" + index : "") + '"></span>';
       }).join("") +
       "</div></div>"
     );
@@ -224,7 +225,7 @@
     });
   }
 
-  /* model: { metrics, showAllQueries } */
+  /* model: { metrics, showAllQueries, enter? } */
   function metricsSection(model) {
     var metrics = model.metrics;
     if (!metrics || typeof metrics.analyzed !== "number") {
@@ -235,7 +236,7 @@
       sectionHead(tr("Métricas de operación"), '<span class="section-ago">' + ui.esc(tr("Últimas 24 horas")) + '</span>') +
       '<div class="note-bar">' + ui.esc(tr("Datos simulados para la demostración; no son métricas personales ni del backend.")) + '</div>' +
       '<div class="stat-grid">' + statCards(metrics) + "</div>" +
-      chartCard(metrics.hourly) +
+      chartCard(metrics.hourly, model.enter) +
       queriesCard(metrics.queries || [], model.showAllQueries) +
       "</section>"
     );

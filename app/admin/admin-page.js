@@ -48,6 +48,8 @@
     showAllQueries: false,
     addPolicy: domainPolicy.DEFAULT_POLICY,
     metrics: null,
+    // One-shot: the bars rise on the first render that shows freshly loaded metrics.
+    chartEnter: false,
     cache: null,
     domainsStored: [],
     domainsDraft: [],
@@ -80,6 +82,7 @@
 
   function resetPrivilegedState() {
     App.metrics = null;
+    App.chartEnter = false;
     App.cache = null;
     App.domainsStored = [];
     App.domainsDraft = [];
@@ -102,8 +105,14 @@
       return;
     }
     var restoreFocus = Sereno.ui.captureFocus(root);
+    var showsChart = App.authorization === "authorized" && App.section === "metricas" && App.load.metricas.status === "ready";
+    var animatesChart = App.chartEnter && showsChart;
     root.innerHTML = Sereno.adminViews.page(App, App.state);
     restoreFocus();
+    // Redraws replace the bars, so the entrance is spent once it has been drawn.
+    if (animatesChart) {
+      App.chartEnter = false;
+    }
   }
 
   function timedNotice(field, hiddenValue) {
@@ -181,6 +190,7 @@
       App.cache = result.cache;
     } else if (result.ok) {
       App.metrics = result.metrics;
+      App.chartEnter = true;
     }
     App.load[id] = result.ok ? { status: "ready" } : { status: "error", message: result.message };
     App.loadErrors[id] = result.ok ? null : result.error;

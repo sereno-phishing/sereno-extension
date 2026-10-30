@@ -507,6 +507,25 @@ p {
   background: var(--red-600);
 }
 
+/* First data only: the bars rise from the baseline in a short cascade, capped at twelve steps. */
+.chart[data-enter] .chart-bar {
+  transform-origin: bottom;
+  animation: chart-bar-grow 300ms var(--ease-out) both;
+  animation-delay: calc(min(var(--i), 11) * 25ms);
+}
+
+@keyframes chart-bar-grow {
+  from { opacity: 0; transform: scaleY(0.1); }
+}
+
+/* Reduced motion: the bars fade in together instead of rising. */
+@media (prefers-reduced-motion: reduce) {
+  .chart[data-enter] .chart-bar {
+    animation-name: motion-fade;
+    animation-delay: 0s;
+  }
+}
+
 .legend {
   display: flex;
   align-items: flex-start;

@@ -294,7 +294,7 @@ button {
 }
 
 .app-shell .tabs[data-tab-slide]::before {
-  animation: tab-indicator-slide 400ms cubic-bezier(0.2, 0, 0.2, 1);
+  animation: tab-indicator-slide 240ms var(--ease-in-out);
 }
 
 @keyframes tab-indicator-slide {
@@ -772,6 +772,16 @@ button {
   background: var(--soft);
 }
 
+/* First load only: the rows settle in a short cascade, capped at eight steps. */
+.history-list[data-enter] .history-item {
+  animation: history-item-enter 200ms var(--ease-out) both;
+  animation-delay: calc(min(var(--i), 7) * 35ms);
+}
+
+@keyframes history-item-enter {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
 .history-item > span:first-child {
   display: flex;
   flex: 1 1 0;
@@ -1032,10 +1042,30 @@ button {
   overflow: hidden;
 }
 
+/* The fill is as wide as the track and shifted left by the unfinished part, so
+   it moves on the compositor and keeps its rounded end. */
 .progress-fill {
+  width: 100%;
   height: 100%;
   border-radius: 4px;
   background: var(--indigo-600);
+}
+
+/* Only when the question changed: the fill advances from the previous step. */
+.view-survey[data-enter] .progress-fill {
+  animation: progress-advance 240ms var(--ease-out);
+}
+
+@keyframes progress-advance {
+  from { transform: translateX(var(--progress-from)); }
+}
+
+.view-survey[data-enter] .survey-question {
+  animation: question-enter 180ms var(--ease-out);
+}
+
+@keyframes question-enter {
+  from { opacity: 0; transform: translateY(6px); }
 }
 
 .survey-question {
@@ -1063,10 +1093,15 @@ button {
   font-weight: 600;
   line-height: normal;
   cursor: pointer;
+  transition: transform 160ms var(--ease-out);
 }
 
 .scale-btn:hover {
   background: var(--soft);
+}
+
+.scale-btn:active {
+  transform: scale(0.97);
 }
 
 .scale-btn.is-selected,
@@ -1098,6 +1133,15 @@ button {
 .survey-actions .btn {
   flex: 1 1 0;
   min-width: 0;
+}
+
+/* Rare moment, so a calm entrance is allowed: it runs once, on acceptance. */
+.sus-result h1[data-enter] {
+  animation: thanks-enter 300ms var(--ease-out);
+}
+
+@keyframes thanks-enter {
+  from { opacity: 0; transform: translateY(8px); }
 }
 
 .sus-result {
@@ -1165,6 +1209,7 @@ button {
   position: absolute;
   top: 52px;
   right: 12px;
+  transform-origin: top right;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -1174,6 +1219,15 @@ button {
   border-radius: var(--radius-md);
   background: var(--bg);
   box-shadow: var(--shadow-fig);
+}
+
+/* Only on the render that opens it; it grows from the avatar corner. Closing is instant. */
+.account-menu[data-enter] {
+  animation: menu-enter 150ms var(--ease-out);
+}
+
+@keyframes menu-enter {
+  from { opacity: 0; transform: scale(0.95); }
 }
 
 .menu-head {
@@ -1269,10 +1323,15 @@ button {
   line-height: normal;
   text-align: left;
   cursor: pointer;
+  transition: transform 160ms var(--ease-out);
 }
 
 .menu-item:hover {
   background: var(--soft);
+}
+
+.menu-item:active {
+  transform: scale(0.97);
 }
 
 .menu-item-danger,
@@ -1365,4 +1424,28 @@ button {
 
 .boot-skeleton-short {
   width: 60%;
+}
+
+/* Reduced motion keeps the feedback but drops the movement: the entrances fade,
+   the progress fill jumps and presses do not scale. Last, so it wins the cascade. */
+@media (prefers-reduced-motion: reduce) {
+  .scale-btn:active,
+  .menu-item:active {
+    transform: none;
+  }
+
+  .account-menu[data-enter],
+  .view-survey[data-enter] .survey-question,
+  .sus-result h1[data-enter] {
+    animation-name: motion-fade;
+  }
+
+  .view-survey[data-enter] .progress-fill {
+    animation: none;
+  }
+
+  .history-list[data-enter] .history-item {
+    animation-name: motion-fade;
+    animation-delay: 0s;
+  }
 }

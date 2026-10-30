@@ -131,16 +131,17 @@
           filter: model.historyFilter,
           loading: model.historyLoading,
           error: model.historyError,
-          errorCode: model.historyErrorCode
+          errorCode: model.historyErrorCode,
+          enter: model.enter === "history"
         });
       case "detail":
         return historyUi.detailView(history.findById(userEntries(model), model.detailId));
       case "surveyStatus":
         return surveyUi.statusView({ state: model.surveyStatus, error: model.surveyStatusError });
       case "survey":
-        return surveyUi.questionView({ index: model.surveyIndex, selected: model.surveyAnswers[model.surveyIndex] });
+        return surveyUi.questionView({ index: model.surveyIndex, selected: model.surveyAnswers[model.surveyIndex], from: model.surveyFrom });
       case "surveyResult":
-        return surveyUi.resultView({ state: model.surveySubmission, error: model.surveyError });
+        return surveyUi.resultView({ state: model.surveySubmission, error: model.surveyError, enter: model.enter === "thanks" });
       default:
         return home(state, model);
     }
@@ -166,7 +167,7 @@
       '<main class="app-content" id="content"' + (model.confirmOpen ? " inert" : "") + ">" + content(model, state) + "</main>" +
       footer(state, model) +
       (model.menuOpen && state.session
-        ? accountUi.accountMenu(state.session, { language: model.language, showSurvey: model.surveyMenuStatus !== "loading" && model.surveyMenuStatus !== "submitted" })
+        ? accountUi.accountMenu(state.session, { language: model.language, showSurvey: model.surveyMenuStatus !== "loading" && model.surveyMenuStatus !== "submitted", enter: model.enter === "menu" })
         : "") +
       (model.confirmOpen ? historyUi.clearConfirm() : "")
     );

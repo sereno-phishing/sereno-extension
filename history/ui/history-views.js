@@ -44,9 +44,11 @@
     return chunks[0] + (chunks[1] ? " · " + chunks[1] : "");
   }
 
-  function historyItem(entry) {
+  /* position (optional) numbers the row for the entrance cascade; omit it for a still row. */
+  function historyItem(entry, position) {
     return (
-      '<button type="button" class="history-item" data-action="open-detail" data-id="' + ui.esc(entry.id) + '">' +
+      '<button type="button" class="history-item"' + (position === undefined ? "" : ' style="--i:' + position + '"') +
+      ' data-action="open-detail" data-id="' + ui.esc(entry.id) + '">' +
       '<span><span class="history-domain">' + ui.esc(entry.domain) + "</span>" +
       '<span class="history-date">' + ui.esc(listDate(entry.ts)) + "</span></span>" +
       '<span class="history-right">' + local.pill(entry.status, "sm") + '<span class="chevron" aria-hidden="true">›</span></span>' +
@@ -76,6 +78,14 @@
     );
   }
 
+  /* enter: the list has just replaced its skeleton, so the rows cascade in once. */
+  function entryList(entries, enter) {
+    return (
+      '<div class="history-list"' + (enter ? " data-enter" : "") + ">" +
+      entries.map(function (entry, index) { return historyItem(entry, enter ? index : undefined); }).join("") + "</div>"
+    );
+  }
+
   /* Error text from the data port plus the retry action. */
   function errorNotice(message, code) {
     // Only local provider messages are translated; arbitrary port text stays intact.
@@ -87,13 +97,14 @@
     );
   }
 
-  /* model: { tabsHtml, entries, filter, loading?, error? }
-     loading: the list has not arrived yet; error: Spanish text of the failure. */
+  /* model: { tabsHtml, entries, filter, loading?, error?, enter? }
+     loading: the list has not arrived yet; error: Spanish text of the failure;
+     enter: the list has just replaced its skeleton (one-shot entrance). */
   function listView(model) {
     var filtered = history.filter(model.entries, model.filter);
     var body;
     if (model.error) {
-      body = errorNotice(model.error, model.errorCode) + (model.entries.length ? '<div class="history-list">' + filtered.map(historyItem).join("") + "</div>" : "");
+      body = errorNotice(model.error, model.errorCode) + (model.entries.length ? entryList(filtered) : "");
     } else if (model.loading && !model.entries.length) {
       body = loadingState();
     } else if (!model.entries.length) {
@@ -101,7 +112,7 @@
     } else if (!filtered.length) {
       body = noMatch();
     } else {
-      body = '<div class="history-list">' + filtered.map(historyItem).join("") + "</div>";
+      body = entryList(filtered, model.enter);
     }
     return (
       '<section class="view view-history"><h1 class="sr-only">' + t("Historial") + '</h1>' + model.tabsHtml +

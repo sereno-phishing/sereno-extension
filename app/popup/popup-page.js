@@ -31,6 +31,10 @@
     onboardingStep: 1,
     tab: "home",
     tabSlide: null,
+    // One-shot entrance requested for the next render only: "menu", "thanks" or "history".
+    enter: null,
+    // Previous question index for the render that follows a change of question.
+    surveyFrom: null,
     historyFilter: history.ALL,
     detailId: null,
     surveyIndex: 0,
@@ -105,8 +109,10 @@
     if (typeof root.removeAttribute === "function") {
       root.removeAttribute("aria-busy");
     }
-    // Each render replaces the tabs, so animate only the requested tab change.
+    // Each render replaces the nodes, so an entrance runs only for the render that asked for it.
     App.tabSlide = null;
+    App.enter = null;
+    App.surveyFrom = null;
   }
 
   /* ---------------- survey flow ---------------- */
@@ -196,6 +202,7 @@
       App.surveyMenuStatus = "submitted";
       App.surveyStatus = "submitted";
       App.surveySubmission = "accepted";
+      App.enter = "thanks";
     } else if (result.error === "already_submitted") {
       App.surveyMenuStatus = "submitted";
       App.surveyStatus = "submitted";
@@ -225,6 +232,7 @@
       submitSurvey();
       return;
     }
+    App.surveyFrom = App.surveyIndex;
     App.surveyIndex += 1;
     render();
   }
@@ -305,6 +313,10 @@
       return;
     }
     if (result.ok) {
+      // The list replaces the skeleton: its rows settle in once.
+      if (App.historyLoading && result.entries.length) {
+        App.enter = "history";
+      }
       setData({ historyEntries: result.entries, historyLoading: false, historyError: null, historyErrorCode: null });
     } else {
       setData({ historyLoading: false, historyError: result.message, historyErrorCode: result.error || null });
@@ -439,6 +451,7 @@
     },
     "toggle-menu": function () {
       App.menuOpen = !App.menuOpen;
+      App.enter = App.menuOpen ? "menu" : null;
       render();
       focusFirst(App.menuOpen ? ".menu-item" : '[data-action="toggle-menu"]');
     },
@@ -476,6 +489,7 @@
     },
     "survey-back": function () {
       if (App.surveyIndex > 0) {
+        App.surveyFrom = App.surveyIndex;
         App.surveyIndex -= 1;
         render();
       }

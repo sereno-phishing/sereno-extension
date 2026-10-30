@@ -674,3 +674,110 @@ test("the model version is loaded once per user, not again when the notice is di
   await settle();
   assert.equal(loads, 1);
 });
+
+/* ---------------- one-shot motion hooks ---------------- */
+
+test("the account menu animates only on the render that opens it", async () => {
+  const popup = await popupHarness({ state: { session: USER } });
+  assert.ok(popup.renders.every((model) => model.enter === null));
+  popup.actions["toggle-menu"]();
+  assert.equal(popup.renders.at(-1).menuOpen, true);
+  assert.equal(popup.renders.at(-1).enter, "menu");
+  popup.emitState({});
+  assert.equal(popup.renders.at(-1).menuOpen, true);
+  assert.equal(popup.renders.at(-1).enter, null);
+  popup.actions["toggle-menu"]();
+  assert.equal(popup.renders.at(-1).menuOpen, false);
+  assert.equal(popup.renders.at(-1).enter, null);
+  popup.actions["toggle-menu"]();
+  assert.equal(popup.renders.at(-1).enter, "menu");
+});
+
+test("the survey question animates only when the question index changes", async () => {
+  const popup = await popupHarness({ state: { session: USER } });
+  popup.actions["open-survey"]();
+  await settle();
+  assert.equal(popup.renders.at(-1).view, "survey");
+  assert.equal(popup.renders.at(-1).surveyFrom, null);
+  popup.actions.answer({ getAttribute: () => "3" });
+  assert.equal(popup.renders.at(-1).surveyFrom, null);
+  popup.actions["survey-next"]();
+  assert.equal(popup.renders.at(-1).surveyIndex, 1);
+  assert.equal(popup.renders.at(-1).surveyFrom, 0);
+  popup.emitState({});
+  assert.equal(popup.renders.at(-1).surveyFrom, null);
+  popup.actions.answer({ getAttribute: () => "4" });
+  assert.equal(popup.renders.at(-1).surveyFrom, null);
+  popup.actions["survey-back"]();
+  assert.equal(popup.renders.at(-1).surveyIndex, 0);
+  assert.equal(popup.renders.at(-1).surveyFrom, 1);
+  popup.emitState({});
+  assert.equal(popup.renders.at(-1).surveyFrom, null);
+});
+
+test("the thank-you entrance runs once, for an accepted submission only", async () => {
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const popup = await popupHarness({
+    state: { session: USER, survey: { byUser: {} } },
+    services: { survey: { status: async () => ({ ok: true, submitted: false }), submit: () => pending } }
+  });
+  popup.actions["open-survey"]();
+  await settle();
+  for (let step = 0; step < 10; step += 1) {
+    popup.actions.answer({ getAttribute: () => "3" });
+    popup.actions["survey-next"]();
+  }
+  assert.equal(popup.renders.at(-1).surveySubmission, "submitting");
+  assert.ok(popup.renders.every((model) => model.enter !== "thanks"));
+  release({ ok: true });
+  await settle();
+  assert.equal(popup.renders.at(-1).surveySubmission, "accepted");
+  assert.equal(popup.renders.at(-1).enter, "thanks");
+  popup.emitState({});
+  assert.equal(popup.renders.at(-1).surveySubmission, "accepted");
+  assert.equal(popup.renders.at(-1).enter, null);
+});
+
+test("an earlier submission shows the thank-you screen without the entrance", async () => {
+  const popup = await popupHarness({
+    state: { session: USER },
+    services: { survey: { status: async () => ({ ok: true, submitted: true }), submit: async () => ({ ok: true }) } }
+  });
+  popup.actions["open-survey"]();
+  await settle();
+  assert.equal(popup.renders.at(-1).surveySubmission, "already");
+  assert.ok(popup.renders.every((model) => model.enter !== "thanks"));
+});
+
+test("history rows stagger in once, when the first load replaces the skeleton", async () => {
+  const entries = [{ id: "h-1", domain: "a.pe", status: "seguro", score: 0.1, source: "modelo", ts: "2026-09-21T10:00", latencyMs: 10 }];
+  const popup = await popupHarness({
+    state: { session: USER },
+    historyService: { list: async () => ({ ok: true, entries }), clear: async () => ({ ok: true }) }
+  });
+  await settle();
+  const loaded = popup.renders.filter((model) => !model.historyLoading && model.historyEntries.length);
+  assert.ok(popup.renders.some((model) => model.historyLoading), "the skeleton rendered first");
+  assert.equal(loaded[0].enter, "history");
+  assert.equal(popup.renders.filter((model) => model.enter === "history").length, 1);
+  popup.actions.tab({ getAttribute: () => "history" });
+  await settle();
+  popup.actions.filter({ getAttribute: () => "all" });
+  popup.emitState({});
+  const after = popup.renders.slice(popup.renders.indexOf(loaded[0]) + 1);
+  assert.ok(after.length >= 3);
+  assert.ok(after.every((model) => model.enter === null));
+});
+
+test("a failed or empty history load does not request the stagger", async () => {
+  const empty = await popupHarness({ state: { session: USER } });
+  await settle();
+  assert.ok(empty.renders.every((model) => model.enter !== "history"));
+  const failed = await popupHarness({
+    state: { session: USER },
+    historyService: { list: async () => ({ ok: false, message: "down", error: "server" }), clear: async () => ({ ok: true }) }
+  });
+  await settle();
+  assert.ok(failed.renders.every((model) => model.enter !== "history"));
+});

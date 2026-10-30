@@ -94,6 +94,11 @@
   text-align: center;
   text-decoration: none;
   cursor: pointer;
+  transition: transform 160ms var(--ease-out);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .btn:disabled {
@@ -368,6 +373,15 @@
   cursor: pointer;
 }
 
+/* The avatar is also a decorative span in the admin sidebar: only the button presses. */
+button.avatar {
+  transition: transform 160ms var(--ease-out);
+}
+
+button.avatar:active {
+  transform: scale(0.97);
+}
+
 /* ---------- Misc ---------- */
 
 .footnote {
@@ -399,9 +413,19 @@
   to { transform: translateX(100%); }
 }
 
+/* Shared entrance for reduced motion: the same one-shot hooks fade in without moving. */
+@keyframes motion-fade {
+  from { opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skeleton::after {
     animation: none;
+  }
+
+  .btn:active:not(:disabled),
+  button.avatar:active {
+    transform: none;
   }
 }
 

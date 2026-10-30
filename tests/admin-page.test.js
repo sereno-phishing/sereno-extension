@@ -217,3 +217,23 @@ test("a failed save keeps the draft and shows the message; a good one clears it"
   assert.equal(renders.at(-1).domainsError, "");
   assert.equal(renders.at(-1).domainsBanner, true);
 });
+
+test("chart bars grow in once, on the render that first shows the loaded metrics", async () => {
+  const harness = await adminHarness(service(), undefined, undefined, "#dominios");
+  assert.ok(harness.renders.some((model) => model.load.metricas.status === "ready"));
+  harness.navigate("#metricas");
+  assert.equal(harness.renders.at(-1).section, "metricas");
+  assert.equal(harness.renders.at(-1).chartEnter, true);
+  harness.actions["toggle-queries"]();
+  assert.equal(harness.renders.at(-1).chartEnter, false);
+  harness.navigate("#cache");
+  harness.navigate("#metricas");
+  assert.equal(harness.renders.at(-1).chartEnter, false);
+});
+
+test("the chart entrance is consumed by the first visible metrics render", async () => {
+  const harness = await adminHarness(service(), undefined, undefined, "#metricas");
+  const shown = harness.renders.filter((model) => model.section === "metricas" && model.load.metricas.status === "ready");
+  assert.equal(shown[0].chartEnter, true);
+  assert.ok(shown.slice(1).every((model) => model.chartEnter === false));
+});

@@ -21,10 +21,16 @@ Strict TDD where a deterministic test exists (markup/contract tests); CSS motion
 
 ## Work units
 - [x] T1 Skeleton primitive + loading surfaces (popup boot, history list, admin initial + sections, survey status/submitting, protection pending, account menu survey item).
-- [ ] T2 Motion: press feedback, account menu popover, survey question/progress/thanks, history first-load stagger, admin chart bars, verdict modal enter.
+- [x] T2 Motion: press feedback, account menu popover, survey question/progress/thanks, history first-load stagger, admin chart bars, verdict modal enter, tab indicator 240ms (writer done, 502 tests pass; not committed).
 
 ## Rejected (gate)
 Tab switching and hover on list rows (tens/day: no or imperceptible), protection polling updates, keyboard-initiated actions.
 
+## T2 notes
+- Containers redraw with innerHTML, so entrances hang on one-shot `data-enter` hooks: `App.enter` ("menu" | "thanks" | "history"), `App.surveyFrom`, admin `App.chartEnter`; each is cleared by the render that consumed it (tests prove plain redraws carry no hook).
+- Progress fill uses translateX (not scaleX) so the rounded end is not stretched.
+- Skipped: thank-you checkmark (adds an element, changes layout); exits (menu, verdict dialog close instantly).
+- Tab indicator moved from 400ms to 240ms --ease-in-out; its pinned test was updated.
+
 ## Next step
-T1 done (478 tests pass). Skipped: protection card (aria-busy on real content), account menu item (hidden while loading), admin session check. Next: T2 motion.
+T2 written; needs a manual feel-check in the real popup, admin and page, then a work-unit commit.

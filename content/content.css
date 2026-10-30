@@ -48,6 +48,39 @@
   background: rgba(15, 23, 42, 0.5);
 }
 
+/* Entrance of a security warning: calm and brief, opening only. The card and the
+   backdrop fade in; the card also settles from 0.98 when motion is allowed. */
+.verdict-dialog[open]::backdrop {
+  opacity: 1;
+  transition: opacity 200ms var(--ease-out);
+}
+
+.verdict-dialog[open] .verdict-modal {
+  transition: opacity 200ms var(--ease-out);
+}
+
+@starting-style {
+  .verdict-dialog[open]::backdrop {
+    opacity: 0;
+  }
+
+  .verdict-dialog[open] .verdict-modal {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .verdict-dialog[open] .verdict-modal {
+    transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+  }
+
+  @starting-style {
+    .verdict-dialog[open] .verdict-modal {
+      transform: scale(0.98);
+    }
+  }
+}
+
 .verdict-dialog .verdict-details[hidden] {
   display: none;
 }

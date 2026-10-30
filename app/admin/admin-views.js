@@ -122,7 +122,7 @@
       case "cache":
         return administrationUi.cacheSection({ cache: model.cache, notice: model.cacheNotice, error: model.cacheError, errorCode: model.cacheErrorCode });
       default:
-        return administrationUi.metricsSection({ metrics: model.metrics, showAllQueries: model.showAllQueries });
+        return administrationUi.metricsSection({ metrics: model.metrics, showAllQueries: model.showAllQueries, enter: model.chartEnter });
     }
   }
 

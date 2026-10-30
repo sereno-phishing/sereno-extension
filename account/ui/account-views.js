@@ -135,12 +135,14 @@
 
   var SEPARATOR = '<div class="menu-sep"></div>';
 
+  /* options: { language, showSurvey, enter }. enter requests the one-shot opening
+     animation; it is set only for the render that opens the menu. */
   function accountMenu(session, options) {
     options = options || {};
     var surveyEntry = options.showSurvey === false ? "" : SEPARATOR + menuItem("open-survey", t("survey"));
     return (
       '<div class="menu-overlay" data-action="close-menu">' +
-      '<div class="account-menu" data-action="menu-content" role="menu" aria-label="' + ui.esc(t("account")) + '">' +
+      '<div class="account-menu"' + (options.enter ? " data-enter" : "") + ' data-action="menu-content" role="menu" aria-label="' + ui.esc(t("account")) + '">' +
       '<div class="menu-head"><div class="menu-user">' + ui.esc(session.username) + "</div>" +
       '<div class="menu-role">' + t("role") + t(account.isAdmin(session) ? "roleAdmin" : "roleUser") + "</div></div>" +
       (account.isAdmin(session) ? menuItem("open-admin", t("admin")) : "") +

@@ -75,9 +75,9 @@ test("tab indicator requests animation only for the destination of an explicit t
   }
 });
 
-test("tab indicator motion is transform-only, 400ms and disabled for reduced motion", () => {
+test("tab indicator motion is transform-only, 240ms and disabled for reduced motion", () => {
   const css = fs.readFileSync(path.join(ROOT, "app/popup/popup.css"), "utf8");
-  assert.match(css, /animation: tab-indicator-slide 400ms/);
+  assert.match(css, /animation: tab-indicator-slide 240ms var\(--ease-in-out\)/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.app-shell \.tabs\[data-tab-slide\]::before\s*\{\s*animation: none;/);
   const indicator = css.match(/\.app-shell \.tabs::before\s*\{([^}]*)\}/)[1];
   assert.match(indicator, /position: absolute;/);
