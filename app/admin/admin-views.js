@@ -55,7 +55,7 @@
       '<div class="sidebar-brand">' + ui.logo("sidebar-logo", "Sereno") + '<span class="sidebar-name">Sereno</span></div>' +
       nav(activeSection) +
       '<div class="sidebar-foot">' +
-      '<div class="sidebar-user"><span class="sidebar-avatar" aria-hidden="true"></span>' +
+      '<div class="sidebar-user"><span class="sidebar-avatar" aria-hidden="true">' + ui.esc(account.initials(session.username)) + '</span>' +
       '<div><div class="sidebar-username">' + ui.esc(session.username) + "</div>" +
       '<div class="sidebar-role">' + ui.esc(session.isAdmin === true ? gateText("admin.role") : gateText("admin.role.user")) + "</div></div></div>" +
       "</div></aside>"

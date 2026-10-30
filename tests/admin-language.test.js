@@ -105,3 +105,9 @@ test("real preference initializes from storage, then responds to external change
   watch("es");
   assert.deepEqual(updates, ["en", "es"]);
 });
+
+test("admin sidebar avatar shows the initials of the signed-in account", () => {
+  const model = { authorization: "authorized", section: "cache", load: {} };
+  const html = Sereno.adminViews.page(model, { session: { username: "andres.torres", isAdmin: true } });
+  assert.match(html, /<span class="sidebar-avatar" aria-hidden="true">AT<\/span>/);
+});
