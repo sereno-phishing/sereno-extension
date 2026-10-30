@@ -174,7 +174,7 @@ test("the colours the stylesheets actually pair, once resolved, reach 4.5:1", ()
   const checks = [
     [tokensCss, [".chip-seguro", ".chip-advertencia", ".chip-bloqueado", ".chip-soft-seguro", ".chip-soft-advertencia",
       ".chip-soft-bloqueado", ".chip-soft-neutral", ".hu-chip", ".btn-primary", ".btn-danger", ".banner-error", ".banner-success",
-      ".avatar", ".admin-pill"]],
+      ".avatar"]],
     [popupCss, [".protection-card.is-degraded", ".protection-card", ".session-notice"]]
   ];
   for (const [css, selectors] of checks) {

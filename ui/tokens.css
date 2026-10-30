@@ -364,20 +364,6 @@
   cursor: pointer;
 }
 
-.admin-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--dark);
-  color: #FFFFFF;
-  font-family: inherit;
-  font-size: 11.5px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
 /* ---------- Misc ---------- */
 
 .footnote {
