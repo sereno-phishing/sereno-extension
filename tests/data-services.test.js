@@ -57,13 +57,15 @@ function reply(status, body) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
 }
 
-/* Serves the REST contract of remote.js by delegating to a mock adapter. */
+/* Serves the REST contract of remote.js by delegating to a mock adapter. Like
+   the real backend, history answers 401 invalid without a session. */
 function fakeBackend(mock) {
+  const signedIn = (action) => async () => ((await mock.auth.session()).session ? action() : { ok: false, error: "invalid" });
   const routes = {
     "POST /v1/verdict": (body) => mock.verdict.evaluate(body.url),
     "POST /v1/auth/login": (body) => mock.auth.login(body.username, body.password),
-    "GET /v1/history": () => mock.data.listHistory(),
-    "DELETE /v1/history": () => mock.data.deleteHistory(),
+    "GET /v1/history": signedIn(() => mock.data.listHistory()),
+    "DELETE /v1/history": signedIn(() => mock.data.deleteHistory()),
     "GET /v1/domains": () => mock.data.getDomainPolicies(),
     "PUT /v1/domains": (body) => mock.data.putDomainPolicies(body.domains),
     "GET /v1/cache": () => mock.data.getCache(),
@@ -213,6 +215,18 @@ test("failures are normalized with a Spanish message and nothing throws", async 
     assert.deepEqual(await protectionService.loadModelVersion(services), expected, "model " + code);
   }
   assert.equal(surveyService.completedAtFor(await store.get(), "andres.torres"), null);
+});
+
+test("history reads the backend's signed-out answer as no history, not as an error", async () => {
+  const signedOut = async () => ({ ok: false, error: "invalid" });
+  const services = { data: { listHistory: signedOut, deleteHistory: signedOut } };
+  assert.deepEqual(await historyService.list(services), { ok: true, entries: [] });
+  assert.deepEqual(await historyService.clear(services), { ok: true });
+});
+
+test("the forbidden message fits every administrator-only section", () => {
+  assert.match(providers.errors.message("forbidden"), /administrador/);
+  assert.doesNotMatch(providers.errors.message("forbidden"), /políticas por dominio/);
 });
 
 test("a failing survey submission leaves no completion stamp and broken ports do not throw", async () => {
@@ -469,11 +483,13 @@ test("the loaded sections keep their happy path markup", () => {
   const cache = Sereno.adminViews.page(adminModel({ section: "cache", cache: withInvalidation }), ADMIN_STATE);
   assert.match(cache, /value="9"/);
   assert.match(cache, /x\.pe/);
-  assert.match(cache, /simulados para la demostración/);
+  assert.match(cache, /caché del servicio de veredictos/);
+  assert.doesNotMatch(cache, /simulad/);
   const metrics = Sereno.adminViews.page(adminModel({ section: "metricas" }), ADMIN_STATE);
   assert.match(metrics, /1 284/);
-  assert.match(metrics, /Datos simulados/);
+  assert.match(metrics, /consultas atendidas por el servicio/);
   assert.match(metrics, /no son métricas personales/);
+  assert.doesNotMatch(metrics, /simulad/);
 });
 
 test("a failed save or invalidation shows an error banner above the section", () => {

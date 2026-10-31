@@ -19,7 +19,7 @@
     "Últimas consultas (hasta 50)": "Latest queries (up to 50)", "Ver menos": "Show less", "Ver todas": "Show all", "Últimas consultas": "Latest queries",
     "Dominio": "Domain", "Fecha y hora": "Date and time", "Fuente": "Source", "Latencia": "Latency", "Resultado": "Result",
     "Métricas de operación": "Operation metrics", "Todavía no hay métricas para mostrar.": "There are no metrics to show yet.", "Últimas 24 horas": "Last 24 hours",
-    "Datos simulados para la demostración; no son métricas personales ni del backend.": "Simulated data for demonstration; these are not personal or backend metrics.",
+    "Métricas de las consultas atendidas por el servicio; no son métricas personales.": "Metrics of the queries served by the service; these are not personal metrics.",
     "Dominio a agregar": "Domain to add", "Política del dominio nuevo": "New domain policy", "Agregar": "Add",
     "Todavía no hay dominios en la lista.": "There are no domains in the list yet.", "Dominios con política propia": "Domains with custom policy",
     "Política": "Policy", "Modificado": "Modified", "Acciones": "Actions", "Política de ": "Policy for ", " para ": " for ", "Quitar ": "Remove ", "Quitar": "Remove",
@@ -31,13 +31,13 @@
     "Invalidar un dominio": "Invalidate a domain", "Úsalo cuando un dominio legítimo fue clasificado por error.": "Use this when a legitimate domain was classified incorrectly.",
     "Dominio a invalidar": "Domain to invalidate", "Invalidar": "Invalidate", "No hay invalidaciones recientes.": "There are no recent invalidations.",
     "Invalidaciones recientes": "Recent invalidations", "Estado": "Status", "Fecha": "Date", "Caché de veredictos": "Verdict cache",
-    "Datos y acciones simulados para la demostración; todavía no modifican el backend.": "Simulated data and actions for demonstration; they do not modify the backend yet.",
+    "Los cambios se aplican al caché del servicio de veredictos.": "Changes apply to the verdict service cache.",
     "TTL guardado.": "TTL saved.", " se invalidó. La siguiente consulta irá al modelo.": " was invalidated. The next query will go to the model.",
     "El servidor tardó demasiado en responder. Inténtalo de nuevo.": "The server took too long to respond. Please try again.",
     "Sin conexión. Revisa tu red e inténtalo de nuevo.": "Offline. Check your network and try again.",
     "El servidor no está disponible. Inténtalo más tarde.": "The server is unavailable. Please try again later.",
     "El caché de veredictos no está disponible. Inténtalo más tarde.": "The verdict cache is unavailable. Please try again later.",
-    "Solo una cuenta de administrador puede gestionar las políticas por dominio.": "Only an administrator account can manage domain policies.",
+    "Solo una cuenta de administrador puede acceder a esta sección.": "Only an administrator account can access this section.",
     "Esta cuenta ya participó en la encuesta. Gracias por tu opinión.": "This account has already completed the survey. Thank you for your feedback."
   };
   var entries = {};
@@ -48,7 +48,7 @@
     return ui.tableCard(options).replace('<span class="sr-only">Acciones</span>', '<span class="sr-only">' + ui.esc(tr("Acciones")) + '</span>');
   }
   function errorMessage(code, fallback) {
-    var messages = { timeout: "El servidor tardó demasiado en responder. Inténtalo de nuevo.", offline: "Sin conexión. Revisa tu red e inténtalo de nuevo.", server: "El servidor no está disponible. Inténtalo más tarde.", cache_down: "El caché de veredictos no está disponible. Inténtalo más tarde.", forbidden: "Solo una cuenta de administrador puede gestionar las políticas por dominio.", already_submitted: "Esta cuenta ya participó en la encuesta. Gracias por tu opinión." };
+    var messages = { timeout: "El servidor tardó demasiado en responder. Inténtalo de nuevo.", offline: "Sin conexión. Revisa tu red e inténtalo de nuevo.", server: "El servidor no está disponible. Inténtalo más tarde.", cache_down: "El caché de veredictos no está disponible. Inténtalo más tarde.", forbidden: "Solo una cuenta de administrador puede acceder a esta sección.", already_submitted: "Esta cuenta ya participó en la encuesta. Gracias por tu opinión." };
     return code && messages[code] && fallback === messages[code] ? tr(messages[code]) : fallback;
   }
 
@@ -234,7 +234,7 @@
     return (
       '<section class="section section-metricas">' +
       sectionHead(tr("Métricas de operación"), '<span class="section-ago">' + ui.esc(tr("Últimas 24 horas")) + '</span>') +
-      '<div class="note-bar">' + ui.esc(tr("Datos simulados para la demostración; no son métricas personales ni del backend.")) + '</div>' +
+      '<div class="note-bar">' + ui.esc(tr("Métricas de las consultas atendidas por el servicio; no son métricas personales.")) + '</div>' +
       '<div class="stat-grid">' + statCards(metrics) + "</div>" +
       chartCard(metrics.hourly, model.enter) +
       queriesCard(metrics.queries || [], model.showAllQueries) +
@@ -376,7 +376,7 @@
     var cache = model.cache || {};
     return (
       '<section class="section section-cache">' +
-      describedHead(tr("Caché de veredictos"), tr("Datos y acciones simulados para la demostración; todavía no modifican el backend.")) +
+      describedHead(tr("Caché de veredictos"), tr("Los cambios se aplican al caché del servicio de veredictos.")) +
       (model.notice ? successBanner(typeof model.notice === "object" ? model.notice.domain + tr(" se invalidó. La siguiente consulta irá al modelo.") : tr(model.notice)) : "") +
       (model.error ? errorBanner(errorMessage(model.errorCode, model.error)) : "") +
       '<div class="cache-grid">' + ttlCard(cache) + invalidateCard() + "</div>" +

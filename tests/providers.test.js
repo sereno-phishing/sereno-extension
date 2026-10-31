@@ -255,13 +255,21 @@ test("remote maps a hung request to timeout and aborts it", async () => {
   assert.equal(signal.aborted, true);
 });
 
-test("remote maps server failures, cache outage and policy-only authorization", async () => {
+test("remote maps server failures, cache outage and admin-only authorization", async () => {
   const failing = (status, body) => newRemote(async () => reply(status, body));
   assert.deepEqual(await failing(500, {}).verdict.evaluate("https://a.pe/"), { ok: false, error: "server" });
   assert.deepEqual(await failing(503, { error: "cache_down" }).verdict.evaluate("https://a.pe/"), { ok: false, error: "cache_down" });
   assert.deepEqual(await failing(404, { error: "weird" }).data.getCache(), { ok: false, error: "server" });
   assert.deepEqual(await failing(403, { error: "forbidden" }).data.getDomainPolicies(), { ok: false, error: "forbidden" });
   assert.deepEqual(await failing(403, { error: "forbidden" }).data.putDomainPolicies([]), { ok: false, error: "forbidden" });
+  assert.deepEqual(await failing(403, { error: "forbidden" }).data.getCache(), { ok: false, error: "forbidden" });
+  assert.deepEqual(await failing(403, { error: "forbidden" }).data.setCacheTtl(7, 24), { ok: false, error: "forbidden" });
+  assert.deepEqual(await failing(403, { error: "forbidden" }).data.invalidateCache("a.pe"), { ok: false, error: "forbidden" });
+  assert.deepEqual(await failing(403, { error: "forbidden" }).data.getMetrics(), { ok: false, error: "forbidden" });
+  assert.deepEqual(await failing(503, { error: "cache_down" }).data.setCacheTtl(7, 24), { ok: false, error: "cache_down" });
+  assert.deepEqual(await failing(401, { error: "invalid" }).data.listHistory(), { ok: false, error: "invalid" });
+  assert.deepEqual(await failing(403, { error: "forbidden" }).data.listHistory(), { ok: false, error: "server" });
+  assert.deepEqual(await failing(403, { error: "forbidden" }).data.getModelVersion(), { ok: false, error: "server" });
   assert.deepEqual(await failing(403, { error: "forbidden" }).survey.status(), { ok: false, error: "server" });
   const malformed = newRemote(async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError("bad json"); } }));
   assert.deepEqual(await malformed.data.getCache(), { ok: false, error: "server" });
@@ -277,9 +285,10 @@ test("composition root picks the adapter from config", () => {
   assert.throws(() => providers.create({ config: { provider: "carrier-pigeon" } }), /provider/);
 });
 
-test("the default config keeps general data mocked but ships policies remote", async () => {
-  assert.equal(providers.config.provider, "mock");
+test("the default config serves verdicts, data, auth and policies from the backend", async () => {
+  assert.equal(providers.config.provider, "remote");
+  assert.equal(providers.config.authProvider, "remote");
   assert.equal(providers.config.policyProvider, "remote");
-  assert.equal(Sereno.services.provider, "mock");
+  assert.equal(Sereno.services.provider, "remote");
   assert.deepEqual(Object.keys(Sereno.services).sort(), ["auth", "data", "provider", "survey", "verdict"]);
 });

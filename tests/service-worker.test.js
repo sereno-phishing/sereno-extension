@@ -90,6 +90,25 @@ globalThis.chrome = {
   }
 };
 
+/* The default config serves verdicts from the backend, so the worker's
+   requests go to a fake backend that answers the verdict route with the mock's
+   scenario verdicts (the same ones the backend's FakeClassifier returns). */
+const verdictRequests = [];
+let fakeVerdicts = null;
+globalThis.fetch = async (url, init) => {
+  const Sereno = globalThis.Sereno;
+  verdictRequests.push({ url, method: init.method, credentials: init.credentials });
+  if (url !== Sereno.providers.config.baseUrl + "/v1/verdict" || init.method !== "POST") {
+    return { ok: false, status: 404, json: async () => ({ error: "server" }) };
+  }
+  fakeVerdicts = fakeVerdicts || Sereno.providers.mock.create({
+    store: Sereno.stateStore.create({ storage: Sereno.storage.memoryStorage(), key: "fake-backend", defaults: Sereno.seed.defaultState }),
+    delayMs: 0
+  });
+  const verdict = await fakeVerdicts.verdict.evaluate(JSON.parse(init.body).url);
+  return { ok: true, status: 200, json: async () => verdict };
+};
+
 /* No await between the require and the assertions: registration is synchronous. */
 require(WORKER);
 const registeredRightAway = {
@@ -143,6 +162,8 @@ test("a real navigation gets a verdict, a badge, a popup state and a tab message
   assert.equal(state.currentSite.domain, "pago-servicios-linea.net");
   assert.equal(state.protectionLevel, "active");
   assert.ok(sessionData.has("sereno.tab.1"));
+  assert.ok(verdictRequests.length > 0);
+  assert.ok(verdictRequests.every((request) => request.method === "POST" && request.credentials === "include"));
 });
 
 test("activating and closing a tab use the stored outcome", async () => {

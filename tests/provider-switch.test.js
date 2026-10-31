@@ -92,6 +92,18 @@ function fakeBackend(Sereno) {
   const server = Sereno.providers.mock.create({ store, delayMs: 0, now: () => NOW });
   const backend = { calls: [], failWith: null };
 
+  /* Same gates as the real backend: history needs a session (401 invalid);
+     cache and metrics need an administrator (401 invalid, 403 forbidden). */
+  async function gated(adminOnly, action) {
+    const session = (await server.auth.session()).session;
+    if (!session) {
+      return reply(401, { error: "invalid" });
+    }
+    return adminOnly && !session.isAdmin ? reply(403, { error: "forbidden" }) : action();
+  }
+  const signedIn = (action) => (body) => gated(false, () => action(body));
+  const admin = (action) => (body) => gated(true, () => action(body));
+
   const routes = {
     "POST /v1/verdict": (body) => server.verdict.evaluate(body.url),
     "POST /v1/auth/login": async (body) => {
@@ -104,14 +116,14 @@ function fakeBackend(Sereno) {
     },
     "POST /v1/auth/logout": () => server.auth.logout(),
     "GET /v1/auth/session": () => server.auth.session(),
-    "GET /v1/history": () => server.data.listHistory(),
-    "DELETE /v1/history": () => server.data.deleteHistory(),
+    "GET /v1/history": signedIn(() => server.data.listHistory()),
+    "DELETE /v1/history": signedIn(() => server.data.deleteHistory()),
     "GET /v1/domains": () => server.data.getDomainPolicies(),
     "PUT /v1/domains": (body) => server.data.putDomainPolicies(body.domains),
-    "GET /v1/cache": () => server.data.getCache(),
-    "PUT /v1/cache/ttl": (body) => server.data.setCacheTtl(body.ttlPhishingDays, body.ttlLegitHours),
-    "POST /v1/cache/invalidations": (body) => server.data.invalidateCache(body.domain),
-    "GET /v1/metrics": () => server.data.getMetrics(),
+    "GET /v1/cache": admin(() => server.data.getCache()),
+    "PUT /v1/cache/ttl": admin((body) => server.data.setCacheTtl(body.ttlPhishingDays, body.ttlLegitHours)),
+    "POST /v1/cache/invalidations": admin((body) => server.data.invalidateCache(body.domain)),
+    "GET /v1/metrics": admin(() => server.data.getMetrics()),
     "GET /v1/model": () => server.data.getModelVersion(),
     "POST /v1/survey": () => ({ ok: true })
   };
@@ -303,6 +315,11 @@ const SCENARIOS = {
     return out;
   },
 
+  "history while signed out": async (env) => {
+    const { historyService } = env.Sereno;
+    return { listed: await historyService.list(env.services), cleared: await historyService.clear(env.services) };
+  },
+
   "history list and delete": async (env) => {
     const { historyService } = env.Sereno;
     const store = env.newStore();
@@ -347,6 +364,7 @@ const SCENARIOS = {
   },
 
   "admin metrics and model version": async (env) => {
+    await signIn(env, env.newStore(), "admin.sereno", "sereno123");
     const metrics = await env.Sereno.administrationService.loadMetrics(env.services);
     const model = await env.Sereno.protectionService.loadModelVersion(env.services);
     return { metrics, model };
@@ -419,6 +437,10 @@ const EXPECTED = {
         assert.equal(typeof answer.message, "string");
       });
     });
+  },
+  "history while signed out": (r) => {
+    assert.deepEqual(r.listed, { ok: true, entries: [] });
+    assert.deepEqual(r.cleared, { ok: true });
   },
   "history list and delete": (r) => {
     assert.equal(r.visited.length, r.before.length + 1);
@@ -501,6 +523,21 @@ test("swap: the remote run really goes through the REST contract and the mock ru
   assert.deepEqual(remote.result.map((call) => call.method + " " + call.path), ["POST /v1/verdict"]);
   assert.deepEqual(remote.result[0].body, { url: URLS.block });
   assert.equal(remote.result[0].credentials, "include");
+});
+
+test("swap: the remote run surfaces the backend's administrator gate on cache and metrics", async () => {
+  const { result } = await inEnvironment("remote", async (env) => {
+    const { administrationService } = env.Sereno;
+    await signIn(env, env.newStore(), "andres.torres", "sereno123");
+    return {
+      cache: failureOf(await administrationService.loadCache(env.services)),
+      invalidated: failureOf(await administrationService.invalidateDomain(env.services, "banco-falso.pe")),
+      metrics: failureOf(await administrationService.loadMetrics(env.services)),
+      message: env.Sereno.providers.errors.message("forbidden")
+    };
+  });
+  const forbidden = { ok: false, error: "forbidden", message: result.message };
+  assert.deepEqual(result, { cache: forbidden, invalidated: forbidden, metrics: forbidden, message: result.message });
 });
 
 test("swap: timeouts and offline failures come from the transport, not from a shortcut", async () => {

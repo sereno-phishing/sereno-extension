@@ -3,8 +3,10 @@
    through the data port (services.data, see platform/providers/ports.js).
    The backend records visits when it evaluates a site; the client never writes
    them. The domain rules (60 s dedupe, 200 cap) are applied to what the port
-   returns. Results: { ok: true, ... } or { ok: false, error, message } where
-   error is one of Sereno.providers.errors.CODES. */
+   returns. The port answers "invalid" when nobody is signed in on the backend:
+   that reads as no history (empty list, nothing to clear), not as an error.
+   Results: { ok: true, ... } or { ok: false, error, message } where error is
+   one of Sereno.providers.errors.CODES. */
 
 (function (Sereno) {
   "use strict";
@@ -15,6 +17,10 @@
     return Sereno.providers.errors.failure(error);
   }
 
+  function signedOut(answer) {
+    return !!answer && answer.ok === false && answer.error === "invalid";
+  }
+
   function isEntry(entry) {
     return !!entry && typeof entry === "object" && typeof entry.id === "string" && typeof entry.domain === "string";
   }
@@ -23,6 +29,9 @@
   async function list(services) {
     try {
       var answer = await services.data.listHistory();
+      if (signedOut(answer)) {
+        return { ok: true, entries: [] };
+      }
       if (!answer || !answer.ok) {
         return failure(answer && answer.error);
       }
@@ -39,7 +48,7 @@
   async function clear(services) {
     try {
       var answer = await services.data.deleteHistory();
-      return answer && answer.ok ? { ok: true } : failure(answer && answer.error);
+      return (answer && answer.ok) || signedOut(answer) ? { ok: true } : failure(answer && answer.error);
     } catch (error) {
       return failure("server");
     }

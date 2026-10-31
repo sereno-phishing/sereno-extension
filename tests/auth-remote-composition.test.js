@@ -21,8 +21,8 @@ function compose(store, fetch) {
   return Sereno.providers.create({ config: { provider: "mock", authProvider: "remote", policyProvider: "remote", baseUrl: "http://127.0.0.1:5000" }, store, fetch, delayMs: 0 });
 }
 
-test("local defaults route authentication, surveys and domain policies to the backend", () => {
-  assert.equal(Sereno.providers.config.provider, "mock");
+test("local defaults route verdicts, data, authentication, surveys and domain policies to the backend", () => {
+  assert.equal(Sereno.providers.config.provider, "remote");
   assert.equal(Sereno.providers.config.authProvider, "remote");
   assert.equal(Sereno.providers.config.policyProvider, "remote");
   assert.equal(Sereno.providers.config.baseUrl, "http://127.0.0.1:5000");

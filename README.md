@@ -6,15 +6,20 @@ página http/https que abres y muestra el resultado de tres formas: el badge del
 completo, el panel de administración, la política de privacidad y una tienda de
 demo para probar los flujos.
 
-La autenticación, el envío de encuestas SUS y las políticas por dominio usan el
-backend local hermano en `http://127.0.0.1:5000`. Los veredictos, el historial,
-la caché y las métricas siguen **simulados**; esto no es protección real contra phishing. Start the backend before signing in;
-[Conectar el backend](#conectar-el-backend) has the local setup.
+Todos los datos vienen del backend local hermano en `http://127.0.0.1:5000`:
+veredictos, historial, caché, métricas, versión del modelo, autenticación,
+encuestas SUS y políticas por dominio. El backend decide los veredictos con un
+`FakeClassifier` determinista (los mismos resultados que el mock) mientras el
+modelo de ML está pendiente; esto no es protección real contra phishing. Start
+the backend before using the extension; [Conectar el backend](#conectar-el-backend)
+has the local setup. La demo sin conexión sigue disponible con todos los
+proveedores en `"mock"`.
 
 **Estado de la verificación.** `node --test` cubre dominios, casos de uso,
 vistas (HTML y DOM simulado), el service worker, el content script y la
-equivalencia entre mock y remote. An isolated Node HTTP test also exercises the
-real local backend with throwaway JSON data and the remote auth/policy adapters.
+equivalencia entre mock y remote. Isolated Node HTTP tests also exercise the
+real local backend with throwaway JSON data through the remote adapter: auth,
+surveys, policies, verdicts, history, cache, metrics and model version.
 **Real Chrome cookie behavior remains unverified**; Node supplies its own test
 cookie jar and does not enforce browser cookie policy. Manual checks remain in
 [Verificación manual en Chrome](#verificación-manual-en-chrome).
@@ -72,8 +77,8 @@ lista de extensiones usa el idioma del navegador, independientemente del selecto
    - Pendiente: toast «Evaluación pendiente».
    Cada escenario pasa por un estado «Evaluando…» de ~0.7 s antes del veredicto.
 5. Vuelve al popup para ver el estado del sitio y el historial de la navegación
-   que simulaste. En el panel de administración puedes ver las métricas,
-   las políticas remotas y los datos simulados de métricas/caché. Con `andres.torres` ves la experiencia
+   que simulaste. En el panel de administración puedes ver las métricas, las
+   políticas y el caché que sirve el backend. Con `andres.torres` ves la experiencia
    de usuario (pestañas Inicio/Historial); con `admin.sereno` ves la tarjeta de
    administración que abre el panel. La tarjeta «Este sitio» aparece con y sin sesión.
 
@@ -81,16 +86,18 @@ Para empezar de cero, borra el historial desde el popup. También puedes quitar
 y volver a cargar la extensión en `chrome://extensions` para restaurar los datos
 semilla.
 
-### En pestañas reales (proveedor mock)
+### En pestañas reales
 
-El service worker evalúa cada navegación http/https con el mismo proveedor. Al
+El service worker evalúa cada navegación http/https con el mismo proveedor. Con
+la configuración entregada pregunta al backend, cuyo `FakeClassifier` devuelve
+los mismos veredictos que el mock para los dominios de la tabla. Al
 activar una pestaña ya abierta sin resultado guardado, también evalúa su URL sin
 necesidad de refrescarla. Si la página se abrió antes de cargar la extensión,
 el aviso dentro de la página puede requerir una recarga para instalar el content
 script; el badge y el popup no la requieren. El mock solo conoce los dominios de los escenarios y los hosts de prueba
 `*.localhost`; cualquier otro dominio da «seguro».
 
-| Dominio | Veredicto del mock |
+| Dominio | Veredicto (mock y `FakeClassifier`) |
 | --- | --- |
 | `tienda-servicios.pe` | Seguro |
 | `paypal-secure-login.com` | Advertencia |
@@ -128,8 +135,9 @@ Notas:
 
 ## Mapa de vistas ↔ HU
 
-Todo funciona con el mock. «Backend» indica qué dato real depende de él cuando
-se conecte; las vistas no cambian.
+Todo funciona con el mock y con el backend local. «Backend» indica qué dato
+sirve el backend; las vistas no cambian. Los veredictos del backend salen de un
+`FakeClassifier` hasta que exista el modelo de ML.
 
 | Vista o flujo | HU | Dónde se ve | Estado |
 | --- | --- | --- | --- |
@@ -307,14 +315,14 @@ sereno-extension/
   lector de pantalla.
 - Los datos simulados de usuarios, historial, reglas por dominio, caché y
   métricas están en `platform/seed.js`, y solo el adaptador mock los lee. La
-  configuración entregada usa las reglas por dominio remotas; el mock de reglas
-  permanece disponible solo para pruebas y configuraciones explícitas.
+  configuración entregada usa el backend para todos los puertos; el mock queda
+  para la demo sin conexión, las pruebas y configuraciones explícitas.
 - Ejecuta las pruebas con `node --test` desde la raíz. Necesitas Node 18 o
   superior, sin dependencias.
 
 ## Conectar el backend
 
-### Inicio rápido: autenticación, encuestas y políticas locales
+### Inicio rápido: backend local
 
 1. From the sibling `sereno-backend/`, with its existing virtual environment:
 
@@ -325,14 +333,17 @@ sereno-extension/
    .venv/Scripts/python.exe -m flask --app app:create_app run --host 127.0.0.1 --port 5000 --no-debugger --no-reload
    ```
 
-   Use one process and throwaway accounts only. The backend README covers
-   environment setup and JSON storage limits. Do not expose this server publicly.
+   Use one process and throwaway accounts only. The backend keeps the cache,
+   history and query log in `cache.json`, `history.json` and `queries.json` next
+   to `DATA_FILE` unless `CACHE_DATA_FILE`, `HISTORY_DATA_FILE` and
+   `QUERY_LOG_DATA_FILE` say otherwise. The backend README covers environment
+   setup and JSON storage limits. Do not expose this server publicly.
 
 2. Keep the shipped `platform/providers/config.js` configuration:
 
    ```js
    Sereno.providers.config = {
-     provider: "mock",              // Veredictos, historial, caché y métricas de demo
+     provider: "remote",            // Veredictos, historial, caché, métricas y versión del modelo
      authProvider: "remote",        // Registro, login, sesión y logout
      policyProvider: "remote",      // Solo GET/PUT de políticas por dominio
      baseUrl: "http://127.0.0.1:5000",
@@ -344,10 +355,10 @@ sereno-extension/
    `authProvider` y `policyProvider` usan `provider` cuando se omiten, para conservar
    los consumidores anteriores. Los valores desconocidos fallan de forma cerrada.
    La encuesta usa siempre el adaptador remoto y no tiene mock ni fallback. El
-   backend actual implementa autenticación, `GET/POST /v1/survey` y `GET/PUT /v1/domains`;
-   no se debe configurar `provider: "remote"` porque los demás datos continúan
-   simulados. Los errores de API nunca activan autenticación, encuestas ni políticas
-   mock. On remote auth operations,
+   backend implementa todas las rutas del [Contrato REST](#contrato-rest); los
+   veredictos salen de un `FakeClassifier` hasta que exista el modelo de ML. Los
+   errores de API nunca activan el mock: la protección queda degradada y los
+   datos muestran su error. On remote auth operations,
    account use cases remove legacy mock users/passwords and mock sessions from
    local state. Submitted passwords go only to the auth port, not local storage.
    A successful session check adopts the server identity, replacing stale local
@@ -363,8 +374,9 @@ sereno-extension/
    auth JSON, change that user's stored role from `user` to `admin` (never a Spanish value),
    and restart. Never edit the runtime JSON while the server is running. Existing
    server sessions reload the current role (exposed as `isAdmin`) on each request, so promotion or demotion
-   takes effect without logging in again. El historial, los veredictos, la caché y
-   las métricas permanecen en el estado mock/local. Las respuestas SUS se agregan al JSON aislado del backend y la
+   takes effect without logging in again. El caché y las métricas son solo para
+   administradores. El historial es de la cuenta con sesión; sin sesión el popup
+   no muestra historial. Las respuestas SUS se agregan al JSON aislado del backend y la
    participación se registra por separado para impedir envíos repetidos. El estado
    local conserva borradores por usuario, pero nunca decide si una cuenta puede participar.
 
@@ -372,11 +384,14 @@ sereno-extension/
    the sibling backend on an ephemeral loopback port with temporary JSON, runs
    el adaptador remoto real para autenticación y encuestas. `tests/admin-local-http.test.js`
    usa el mismo aislamiento para denegación de usuario, promoción/democión manual,
-   persistencia y fallos sin fallback de políticas; luego detiene el servidor
-   y elimina sus datos temporales. Requiere el entorno virtual del backend hermano;
-   de lo contrario informa un `skip`. Nunca accede a `data/db.json`. Las pruebas de
-   cambio de proveedor comparan los comportamientos no migrados y excluyen el contrato
-   de encuesta, que ahora es deliberadamente remoto.
+   persistencia y fallos sin fallback de políticas. `tests/verdict-local-http.test.js`
+   cubre veredictos (seguro, advertencia, bloqueo y acierto de caché), historial,
+   caché, métricas (administrador y `forbidden` para usuario), versión del modelo y
+   `cache_down`. Al terminar detienen el servidor y eliminan sus datos temporales.
+   Requieren el entorno virtual del backend hermano; de lo contrario informan un
+   `skip`. Nunca acceden a `data/*.json`. Las pruebas de cambio de proveedor
+   comparan el mock con un backend falso que aplica las mismas reglas de sesión y
+   de administrador, y excluyen el contrato de encuesta, que es deliberadamente remoto.
 
 ### Cookie boundary and other configurations
 
@@ -411,19 +426,19 @@ añade).
 
 | Método | Ruta | Petición | Respuesta | Errores |
 | --- | --- | --- | --- | --- |
-| POST | `/v1/verdict` | `{ url }` | `{ domain, status, score, source, latencyMs }` | `timeout`, `server`, `cache_down` |
+| POST | `/v1/verdict` | `{ url }` | `{ domain, status, score, source, latencyMs }` | 400 `invalid`, 500 `server`, 503 `cache_down` |
 | POST | `/v1/auth/login` | `{ username, password }` | `{ user, token }` | 401 `{ error: "invalid" }` |
 | POST | `/v1/auth/register` | `{ username, password }` | `{ user, token }` | 409 `duplicate`, 400 `invalid` |
 | POST | `/v1/auth/logout` | `{}` | `{}` | |
 | GET | `/v1/auth/session` | | `{ session }` (`null` sin sesión) | |
-| GET | `/v1/history` | | `{ entries }` | |
-| DELETE | `/v1/history` | | `{}` | |
+| GET | `/v1/history` | | `{ entries }` | 401 `invalid`, 500 `server` |
+| DELETE | `/v1/history` | | `{}` | 401 `invalid`, 500 `server` |
 | GET | `/v1/domains` | | `{ domains }` | 401 `invalid`, 403 `forbidden`, 500 `server` |
 | PUT | `/v1/domains` | `{ domains }` | `{ domains }` | 400 `invalid`, 401 `invalid`, 403 `forbidden`, 500 `server` |
-| GET | `/v1/cache` | | `{ cache }` | `cache_down` |
-| PUT | `/v1/cache/ttl` | `{ ttlPhishingDays, ttlLegitHours }` | `{ cache }` | |
-| POST | `/v1/cache/invalidations` | `{ domain }` | `{ cache }` | |
-| GET | `/v1/metrics` | | `{ metrics }` | |
+| GET | `/v1/cache` | | `{ cache }` | 401 `invalid`, 403 `forbidden`, 503 `cache_down` |
+| PUT | `/v1/cache/ttl` | `{ ttlPhishingDays, ttlLegitHours }` | `{ cache }` | 400 `invalid`, 401 `invalid`, 403 `forbidden`, 503 `cache_down` |
+| POST | `/v1/cache/invalidations` | `{ domain }` | `{ cache }` | 400 `invalid`, 401 `invalid`, 403 `forbidden`, 503 `cache_down` |
+| GET | `/v1/metrics` | | `{ metrics }` | 401 `invalid`, 403 `forbidden`, 500 `server` |
 | GET | `/v1/model` | | `{ version }` | |
 | GET | `/v1/survey` | | `{ submitted: boolean }` | 401 `invalid`, 500 `server` |
 | POST | `/v1/survey` | `{ answers }` | `{}` | 409 `already_submitted`, 400 `invalid`, 401 `invalid`, 500 `server` |
@@ -446,9 +461,11 @@ Formas:
 
 Errores: un cuerpo no 2xx `{ error }` con un código conocido se pasa tal cual
 (`invalid`, `duplicate`, `cache_down`, `timeout`, `offline`, `server`). En las
-rutas de políticas también se conserva `forbidden`, con un mensaje específico
-para permisos de administrador; las rutas de autenticación y encuesta mantienen
-su mapeo existente. En el POST de encuesta también se conserva `already_submitted`;
+rutas solo para administradores (políticas, caché y métricas) también se conserva
+`forbidden`, con un mensaje específico para permisos de administrador; las rutas
+de autenticación, historial y encuesta mantienen su mapeo existente. Un 401
+`invalid` del historial significa que no hay sesión en el backend: el caso de uso
+lo muestra como historial vacío, igual que el mock, y no como error. En el POST de encuesta también se conserva `already_submitted`;
 no se interpreta así ningún 409 de otros endpoints. Un 504 es
 `timeout`; cualquier otro fallo es `server`. Sin red es `offline`. Si no hay
 respuesta en `timeoutMs`, el adaptador aborta la petición y devuelve `timeout`.
@@ -531,8 +548,13 @@ worker (`chrome://extensions` → «service worker») y revisa:
       repetido en Chrome real. Sin sesión y ante errores de red/400/401/500, la
       encuesta debe consultar el estado remoto antes de mostrar preguntas, impedir un
       segundo envío y mostrar el fallo sin fingir éxito. La confirmación no debe exponer
-      el puntaje SUS. Los borradores no deben aparecer al cambiar de cuenta. Veredictos
-      y demás datos siguen simulados.
+      el puntaje SUS. Los borradores no deben aparecer al cambiar de cuenta.
+- [ ] Backend local, datos: con el backend encendido, el badge y el modal de los
+      dominios de demo salen del `FakeClassifier`; la segunda visita llega con
+      `source: "cache"`. El historial del popup lista las visitas de la cuenta con
+      sesión y se borra; el panel muestra caché (TTL, invalidación) y métricas para
+      un administrador. Con el backend apagado, la protección queda degradada (`?`)
+      sin bloquear.
 - [ ] With a future HTTPS backend, verify Secure/None cookies and remote verdict
       failures (offline, timeout, 500, cache outage) degrade without blocking.
 

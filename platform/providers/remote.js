@@ -10,8 +10,8 @@
      POST   /v1/auth/register        { username, password }             -> { user, token }  409 { error: "duplicate" }, 400 { error: "invalid" }
      POST   /v1/auth/logout          {}                                 -> {}
      GET    /v1/auth/session                                            -> { session }      (null when signed out)
-     GET    /v1/history                                                 -> { entries }
-     DELETE /v1/history                                                 -> {}
+     GET    /v1/history                                                 -> { entries }      401 { error: "invalid" } when signed out
+     DELETE /v1/history                                                 -> {}               401 { error: "invalid" } when signed out
      GET    /v1/domains                                                 -> { domains }
      PUT    /v1/domains              { domains }                        -> { domains }
      GET    /v1/cache                                                   -> { cache }
@@ -21,9 +21,12 @@
      GET    /v1/model                                                   -> { version }
      GET    /v1/survey                                                  -> { submitted }
      POST   /v1/survey               { answers }                        -> {}  409 { error: "already_submitted" }
+   Domain policies, cache and metrics are administrator-only: 401 { error:
+   "invalid" } without a session, 403 { error: "forbidden" } for a user. Cache
+   storage failures answer 503 { error: "cache_down" } (cache and verdict).
    Errors: a non-2xx body { error } with a known code is passed through
    ("invalid", "duplicate", "cache_down", "timeout", "offline", "server");
-   "forbidden" is accepted only from domain-policy requests and
+   "forbidden" is accepted only from the administrator-only requests and
    "already_submitted" only from POST /v1/survey.
    HTTP 504 maps to "timeout"; any other failure maps to "server".
    create({ baseUrl, timeoutMs, fetch }) never throws to its callers: a network
@@ -47,6 +50,7 @@
 
   var KNOWN_ERRORS = ["invalid", "duplicate", "cache_down", "timeout", "offline", "server"];
   var DEFAULT_TIMEOUT_MS = 4000;
+  var ADMIN_ONLY = ["forbidden"];
 
   function failure(error) {
     return { ok: false, error: error };
@@ -140,22 +144,22 @@
           return request("DELETE", "/v1/history");
         },
         getDomainPolicies: function () {
-          return request("GET", "/v1/domains", undefined, ["forbidden"]);
+          return request("GET", "/v1/domains", undefined, ADMIN_ONLY);
         },
         putDomainPolicies: function (domains) {
-          return request("PUT", "/v1/domains", { domains: domains }, ["forbidden"]);
+          return request("PUT", "/v1/domains", { domains: domains }, ADMIN_ONLY);
         },
         getCache: function () {
-          return request("GET", "/v1/cache");
+          return request("GET", "/v1/cache", undefined, ADMIN_ONLY);
         },
         setCacheTtl: function (phishingDays, legitHours) {
-          return request("PUT", "/v1/cache/ttl", { ttlPhishingDays: phishingDays, ttlLegitHours: legitHours });
+          return request("PUT", "/v1/cache/ttl", { ttlPhishingDays: phishingDays, ttlLegitHours: legitHours }, ADMIN_ONLY);
         },
         invalidateCache: function (domain) {
-          return request("POST", "/v1/cache/invalidations", { domain: domain });
+          return request("POST", "/v1/cache/invalidations", { domain: domain }, ADMIN_ONLY);
         },
         getMetrics: function () {
-          return request("GET", "/v1/metrics");
+          return request("GET", "/v1/metrics", undefined, ADMIN_ONLY);
         },
         getModelVersion: function () {
           return request("GET", "/v1/model");
