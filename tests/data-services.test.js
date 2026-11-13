@@ -131,7 +131,7 @@ test("error messages are Spanish and unknown codes read as a server problem", ()
 });
 
 test("history.normalize applies the dedupe window and the capacity to an external list", () => {
-  const record = (id, domain, ts) => Sereno.history.createRecord({ domain, status: "seguro", score: 0.1 }, id, ts);
+  const record = (id, domain, ts) => Sereno.history.createRecord({ domain, verdict: "legitima", policy: "advertencia", score: 0.1 }, id, ts);
   const list = [record("h-2", "a.pe", "2026-09-21T10:01"), record("h-1", "a.pe", "2026-09-21T10:00"), record("h-0", "b.pe", "2026-09-21T09:00")];
   assert.deepEqual(Sereno.history.normalize(list).map((entry) => entry.id), ["h-2", "h-0"]);
   const many = Array.from({ length: 250 }, (_, index) => record("h-" + index, "d" + index + ".pe", "2026-09-01T10:00"));
@@ -140,6 +140,21 @@ test("history.normalize applies the dedupe window and the capacity to an externa
   assert.equal(capped[0].id, "h-0");
   assert.equal(Sereno.history.normalize(Sereno.seed.defaultState.history["andres.torres"]).length, 6);
   assert.deepEqual(Sereno.history.normalize(undefined), []);
+});
+
+test("historyService.list applies the domain policy to what the port returns and drops records outside the contract", async () => {
+  const item = (id, extra) => Object.assign({ id, domain: id + ".pe", score: 0.9, source: "modelo", ts: "2026-09-21T10:0" + id.slice(-1), latencyMs: 12 }, extra);
+  const entries = [
+    item("h-4", { verdict: "phishing", policy: "bloqueo" }),
+    item("h-3", { verdict: "phishing", policy: "advertencia" }),
+    item("h-2", { verdict: "legitima", policy: "bloqueo" }),
+    item("h-1", { status: "bloqueo" }),
+    item("h-0", { verdict: "phishing", policy: "permitir" })
+  ];
+  const listed = await historyService.list({ data: { listHistory: async () => ({ ok: true, entries }) } });
+  assert.equal(listed.ok, true);
+  assert.deepEqual(listed.entries.map((entry) => [entry.id, entry.status]), [["h-4", "bloqueo"], ["h-3", "advertencia"], ["h-2", "seguro"]]);
+  assert.deepEqual(Object.keys(listed.entries[0]).sort(), ["domain", "id", "latencyMs", "score", "source", "status", "ts"]);
 });
 
 Object.keys(SETUPS).forEach((name) => {
@@ -151,6 +166,7 @@ Object.keys(SETUPS).forEach((name) => {
     assert.equal(listed.ok, true);
     assert.equal(listed.entries.length, 6);
     assert.equal(listed.entries[0].domain, "pago-servicios-linea.net");
+    assert.deepEqual(listed.entries.map((entry) => entry.status), ["bloqueo", "seguro", "advertencia", "seguro", "advertencia", "seguro"]);
   });
 
   test(name + ": historyService.clear empties the signed-in user's history", async () => {
@@ -184,9 +200,9 @@ Object.keys(SETUPS).forEach((name) => {
 
   test(name + ": protectionService.loadModelVersion reads the version from the port", async () => {
     const { services, store } = SETUPS[name]();
-    assert.deepEqual(await protectionService.loadModelVersion(services), { ok: true, version: "1.3" });
+    assert.deepEqual(await protectionService.loadModelVersion(services), { ok: true, version: "2.0.0" });
     await store.set({ session: { username: "andres.torres", isAdmin: false, loginAt: "t", token: "x" } });
-    assert.deepEqual(await protectionService.loadModelVersion(services), { ok: true, version: "1.3" });
+    assert.deepEqual(await protectionService.loadModelVersion(services), { ok: true, version: "2.0.0" });
   });
 });
 
@@ -247,7 +263,7 @@ test("a failing survey submission leaves no completion stamp and broken ports do
 
 test("history list shows loading and error states and keeps the happy path markup", () => {
   const { historyUi } = Sereno;
-  const entries = [Sereno.history.createRecord({ domain: "a.pe", status: "seguro", score: 0.1 }, "h-1", "2026-09-21T10:00")];
+  const entries = [Sereno.history.toEntry(Sereno.history.createRecord({ domain: "a.pe", verdict: "legitima", policy: "advertencia", score: 0.1 }, "h-1", "2026-09-21T10:00"))];
   const happy = historyUi.listView({ tabsHtml: "<tabs>", entries, filter: "todas" });
   assert.match(happy, /history-item/);
   assert.doesNotMatch(happy, /role="alert"/);
@@ -346,11 +362,7 @@ Object.keys(SETUPS).forEach((name) => {
     assert.equal(ttl.cache.ttlLegitHours, 24);
     const invalidated = await administrationService.invalidateDomain(services, "ejemplo.pe");
     assert.equal(invalidated.ok, true);
-    assert.deepEqual(invalidated.cache.invalidations[0], {
-      domain: "ejemplo.pe",
-      status: "Se reevaluará en la próxima consulta",
-      date: "21/09/2026"
-    });
+    assert.deepEqual(invalidated.cache.invalidations[0], { domain: "ejemplo.pe", verdict: null, date: "21/09/2026" });
     assert.deepEqual((await administrationService.loadCache(services)).cache, invalidated.cache);
   });
 
@@ -479,10 +491,21 @@ test("the loaded sections keep their happy path markup", () => {
   assert.match(domains, /<table/);
   assert.match(domains, /a\.pe/);
   assert.doesNotMatch(domains, /role="alert"/);
-  const withInvalidation = { ttlPhishingDays: 9, ttlLegitHours: 5, invalidations: [{ domain: "x.pe", status: "s", date: "2026-09-18" }] };
+  const withInvalidation = {
+    ttlPhishingDays: 9,
+    ttlLegitHours: 5,
+    invalidations: [
+      { domain: "x.pe", verdict: "phishing", date: "2026-09-18" },
+      { domain: "x.pe", verdict: "legitima", date: "2026-09-17" },
+      { domain: "y.pe", verdict: null, date: "2026-09-16" }
+    ]
+  };
   const cache = Sereno.adminViews.page(adminModel({ section: "cache", cache: withInvalidation }), ADMIN_STATE);
   assert.match(cache, /value="9"/);
-  assert.match(cache, /x\.pe/);
+  assert.equal(cache.match(/x\.pe/g).length, 2, "entries that share a domain are all listed");
+  assert.match(cache, /Reevaluado: phishing/);
+  assert.match(cache, /Reevaluado: legítimo/);
+  assert.match(cache, /y\.pe<\/td><td[^>]*>Se reevaluará en la próxima consulta/);
   assert.match(cache, /caché del servicio de veredictos/);
   assert.doesNotMatch(cache, /simulad/);
   const metrics = Sereno.adminViews.page(adminModel({ section: "metricas" }), ADMIN_STATE);

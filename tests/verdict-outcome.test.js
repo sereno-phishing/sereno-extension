@@ -9,12 +9,19 @@ const { load } = require("./load");
 
 const { verdictOutcome: outcome } = load("verdict/domain/verdict.js", "verdict/domain/outcome.js");
 
-const GOOD = { ok: true, domain: "a.pe", status: "advertencia", score: 0.9, source: "modelo", latencyMs: 120 };
+const GOOD = { ok: true, domain: "a.pe", verdict: "phishing", policy: "advertencia", score: 0.9, source: "modelo", latencyMs: 120 };
 
-test("a successful provider result becomes a verdict outcome", () => {
+test("a phishing result becomes a verdict outcome with the status the domain policy asks for", () => {
   assert.deepEqual(outcome.fromResult(GOOD), {
     kind: "verdict",
     verdict: { domain: "a.pe", status: "advertencia", score: 0.9, source: "modelo", latencyMs: 120 }
+  });
+});
+
+test("a legitimate result is safe whatever the domain policy", () => {
+  ["advertencia", "bloqueo"].forEach((policy) => {
+    const safe = outcome.fromResult(Object.assign({}, GOOD, { verdict: "legitima", policy, score: 0.03 }));
+    assert.deepEqual(safe, { kind: "verdict", verdict: { domain: "a.pe", status: "seguro", score: 0.03, source: "modelo", latencyMs: 120 } });
   });
 });
 
@@ -30,6 +37,10 @@ test("unknown errors and malformed results degrade as a server failure", () => {
   assert.deepEqual(outcome.fromResult({ ok: false, error: "weird" }), server);
   assert.deepEqual(outcome.fromResult({ ok: false, error: "invalid" }), server);
   assert.deepEqual(outcome.fromResult({ ok: true, status: "evaluando" }), server);
+  assert.deepEqual(outcome.fromResult({ ok: true, domain: "a.pe", status: "bloqueo", score: 0.9 }), server, "the three-state contract is gone");
+  assert.deepEqual(outcome.fromResult(Object.assign({}, GOOD, { verdict: "sospechoso" })), server);
+  assert.deepEqual(outcome.fromResult(Object.assign({}, GOOD, { policy: "permitir" })), server);
+  assert.deepEqual(outcome.fromResult(Object.assign({}, GOOD, { policy: undefined })), server);
   assert.deepEqual(outcome.fromResult({ ok: true }), server);
   assert.deepEqual(outcome.fromResult(null), server);
   assert.deepEqual(outcome.fromResult(undefined), server);
@@ -61,7 +72,8 @@ test("protection is degraded only for degraded outcomes", () => {
 });
 
 test("fail-open: only a real block verdict blocks navigation", () => {
-  const block = outcome.fromResult(Object.assign({}, GOOD, { status: "bloqueo" }));
+  const block = outcome.fromResult(Object.assign({}, GOOD, { policy: "bloqueo" }));
+  assert.equal(outcome.blocksNavigation(outcome.fromResult(Object.assign({}, GOOD, { verdict: "legitima", policy: "bloqueo" }))), false);
   assert.equal(outcome.blocksNavigation(block), true);
   assert.equal(outcome.blocksNavigation(outcome.fromResult(GOOD)), false);
   assert.equal(outcome.blocksNavigation(outcome.pending()), false);

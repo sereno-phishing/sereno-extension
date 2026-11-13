@@ -57,7 +57,7 @@ test("survey is a remote-only status and submit port while verdict and data rema
     }
   });
 
-  assert.equal((await services.verdict.evaluate("https://tienda-servicios.pe")).status, "seguro");
+  assert.equal((await services.verdict.evaluate("https://tienda-servicios.pe")).verdict, "legitima");
   assert.equal((await services.data.getMetrics()).metrics.analyzed, 1284);
   assert.equal(typeof services.data.submitSurvey, "undefined");
   assert.equal(typeof Sereno.providers.mock.create({ store }).survey, "undefined");

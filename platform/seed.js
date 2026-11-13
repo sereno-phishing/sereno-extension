@@ -25,12 +25,12 @@
     ],
     history: {
       "andres.torres": [
-        { id: "h-000001", domain: "pago-servicios-linea.net", status: "bloqueo", score: 0.97, source: "cache", ts: "2026-09-21T10:14", latencyMs: 38 },
-        { id: "h-000002", domain: "tienda-servicios.pe", status: "seguro", score: 0.04, source: "modelo", ts: "2026-09-21T09:12", latencyMs: 171 },
-        { id: "h-000003", domain: "paypal-secure-login.com", status: "advertencia", score: 0.92, source: "modelo", ts: "2026-09-20T18:03", latencyMs: 186 },
-        { id: "h-000004", domain: "reservas-hotel.pe", status: "seguro", score: 0.06, source: "modelo", ts: "2026-09-20T16:40", latencyMs: 149 },
-        { id: "h-000005", domain: "banco-verifica-cuenta.com", status: "advertencia", score: 0.88, source: "modelo", ts: "2026-09-19T21:55", latencyMs: 203 },
-        { id: "h-000006", domain: "entradas-concierto.pe", status: "seguro", score: 0.05, source: "modelo", ts: "2026-09-19T12:30", latencyMs: 138 }
+        { id: "h-000001", domain: "pago-servicios-linea.net", verdict: "phishing", policy: "bloqueo", score: 0.97, source: "cache", ts: "2026-09-21T10:14", latencyMs: 38 },
+        { id: "h-000002", domain: "tienda-servicios.pe", verdict: "legitima", policy: "advertencia", score: 0.04, source: "modelo", ts: "2026-09-21T09:12", latencyMs: 171 },
+        { id: "h-000003", domain: "paypal-secure-login.com", verdict: "phishing", policy: "advertencia", score: 0.92, source: "modelo", ts: "2026-09-20T18:03", latencyMs: 186 },
+        { id: "h-000004", domain: "reservas-hotel.pe", verdict: "legitima", policy: "advertencia", score: 0.06, source: "modelo", ts: "2026-09-20T16:40", latencyMs: 149 },
+        { id: "h-000005", domain: "banco-verifica-cuenta.com", verdict: "phishing", policy: "advertencia", score: 0.88, source: "modelo", ts: "2026-09-19T21:55", latencyMs: 203 },
+        { id: "h-000006", domain: "entradas-concierto.pe", verdict: "legitima", policy: "advertencia", score: 0.05, source: "modelo", ts: "2026-09-19T12:30", latencyMs: 138 }
       ]
     },
     currentSite: { domain: "tienda-servicios.pe", status: "seguro", score: 0.04, source: "modelo", ts: "2026-09-21T09:12:00" },
@@ -48,8 +48,8 @@
       ttlPhishingDays: 7,
       ttlLegitHours: 24,
       invalidations: [
-        { domain: "reservas-hotel.pe", status: "Se reevaluará en la próxima consulta", date: "2026-09-22" },
-        { domain: "entradas-concierto.pe", status: "Reevaluado: seguro", date: "2026-09-18" }
+        { domain: "reservas-hotel.pe", verdict: null, date: "2026-09-22" },
+        { domain: "entradas-concierto.pe", verdict: "legitima", date: "2026-09-18" }
       ]
     }
   };
@@ -138,7 +138,7 @@
   Sereno.seed = {
     defaultState: DEFAULT_STATE,
     /* The model version the mock backend reports, the same for everyone. */
-    modelVersion: "1.3",
+    modelVersion: "2.0.0",
     metrics: METRICS
   };
 })(globalThis.Sereno = globalThis.Sereno || {});

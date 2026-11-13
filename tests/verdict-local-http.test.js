@@ -1,8 +1,10 @@
 "use strict";
 
 /* Real loopback contract of the verdict pipeline and backend-owned data:
-   verdict (FakeClassifier + cache), history, cache, metrics and model version,
-   served by the sibling backend with isolated temporary JSON files. Node
+   verdict (stand-in classifier + cache), history, cache, metrics and model
+   version, served by the sibling backend with isolated temporary JSON files.
+   The backend answers the model verdict and the domain policy; the extension
+   applies the policy, which the history use case shows here end to end. Node
    supplies one cookie jar per account; the production remote adapter and the
    history use case run unchanged. Never touches the backend's data/*.json. */
 const test = require("node:test");
@@ -18,8 +20,8 @@ const { load } = require("./load");
 const backend = path.resolve(__dirname, "../../sereno-backend");
 const python = path.join(backend, process.platform === "win32" ? ".venv/Scripts/python.exe" : ".venv/bin/python");
 const Sereno = load(
-  "time/domain/time.js", "history/domain/history.js", "platform/providers/errors.js",
-  "history/application/history-service.js", "platform/providers/remote.js"
+  "time/domain/time.js", "verdict/domain/verdict.js", "history/domain/history.js", "administration/domain/verdict-cache.js",
+  "platform/providers/errors.js", "history/application/history-service.js", "platform/providers/remote.js"
 );
 
 const URLS = {
@@ -41,7 +43,7 @@ async function startBackend(t, files) {
     "import sys",
     "app = create_app({'DATA_FILE': sys.argv[1], 'SURVEY_DATA_FILE': sys.argv[2], 'POLICY_DATA_FILE': sys.argv[3],",
     "                  'CACHE_DATA_FILE': sys.argv[4], 'HISTORY_DATA_FILE': sys.argv[5], 'QUERY_LOG_DATA_FILE': sys.argv[6],",
-    "                  'STORAGE_DRIVER': 'json', 'AUTH_LOCAL_HTTP': True})",
+    "                  'STORAGE_DRIVER': 'json', 'AUTH_LOCAL_HTTP': True, 'CLASSIFIER': 'fake'})",
     "server = make_server('127.0.0.1', 0, app)",
     "print(server.server_port, flush=True)",
     "server.serve_forever()"
@@ -99,15 +101,23 @@ test("remote verdicts, history, cache, metrics and model version run against the
   const admin = client(baseUrl);
 
   // Public routes: the model version and verdicts need no session.
-  assert.deepEqual(await anonymous.data.getModelVersion(), { ok: true, version: "1.3" });
+  assert.deepEqual(await anonymous.data.getModelVersion(), { ok: true, version: "2.0.0" });
   const safe = await anonymous.verdict.evaluate(URLS.safe);
   assert.equal(safe.ok, true);
-  assert.deepEqual({ domain: safe.domain, status: safe.status, score: safe.score, source: safe.source },
-    { domain: "tienda-servicios.pe", status: "seguro", score: 0.04, source: "modelo" });
+  assert.deepEqual({ domain: safe.domain, verdict: safe.verdict, policy: safe.policy, source: safe.source },
+    { domain: "tienda-servicios.pe", verdict: "legitima", policy: "advertencia", source: "modelo" });
+  assert.equal(typeof safe.score, "number");
   assert.equal(typeof safe.latencyMs, "number");
+  assert.equal("status" in safe, false);
   const again = await anonymous.verdict.evaluate(URLS.safe);
   assert.equal(again.source, "cache");
-  assert.equal(again.status, "seguro");
+  assert.equal(again.verdict, "legitima");
+
+  // The administrator gives one phishing domain the block policy; the other keeps the default.
+  assert.equal((await admin.auth.register("verdict-admin", "throwaway-password")).ok, true);
+  replaceRole(files.auth, "verdict-admin", "admin");
+  assert.equal((await admin.auth.session()).session.isAdmin, true);
+  assert.equal((await admin.data.putDomainPolicies([{ domain: "pago-servicios-linea.net", policy: "bloqueo", updatedAt: "2026-11-13" }])).ok, true);
 
   // History: signed out is no history; signed in records each evaluated site.
   assert.deepEqual(await anonymous.data.listHistory(), { ok: false, error: "invalid" });
@@ -117,16 +127,16 @@ test("remote verdicts, history, cache, metrics and model version run against the
   assert.equal((await user.auth.register("verdict-user", "throwaway-password")).ok, true);
   assert.deepEqual(await user.data.listHistory(), { ok: true, entries: [] });
   const warn = await user.verdict.evaluate(URLS.warn);
-  assert.deepEqual([warn.status, warn.source], ["advertencia", "modelo"]);
+  assert.deepEqual([warn.verdict, warn.policy, warn.source], ["phishing", "advertencia", "modelo"]);
   const block = await user.verdict.evaluate(URLS.block);
-  assert.deepEqual([block.status, block.score, block.source], ["bloqueo", 0.97, "modelo"]);
+  assert.deepEqual([block.verdict, block.policy, block.source], ["phishing", "bloqueo", "modelo"]);
   const blockAgain = await user.verdict.evaluate(URLS.block);
-  assert.equal(blockAgain.source, "cache");
+  assert.deepEqual([blockAgain.verdict, blockAgain.policy, blockAgain.source], ["phishing", "bloqueo", "cache"]);
   const listed = await Sereno.historyService.list({ data: user.data });
   assert.equal(listed.ok, true);
   assert.deepEqual(listed.entries.map((entry) => [entry.domain, entry.status]),
     [["pago-servicios-linea.net", "bloqueo"], ["paypal-secure-login.com", "advertencia"]],
-    "newest first, the repeated visit deduplicated, anonymous visits not recorded");
+    "newest first, the repeated visit deduplicated, anonymous visits not recorded, each with its domain policy applied");
   assert.ok(listed.entries.every((entry) => typeof entry.id === "string" && typeof entry.ts === "string"));
   assert.deepEqual(await user.data.deleteHistory(), { ok: true });
   assert.deepEqual(await user.data.listHistory(), { ok: true, entries: [] });
@@ -144,9 +154,6 @@ test("remote verdicts, history, cache, metrics and model version run against the
   }
   assert.deepEqual(fs.existsSync(files.cache) ? fs.readFileSync(files.cache) : null, cacheBytes, "user rejections do not mutate the cache");
 
-  assert.equal((await admin.auth.register("verdict-admin", "throwaway-password")).ok, true);
-  replaceRole(files.auth, "verdict-admin", "admin");
-  assert.equal((await admin.auth.session()).session.isAdmin, true);
   assert.deepEqual(await admin.data.getCache(), { ok: true, cache: { ttlPhishingDays: 7, ttlLegitHours: 24, invalidations: [] } });
   assert.deepEqual(await admin.data.setCacheTtl(10, 12), { ok: true, cache: { ttlPhishingDays: 10, ttlLegitHours: 12, invalidations: [] } });
   assert.deepEqual(await admin.data.setCacheTtl(0, 12), { ok: false, error: "invalid" });
@@ -157,7 +164,9 @@ test("remote verdicts, history, cache, metrics and model version run against the
   assert.equal(invalidated.cache.invalidations[0].domain, "tienda-servicios.pe");
   assert.match(invalidated.cache.invalidations[0].date, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal((await anonymous.verdict.evaluate(URLS.safe)).source, "modelo", "an invalidated domain goes back to the model");
-  assert.match((await admin.data.getCache()).cache.invalidations[0].status, /^Reevaluado: seguro$/);
+  const reevaluated = (await admin.data.getCache()).cache.invalidations[0];
+  assert.equal("status" in reevaluated, false);
+  assert.equal(Sereno.verdictCache.statusText(reevaluated), "Reevaluado: legítimo");
 
   const metrics = await admin.data.getMetrics();
   assert.equal(metrics.ok, true);

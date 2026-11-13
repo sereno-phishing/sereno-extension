@@ -12,9 +12,13 @@
                 "already_submitted" (survey submit)
 
    verdict port
-     evaluate(url)            -> { ok, domain, status, score, source, latencyMs }
-                                 status: "seguro" | "advertencia" | "bloqueo"
+     evaluate(url)            -> { ok, domain, verdict, policy, score, source, latencyMs }
+                                 verdict: "phishing" | "legitima"   (the model class)
+                                 policy: "advertencia" | "bloqueo"  (the domain policy, always present)
                                  source: "cache" | "modelo"
+                                 The port never answers a final status: the extension applies
+                                 the policy (Sereno.verdict.applyPolicy) to get "seguro",
+                                 "advertencia" or "bloqueo".
                                  The backend also records the visit in the signed-in
                                  user's history; clients never write history.
 
@@ -26,11 +30,14 @@
      The token is opaque; the backend verifies credentials, clients never do.
 
    data port (history is scoped to the signed-in user)
-     listHistory()                     -> { ok, entries: [{ id, domain, status, score, source, ts, latencyMs }] }
+     listHistory()                     -> { ok, entries: [{ id, domain, verdict, policy, score, source, ts, latencyMs }] }
+                                          (policy: the one in force when the visit was served)
      deleteHistory()                   -> { ok }   (clears the signed-in user's entries)
      getDomainPolicies()               -> { ok, domains: [{ domain, policy, updatedAt }] }
      putDomainPolicies(domains)        -> { ok }   (replaces the whole list)
-     getCache()                        -> { ok, cache: { ttlPhishingDays, ttlLegitHours, invalidations: [{ domain, status, date }] } }
+     getCache()                        -> { ok, cache: { ttlPhishingDays, ttlLegitHours, invalidations: [{ domain, verdict, date }] } }
+                                          (verdict: the model class, or null while the re-evaluation is
+                                          pending; several entries may share a domain)
      setCacheTtl(phishingDays, legitHours) -> { ok, cache }
      invalidateCache(domain)           -> { ok, cache }
      getMetrics()                      -> { ok, metrics }   (dashboard shape of Sereno.seed.metrics)

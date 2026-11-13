@@ -7,7 +7,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-const Sereno = load("platform/i18n.js", "ui/atoms.js", "ui/molecules.js", "account/domain/account.js", "time/domain/time.js", "verdict/domain/verdict.js", "verdict/ui/verdict-ui.js", "administration/domain/domain-policy.js", "administration/ui/administration-views.js", "app/admin/admin-views.js");
+const Sereno = load("platform/i18n.js", "ui/atoms.js", "ui/molecules.js", "account/domain/account.js", "time/domain/time.js", "verdict/domain/verdict.js", "verdict/ui/verdict-ui.js", "administration/domain/domain-policy.js", "administration/domain/verdict-cache.js", "administration/ui/administration-views.js", "app/admin/admin-views.js");
 
 test("admin access gate follows the active language", () => {
   Sereno.i18n.use("en");
@@ -73,7 +73,16 @@ test("metrics and cache translate owned labels, verdicts, errors and notices, no
   assert.match(metrics, /ejemplo\.pe/);
   assert.match(metrics, /backend-source/);
   assert.match(metrics, /backend-date/);
-  const cache = Sereno.administrationUi.cacheSection({ cache: { ttlPhishingDays: 7, ttlLegitHours: 24, invalidations: [{ domain: "ejemplo.pe", status: "backend-status", date: "2026-10-01" }] }, notice: { domain: "ejemplo.pe" }, error: "Sin conexión. Revisa tu red e inténtalo de nuevo.", errorCode: "offline" });
+  const invalidations = [
+    { domain: "ejemplo.pe", verdict: "backend-status", date: "2026-10-01" },
+    { domain: "ejemplo.pe", verdict: "phishing", date: "2026-10-01" },
+    { domain: "otro.pe", verdict: "legitima", date: "2026-10-01" },
+    { domain: "nuevo.pe", verdict: null, date: "2026-10-01" }
+  ];
+  const cache = Sereno.administrationUi.cacheSection({ cache: { ttlPhishingDays: 7, ttlLegitHours: 24, invalidations }, notice: { domain: "ejemplo.pe" }, error: "Sin conexión. Revisa tu red e inténtalo de nuevo.", errorCode: "offline" });
+  assert.match(cache, /Re-evaluated: phishing/);
+  assert.match(cache, /Re-evaluated: legitimate/);
+  assert.match(cache, /Will be re-evaluated on the next query/);
   assert.match(cache, /Verdict cache/);
   assert.match(cache, /Domain to invalidate/);
   assert.match(cache, /ejemplo\.pe was invalidated/);

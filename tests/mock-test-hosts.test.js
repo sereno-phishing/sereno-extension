@@ -44,24 +44,32 @@ function services() {
   return { verdict: newMock().verdict };
 }
 
+/* host, scenario (and final status), model verdict and domain policy the mock answers. */
 const HOSTS = [
-  ["seguro.localhost", "seguro"],
-  ["advertencia.localhost", "advertencia"],
-  ["bloqueo.localhost", "bloqueo"]
+  ["seguro.localhost", "seguro", "legitima", "advertencia"],
+  ["advertencia.localhost", "advertencia", "phishing", "advertencia"],
+  ["bloqueo.localhost", "bloqueo", "phishing", "bloqueo"]
 ];
 
-test("scenario hosts return the scenario verdict with the real hostname as domain", async () => {
-  for (const [host, name] of HOSTS) {
+/* The status the extension shows for a raw mock (backend-shaped) result. */
+function statusOf(result) {
+  return Sereno.verdict.applyPolicy(result.verdict, result.policy);
+}
+
+test("scenario hosts answer the backend shape for the scenario, with the real hostname as domain", async () => {
+  for (const [host, name, verdict, policy] of HOSTS) {
     const result = await newMock().verdict.evaluate(`http://${host}/`);
     const scenario = SCENARIOS[name];
     assert.deepEqual(result, {
       ok: true,
       domain: host,
-      status: scenario.status,
+      verdict,
+      policy,
       score: scenario.score,
       source: scenario.source,
       latencyMs: scenario.latencyMs
     });
+    assert.equal(statusOf(result), name);
   }
 });
 
@@ -76,23 +84,24 @@ test("through the verdict service every scenario host yields its verdict outcome
 
 test("ports and paths in the url are ignored and www. is still stripped", async () => {
   const mock = newMock().verdict;
-  assert.equal((await mock.evaluate("http://bloqueo.localhost:8080/a/b?x=1")).status, "bloqueo");
-  assert.equal((await mock.evaluate("https://bloqueo.localhost:3000")).status, "bloqueo");
+  assert.equal(statusOf(await mock.evaluate("http://bloqueo.localhost:8080/a/b?x=1")), "bloqueo");
+  assert.equal(statusOf(await mock.evaluate("https://bloqueo.localhost:3000")), "bloqueo");
   const www = await mock.evaluate("http://www.advertencia.localhost:8080/");
-  assert.equal(www.status, "advertencia");
+  assert.equal(statusOf(www), "advertencia");
   assert.equal(www.domain, "advertencia.localhost");
-  assert.equal((await mock.evaluate("http://BLOQUEO.LOCALHOST/")).status, "bloqueo");
+  assert.equal(statusOf(await mock.evaluate("http://BLOQUEO.LOCALHOST/")), "bloqueo");
 });
 
 test("unrelated hosts keep today's behavior", async () => {
   const mock = newMock().verdict;
-  assert.equal((await mock.evaluate("http://localhost:8080/")).status, "seguro");
-  assert.equal((await mock.evaluate("http://otro.localhost/")).status, "seguro");
+  assert.equal(statusOf(await mock.evaluate("http://localhost:8080/")), "seguro");
+  assert.equal(statusOf(await mock.evaluate("http://otro.localhost/")), "seguro");
   assert.equal((await mock.evaluate("http://bloqueo.localhost.evil.com/")).domain, "bloqueo.localhost.evil.com");
-  assert.equal((await mock.evaluate("http://bloqueo.localhost.evil.com/")).status, "seguro");
-  assert.equal((await mock.evaluate("https://paypal-secure-login.com/")).status, "advertencia");
-  assert.equal((await mock.evaluate("https://pago-servicios-linea.net/")).status, "bloqueo");
-  assert.equal((await mock.evaluate("https://tienda.pe/")).status, "seguro");
+  assert.equal(statusOf(await mock.evaluate("http://bloqueo.localhost.evil.com/")), "seguro");
+  assert.equal(statusOf(await mock.evaluate("https://paypal-secure-login.com/")), "advertencia");
+  assert.equal(statusOf(await mock.evaluate("https://pago-servicios-linea.net/")), "bloqueo");
+  const plain = await mock.evaluate("https://tienda.pe/");
+  assert.deepEqual([plain.verdict, plain.policy, "status" in plain], ["legitima", "advertencia", false]);
 });
 
 test("pendiente.localhost is slower than the pending threshold, triggers onPending and ends safe", async () => {
@@ -136,6 +145,7 @@ test("test hosts are recorded in the history of a signed-in user, the degraded o
   const entries = (await mock.data.listHistory()).entries;
   assert.equal(entries.length, before + 1);
   assert.equal(entries[0].domain, "bloqueo.localhost");
+  assert.deepEqual([entries[0].verdict, entries[0].policy, "status" in entries[0]], ["phishing", "bloqueo", false]);
 });
 
 test("the delay is injectable", async () => {

@@ -262,7 +262,7 @@ function cacheShape(cache) {
   return {
     ttlPhishingDays: cache.ttlPhishingDays,
     ttlLegitHours: cache.ttlLegitHours,
-    invalidations: cache.invalidations.map((item) => ({ domain: item.domain, status: item.status }))
+    invalidations: cache.invalidations.map((item) => ({ domain: item.domain, verdict: item.verdict }))
   };
 }
 

@@ -121,13 +121,15 @@ Object.keys(ADAPTERS).forEach((name) => {
     const { verdict } = make();
     const blocked = await verdict.evaluate("https://pago-servicios-linea.net/checkout?x=1");
     assert.equal(blocked.ok, true);
-    assert.equal(blocked.status, "bloqueo");
+    assert.deepEqual([blocked.verdict, blocked.policy], ["phishing", "bloqueo"]);
+    assert.equal("status" in blocked, false);
     assert.equal(blocked.source, "cache");
     assert.equal(typeof blocked.score, "number");
     assert.equal(typeof blocked.latencyMs, "number");
     const unknown = await verdict.evaluate("https://www.example-shop.pe/");
     assert.equal(unknown.ok, true);
-    assert.ok(Sereno.verdict.VERDICTS.includes(unknown.status));
+    assert.ok(Sereno.verdict.VERDICTS.includes(Sereno.verdict.applyPolicy(unknown.verdict, unknown.policy)));
+    assert.ok(Sereno.verdict.POLICIES.includes(unknown.policy), "the policy is always present");
   });
 
   test(name + " auth covers login, session, register and logout", async () => {
@@ -163,7 +165,11 @@ Object.keys(ADAPTERS).forEach((name) => {
     const listed = await data.listHistory();
     assert.equal(listed.ok, true);
     assert.equal(listed.entries.length, 6);
-    assert.deepEqual(Object.keys(listed.entries[0]).sort(), ["domain", "id", "latencyMs", "score", "source", "status", "ts"]);
+    assert.deepEqual(Object.keys(listed.entries[0]).sort(), ["domain", "id", "latencyMs", "policy", "score", "source", "ts", "verdict"]);
+    assert.deepEqual(listed.entries.map((entry) => [entry.verdict, entry.policy]), [
+      ["phishing", "bloqueo"], ["legitima", "advertencia"], ["phishing", "advertencia"],
+      ["legitima", "advertencia"], ["phishing", "advertencia"], ["legitima", "advertencia"]
+    ]);
     assert.equal((await data.deleteHistory()).ok, true);
     assert.deepEqual(await data.listHistory(), { ok: true, entries: [] });
   });
@@ -190,7 +196,9 @@ Object.keys(ADAPTERS).forEach((name) => {
     assert.equal(ttl.cache.ttlLegitHours, 12);
     const invalidated = await data.invalidateCache("tienda-servicios.pe");
     assert.equal(invalidated.ok, true);
+    assert.deepEqual(Object.keys(invalidated.cache.invalidations[0]).sort(), ["date", "domain", "verdict"]);
     assert.equal(invalidated.cache.invalidations[0].domain, "tienda-servicios.pe");
+    assert.ok(initial.cache.invalidations.every((item) => !("status" in item)));
     assert.deepEqual((await data.getCache()).cache, invalidated.cache);
   });
 
@@ -199,7 +207,7 @@ Object.keys(ADAPTERS).forEach((name) => {
     const metrics = await data.getMetrics();
     assert.equal(metrics.ok, true);
     assert.equal(metrics.metrics.analyzed, 1284);
-    assert.deepEqual(await data.getModelVersion(), { ok: true, version: "1.3" });
+    assert.deepEqual(await data.getModelVersion(), { ok: true, version: "2.0.0" });
   });
 });
 

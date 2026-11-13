@@ -4,7 +4,9 @@
      { kind: "verdict",  verdict: { domain, status, score, source, latencyMs } }
      { kind: "pending",  reason: "evaluating" }
      { kind: "degraded", reason: "offline" | "timeout" | "server" | "cache_down" }
-   Statuses come from Sereno.verdict; there is no second catalog.
+   Statuses come from Sereno.verdict; there is no second catalog. The provider
+   result carries the model verdict and the domain policy; fromResult applies
+   the policy (Sereno.verdict.applyPolicy), so an outcome only knows statuses.
 
    FAIL-OPEN DECISION: a degraded outcome never blocks the user. Blocking a
    page needs a real "bloqueo" verdict; when the backend, the network or the
@@ -40,20 +42,23 @@
     return { kind: "pending", reason: PENDING_REASON };
   }
 
-  /* Maps a provider port result (or anything else it returned) to an outcome. */
+  /* Maps a provider port result (or anything else it returned) to an outcome.
+     A result whose verdict or policy is outside the contract is a server
+     failure. */
   function fromResult(result) {
     if (!result || typeof result !== "object") {
       return degraded("server");
     }
     if (result.ok === true) {
-      if (verdict.VERDICTS.indexOf(result.status) < 0) {
+      var status = verdict.applyPolicy(result.verdict, result.policy);
+      if (!status) {
         return degraded("server");
       }
       return {
         kind: "verdict",
         verdict: {
           domain: result.domain,
-          status: result.status,
+          status: status,
           score: result.score,
           source: result.source,
           latencyMs: result.latencyMs

@@ -25,6 +25,30 @@ test("unknown statuses read as pending", () => {
   assert.equal(verdict.status("bloqueo").title, "Sitio bloqueado");
 });
 
+test("the domain policy turns the two-class model verdict into a status", () => {
+  assert.equal(verdict.applyPolicy("legitima", "advertencia"), "seguro");
+  assert.equal(verdict.applyPolicy("legitima", "bloqueo"), "seguro");
+  assert.equal(verdict.applyPolicy("phishing", "advertencia"), "advertencia");
+  assert.equal(verdict.applyPolicy("phishing", "bloqueo"), "bloqueo");
+});
+
+test("a verdict or a policy outside the contract has no status", () => {
+  assert.equal(verdict.applyPolicy("phishing", "seguro"), null);
+  assert.equal(verdict.applyPolicy("phishing", undefined), null);
+  assert.equal(verdict.applyPolicy("phishing", "Bloqueo"), null);
+  assert.equal(verdict.applyPolicy("seguro", "advertencia"), null);
+  assert.equal(verdict.applyPolicy("bloqueo", "bloqueo"), null);
+  assert.equal(verdict.applyPolicy(undefined, "bloqueo"), null);
+  assert.equal(verdict.applyPolicy(null, null), null);
+});
+
+test("the model classes have their own labels", () => {
+  assert.equal(verdict.modelVerdict("phishing").label, "Phishing");
+  assert.equal(verdict.modelVerdict("legitima").label, "Legítimo");
+  assert.equal(verdict.modelVerdict("seguro"), null);
+  assert.equal(verdict.modelVerdict(undefined), null);
+});
+
 test("risk level depends on status and, for warnings, on the score", () => {
   assert.equal(verdict.riskLevel({ status: "bloqueo", score: 0.1 }), "Alto");
   assert.equal(verdict.riskLevel({ status: "advertencia", score: 0.85 }), "Alto");

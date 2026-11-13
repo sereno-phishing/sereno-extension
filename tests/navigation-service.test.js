@@ -21,8 +21,11 @@ const Sereno = load(
 const nav = Sereno.navigationService;
 const NOW = new Date(2026, 9, 25, 10, 30, 0);
 
+/* The backend-shaped result that reads as the given status once the policy is applied. */
 function verdictResult(status, domain) {
-  return { ok: true, domain: domain || "tienda.pe", status, score: 0.5, source: "modelo", latencyMs: 10 };
+  const verdict = status === "seguro" ? "legitima" : "phishing";
+  const policy = status === "bloqueo" ? "bloqueo" : "advertencia";
+  return { ok: true, domain: domain || "tienda.pe", verdict, policy, score: 0.5, source: "modelo", latencyMs: 10 };
 }
 
 /* services.verdict.evaluate answers by url from a table; a function value can

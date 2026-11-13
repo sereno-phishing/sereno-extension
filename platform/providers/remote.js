@@ -4,17 +4,21 @@
    BACKEND CONTRACT (all paths under config.baseUrl, JSON bodies, cookies sent
    with credentials: "include"; 2xx bodies are exactly the port results without
    "ok", which this adapter adds):
-     POST   /v1/verdict              { url }                            -> { domain, status, score, source, latencyMs }
-                                     (also records the visit in the signed-in user's history)
+     POST   /v1/verdict              { url }                            -> { domain, verdict, policy, score, source, latencyMs }
+                                     (also records the visit in the signed-in user's history;
+                                     verdict is the model class "phishing" | "legitima" and policy the
+                                     domain policy "advertencia" | "bloqueo"; this adapter passes both
+                                     through and the extension applies the policy, see verdict/domain/verdict.js)
      POST   /v1/auth/login           { username, password }             -> { user, token }  401 { error: "invalid" }
      POST   /v1/auth/register        { username, password }             -> { user, token }  409 { error: "duplicate" }, 400 { error: "invalid" }
      POST   /v1/auth/logout          {}                                 -> {}
      GET    /v1/auth/session                                            -> { session }      (null when signed out)
      GET    /v1/history                                                 -> { entries }      401 { error: "invalid" } when signed out
+                                     (each entry carries verdict and policy, like a verdict)
      DELETE /v1/history                                                 -> {}               401 { error: "invalid" } when signed out
      GET    /v1/domains                                                 -> { domains }
      PUT    /v1/domains              { domains }                        -> { domains }
-     GET    /v1/cache                                                   -> { cache }
+     GET    /v1/cache                                                   -> { cache }        (entries carry verdict, no policy)
      PUT    /v1/cache/ttl            { ttlPhishingDays, ttlLegitHours } -> { cache }
      POST   /v1/cache/invalidations  { domain }                         -> { cache }
      GET    /v1/metrics                                                 -> { metrics }

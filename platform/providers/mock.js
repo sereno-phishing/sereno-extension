@@ -1,6 +1,9 @@
 /* Platform · mock adapter: implements the verdict, auth and data ports on top
    of the seed data, the demo-store scenarios and the shared state store.
-   Classic script that registers Sereno.providers.mock.
+   Classic script that registers Sereno.providers.mock. It plays the backend,
+   so it answers the backend shapes: the model verdict plus the domain policy
+   for a verdict and a history record, the model verdict for a cache entry.
+   Applying the policy is the job of the extension, never of this adapter.
    create({ store?, delayMs?, now? })
      store    state store port; defaults to Sereno.stateStore.open() on first use
      delayMs  simulated verdict latency, 0 by default (config.mockDelayMs in the app)
@@ -15,13 +18,28 @@
   /* Verdict for domains with no scenario: a plain safe model result. */
   var FALLBACK = { status: "seguro", score: 0.05, source: "modelo", latencyMs: 142 };
 
+  /* Policy the backend answers for a domain that has none of its own. */
+  var DEFAULT_POLICY = "advertencia";
+
+  /* The scenarios describe what the user ends up seeing (a status). The
+     backend answers the model class and the domain policy instead: a safe
+     scenario is a legitimate site under the default policy, a warning or a
+     block is a phishing site whose domain policy is that status. */
+  function backendVerdict(scenario) {
+    var phishing = Sereno.verdict.POLICIES.indexOf(scenario.status) >= 0;
+    return {
+      verdict: phishing ? "phishing" : "legitima",
+      policy: phishing ? scenario.status : DEFAULT_POLICY
+    };
+  }
+
   /* Development aid for the mock backend stand-in: Chrome resolves *.localhost
      to the local machine, so these hosts let every verdict kind run on a real
      page (service worker, badge, content script) with no backend. A real
      backend ignores them. Each entry names a scenario of
      Sereno.demoScenarios.SCENARIOS (no duplicated data) or a special case:
        scenario  answer with that scenario's verdict
-       slow      answer "seguro" after PENDING_HOST_DELAY_MS
+       slow      answer a legitimate site after PENDING_HOST_DELAY_MS
        fail      answer the normalized "server" failure (degraded, fail-open) */
   var TEST_HOSTS = {
     "seguro.localhost": { scenario: "seguro" },
@@ -122,7 +140,8 @@
           }
         });
       }
-      var verdict = { ok: true, domain: domain, status: found.status, score: found.score, source: found.source, latencyMs: found.latencyMs };
+      var served = backendVerdict(found);
+      var verdict = { ok: true, domain: domain, verdict: served.verdict, policy: served.policy, score: found.score, source: found.source, latencyMs: found.latencyMs };
       await recordVisit(verdict);
       return verdict;
     }

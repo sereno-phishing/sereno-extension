@@ -23,6 +23,6 @@ test("dismissing without a known version changes nothing", async () => {
 
 test("the seed starts one version behind the constant the mock backend reports", () => {
   assert.equal(seed.defaultState.lastSeenModelVersion, "1.2");
-  assert.equal(seed.modelVersion, "1.3");
+  assert.equal(seed.modelVersion, "2.0.0");
   assert.equal("modelNoticeDismissed" in seed.defaultState, false);
 });

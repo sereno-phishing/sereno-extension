@@ -31,6 +31,7 @@
     "Invalidar un dominio": "Invalidate a domain", "Úsalo cuando un dominio legítimo fue clasificado por error.": "Use this when a legitimate domain was classified incorrectly.",
     "Dominio a invalidar": "Domain to invalidate", "Invalidar": "Invalidate", "No hay invalidaciones recientes.": "There are no recent invalidations.",
     "Invalidaciones recientes": "Recent invalidations", "Estado": "Status", "Fecha": "Date", "Caché de veredictos": "Verdict cache",
+    "Se reevaluará en la próxima consulta": "Will be re-evaluated on the next query", "Reevaluado: phishing": "Re-evaluated: phishing", "Reevaluado: legítimo": "Re-evaluated: legitimate",
     "Los cambios se aplican al caché del servicio de veredictos.": "Changes apply to the verdict service cache.",
     "TTL guardado.": "TTL saved.", " se invalidó. La siguiente consulta irá al modelo.": " was invalidated. The next query will go to the model.",
     "El servidor tardó demasiado en responder. Inténtalo de nuevo.": "The server took too long to respond. Please try again.",
@@ -366,7 +367,7 @@
       caption: tr("Invalidaciones recientes"),
       columns: ["Dominio", "Estado", "Fecha", ""].map(tr),
       rows: (cache.invalidations || []).map(function (item) {
-        return [ui.esc(item.domain), ui.esc(item.status), ui.esc(time.formatAnyDay(item.date)), ""];
+        return [ui.esc(item.domain), ui.esc(tr(Sereno.verdictCache.statusText(item))), ui.esc(time.formatAnyDay(item.date)), ""];
       })
     });
   }

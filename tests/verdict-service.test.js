@@ -70,10 +70,20 @@ test("the mock adapter yields a verdict outcome", async () => {
 
 test("the remote adapter yields a verdict outcome from the contract body", async () => {
   const services = remoteServices(async () =>
-    reply(200, { domain: "a.pe", status: "seguro", score: 0.02, source: "cache", latencyMs: 9 })
+    reply(200, { domain: "a.pe", verdict: "legitima", policy: "advertencia", score: 0.02, source: "cache", latencyMs: 9 })
   );
   const out = await verdictService.evaluate(services, "https://a.pe/");
   assert.deepEqual(out, { kind: "verdict", verdict: { domain: "a.pe", status: "seguro", score: 0.02, source: "cache", latencyMs: 9 } });
+});
+
+test("the remote adapter applies the domain policy of a phishing body and degrades on the old three-state body", async () => {
+  const body = { domain: "a.pe", verdict: "phishing", policy: "bloqueo", score: 0.97, source: "modelo", latencyMs: 80 };
+  const blocked = await verdictService.evaluate(remoteServices(async () => reply(200, body)), "https://a.pe/");
+  assert.equal(blocked.verdict.status, "bloqueo");
+  const warned = await verdictService.evaluate(remoteServices(async () => reply(200, Object.assign({}, body, { policy: "advertencia" }))), "https://a.pe/");
+  assert.equal(warned.verdict.status, "advertencia");
+  const old = await verdictService.evaluate(remoteServices(async () => reply(200, { domain: "a.pe", status: "bloqueo", score: 0.97, source: "modelo", latencyMs: 80 })), "https://a.pe/");
+  assert.deepEqual(old, { kind: "degraded", reason: "server" });
 });
 
 ["timeout", "offline", "server", "cache_down"].forEach((reason) => {
@@ -129,7 +139,7 @@ test("evaluate never throws, even if the provider rejects or throws", async () =
 });
 
 test("onPending fires only when the provider is slower than the threshold", async () => {
-  const answer = { ok: true, domain: "a.pe", status: "seguro", score: 0, source: "modelo", latencyMs: 1 };
+  const answer = { ok: true, domain: "a.pe", verdict: "legitima", policy: "advertencia", score: 0, source: "modelo", latencyMs: 1 };
   const slow = { verdict: { evaluate: () => new Promise((resolve) => setTimeout(() => resolve(answer), 40)) } };
   const seen = [];
   const out = await verdictService.evaluate(slow, "https://a.pe/", { pendingAfterMs: 10, onPending: (o) => seen.push(o) });

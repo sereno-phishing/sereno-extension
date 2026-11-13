@@ -1,10 +1,15 @@
 /* Administration · verdict cache: TTL settings and manual invalidations.
-   Classic script that registers Sereno.verdictCache. Pure. */
+   Classic script that registers Sereno.verdictCache. Pure.
+   A cache entry is { domain, verdict, date }: verdict is the model class the
+   domain was re-evaluated to, or null while the re-evaluation is pending.
+   Several entries may share a domain. No policy applies here: the cache keeps
+   what the model said, not what the user saw. */
 
 (function (Sereno) {
   "use strict";
 
   var PENDING_REEVALUATION = "Se reevaluará en la próxima consulta";
+  var REEVALUATED = "Reevaluado: ";
 
   /* A TTL input is accepted only as a positive integer; otherwise null. */
   function parseTtl(raw) {
@@ -29,14 +34,26 @@
   /* Adds a pending re-evaluation for the domain at the top of the list. */
   function withInvalidation(cache, domain, dayText) {
     var next = Object.assign({}, cache);
-    next.invalidations = [{ domain: domain, status: PENDING_REEVALUATION, date: dayText }].concat(next.invalidations || []);
+    next.invalidations = [{ domain: domain, verdict: null, date: dayText }].concat(next.invalidations || []);
     return next;
+  }
+
+  /* Text of the state column for a cache entry: the model class when the
+     entry carries one, the pending text when it carries none. Any other text
+     the backend sends is shown as it came. */
+  function statusText(entry) {
+    var found = Sereno.verdict.modelVerdict(entry.verdict);
+    if (found) {
+      return REEVALUATED + found.label.toLowerCase();
+    }
+    return typeof entry.verdict === "string" && entry.verdict ? entry.verdict : PENDING_REEVALUATION;
   }
 
   Sereno.verdictCache = {
     PENDING_REEVALUATION: PENDING_REEVALUATION,
     parseTtl: parseTtl,
     withTtl: withTtl,
-    withInvalidation: withInvalidation
+    withInvalidation: withInvalidation,
+    statusText: statusText
   };
 })(globalThis.Sereno = globalThis.Sereno || {});

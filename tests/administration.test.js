@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { load } = require("./load");
 
-const { domainPolicy, verdictCache } = load("administration/domain/domain-policy.js", "administration/domain/verdict-cache.js");
+const { domainPolicy, verdictCache } = load("verdict/domain/verdict.js", "administration/domain/domain-policy.js", "administration/domain/verdict-cache.js");
 
 const STORED = [
   { domain: "pago-servicios-linea.net", policy: "bloqueo", updatedAt: "2026-09-21" },
@@ -70,10 +70,19 @@ test("TTL accepts positive integers only", () => {
 });
 
 test("an invalidation is added first as pending re-evaluation", () => {
-  const cache = { ttlPhishingDays: 7, invalidations: [{ domain: "old.pe", status: "Reevaluado: seguro", date: "2026-09-18" }] };
+  const cache = { ttlPhishingDays: 7, invalidations: [{ domain: "old.pe", verdict: "legitima", date: "2026-09-18" }] };
   const next = verdictCache.withInvalidation(cache, "ejemplo.pe", "21/09/2026");
-  assert.deepEqual(next.invalidations[0], { domain: "ejemplo.pe", status: "Se reevaluará en la próxima consulta", date: "21/09/2026" });
+  assert.deepEqual(next.invalidations[0], { domain: "ejemplo.pe", verdict: null, date: "21/09/2026" });
   assert.equal(next.invalidations.length, 2);
   assert.equal(cache.invalidations.length, 1);
   assert.equal(verdictCache.withInvalidation({}, "a.pe", "d").invalidations.length, 1);
+});
+
+test("a cache entry reads as the model class it was re-evaluated to, or as pending", () => {
+  assert.equal(verdictCache.statusText({ domain: "a.pe", verdict: "phishing", date: "d" }), "Reevaluado: phishing");
+  assert.equal(verdictCache.statusText({ domain: "a.pe", verdict: "legitima", date: "d" }), "Reevaluado: legítimo");
+  assert.equal(verdictCache.statusText({ domain: "a.pe", verdict: null, date: "d" }), "Se reevaluará en la próxima consulta");
+  assert.equal(verdictCache.statusText({ domain: "a.pe", date: "d" }), verdictCache.PENDING_REEVALUATION);
+  assert.equal(verdictCache.statusText({ domain: "a.pe", status: "Reevaluado: seguro", date: "d" }), verdictCache.PENDING_REEVALUATION, "the old status field is not read");
+  assert.equal(verdictCache.statusText({ domain: "a.pe", verdict: "texto del servidor", date: "d" }), "texto del servidor");
 });

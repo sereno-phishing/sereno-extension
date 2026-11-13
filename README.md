@@ -97,12 +97,20 @@ el aviso dentro de la página puede requerir una recarga para instalar el conten
 script; el badge y el popup no la requieren. El mock solo conoce los dominios de los escenarios y los hosts de prueba
 `*.localhost`; cualquier otro dominio da «seguro».
 
-| Dominio | Veredicto (mock y `FakeClassifier`) |
-| --- | --- |
-| `tienda-servicios.pe` | Seguro |
-| `paypal-secure-login.com` | Advertencia |
-| `pago-servicios-linea.net` | Bloqueo |
-| cualquier otro | Seguro |
+| Dominio | Respuesta (mock y `FakeClassifier`) | Lo que muestra la extensión |
+| --- | --- | --- |
+| `tienda-servicios.pe` | `legitima` | Seguro |
+| `paypal-secure-login.com` | `phishing`, política `advertencia` | Advertencia |
+| `pago-servicios-linea.net` | `phishing`, política `bloqueo` | Bloqueo |
+| cualquier otro | `legitima` | Seguro |
+
+El backend (y el mock, que responde con la misma forma) solo dice la clase del
+modelo, `phishing` o `legitima`, y la política del dominio. La extensión aplica
+esa política (RF-10) en un único lugar, `applyPolicy` de
+`verdict/domain/verdict.js`: un sitio legítimo queda «seguro» y uno de phishing
+queda en «advertencia» o «bloqueo» según la política. Con el backend, la
+política sale de la lista del panel de administración (por defecto,
+`advertencia`); en el mock, del escenario.
 
 Los dominios de la tabla no resuelven en internet, así que el aviso en página no
 aparece con ellos: el badge se pinta al empezar la navegación, pero la página
@@ -385,7 +393,7 @@ sereno-extension/
    el adaptador remoto real para autenticación y encuestas. `tests/admin-local-http.test.js`
    usa el mismo aislamiento para denegación de usuario, promoción/democión manual,
    persistencia y fallos sin fallback de políticas. `tests/verdict-local-http.test.js`
-   cubre veredictos (seguro, advertencia, bloqueo y acierto de caché), historial,
+   cubre veredictos (legítimo, phishing con política de advertencia y de bloqueo, y acierto de caché), historial,
    caché, métricas (administrador y `forbidden` para usuario), versión del modelo y
    `cache_down`. Al terminar detienen el servidor y eliminan sus datos temporales.
    Requieren el entorno virtual del backend hermano; de lo contrario informan un
@@ -426,7 +434,7 @@ añade).
 
 | Método | Ruta | Petición | Respuesta | Errores |
 | --- | --- | --- | --- | --- |
-| POST | `/v1/verdict` | `{ url }` | `{ domain, status, score, source, latencyMs }` | 400 `invalid`, 500 `server`, 503 `cache_down` |
+| POST | `/v1/verdict` | `{ url }` | `{ domain, verdict, policy, score, source, latencyMs }` | 400 `invalid`, 500 `server`, 503 `cache_down` |
 | POST | `/v1/auth/login` | `{ username, password }` | `{ user, token }` | 401 `{ error: "invalid" }` |
 | POST | `/v1/auth/register` | `{ username, password }` | `{ user, token }` | 409 `duplicate`, 400 `invalid` |
 | POST | `/v1/auth/logout` | `{}` | `{}` | |
@@ -445,14 +453,25 @@ añade).
 
 Formas:
 
-- `status`: `"seguro"`, `"advertencia"` o `"bloqueo"`. `source`: `"cache"` o `"modelo"`.
+- `verdict`: la clase del modelo, `"phishing"` o `"legitima"`. `policy`: la política del
+  dominio, `"advertencia"` o `"bloqueo"`, siempre presente (`"advertencia"` si el dominio no
+  está en la lista). `source`: `"cache"` o `"modelo"`.
+- El backend no decide qué ve el usuario: la extensión aplica la política. `legitima` se
+  muestra como «seguro»; `phishing`, como la política (`advertencia` o `bloqueo`). Cualquier
+  otro valor se trata como error `server` (protección degradada), nunca como veredicto.
 - `user`: `{ username, isAdmin, createdAt }`, con `isAdmin` booleano (la etiqueta del rol se traduce en el front).
   Nunca lleva la contraseña. `token` es opaco.
 - `session`: `{ username, isAdmin, loginAt, token? }`.
-- `entries`: `[{ id, domain, status, score, source, ts, latencyMs }]`, del usuario con sesión.
+- `entries`: `[{ id, domain, verdict, policy, score, source, ts, latencyMs }]`, del usuario con
+  sesión; `policy` es la que regía cuando se sirvió. La extensión aplica la misma regla a
+  cada elemento y descarta los que no la cumplen.
 - `domains`: `[{ domain, policy, updatedAt }]` con `policy` `"advertencia"` o `"bloqueo"`.
   `PUT` reemplaza la lista completa.
-- `cache`: `{ ttlPhishingDays, ttlLegitHours, invalidations: [{ domain, status, date }] }`.
+- `cache`: `{ ttlPhishingDays, ttlLegitHours, invalidations: [{ domain, verdict, date }] }`.
+  `verdict` es la clase del modelo con la que se reevaluó el dominio, o `null` mientras la
+  reevaluación está pendiente. Varias entradas pueden compartir dominio. Aquí no se aplica
+  política: el caché guarda lo que dijo el modelo.
+- `version` (`GET /v1/model`): la versión del modelo cargado (`2.0.0`).
 - `metrics`: la forma del panel (`Sereno.seed.metrics` en `platform/seed.js`).
 - `answers`: diez valores enteros de la escala SUS (1–5). El servidor obtiene la cuenta de la sesión; el cliente no envía el usuario.
 - `submitted`: indica si la cuenta autenticada ya participó. La participación se almacena separada de las respuestas.
@@ -491,7 +510,7 @@ veredictos y navegación conservan el proveedor general.
 ### Regla fail-open
 
 Una protección degradada **nunca bloquea**. Solo un veredicto `bloqueo` real
-detiene la navegación. Si el backend, la red o el caché fallan, la página carga,
+(phishing en un dominio con política de bloqueo) detiene la navegación. Si el backend, la red o el caché fallan, la página carga,
 el badge muestra `?`, el popup indica «Protección degradada» y la página muestra
 un aviso. Bloquear durante una caída dejaría sin acceso a sitios legítimos cada
 vez que el servicio falle. La decisión está en `verdict/domain/outcome.js`.

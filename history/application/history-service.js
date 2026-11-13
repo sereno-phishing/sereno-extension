@@ -2,8 +2,11 @@
    Every use case is async, never throws, and reads or clears the history only
    through the data port (services.data, see platform/providers/ports.js).
    The backend records visits when it evaluates a site; the client never writes
-   them. The domain rules (60 s dedupe, 200 cap) are applied to what the port
-   returns. The port answers "invalid" when nobody is signed in on the backend:
+   them. The port returns backend records (model verdict + domain policy); each
+   one becomes an entry with its final status (Sereno.history.toEntry) and a
+   record outside the contract is left out. The domain rules (60 s dedupe, 200
+   cap) are applied to those entries. The port answers "invalid" when nobody
+   is signed in on the backend:
    that reads as no history (empty list, nothing to clear), not as an error.
    Results: { ok: true, ... } or { ok: false, error, message } where error is
    one of Sereno.providers.errors.CODES. */
@@ -21,8 +24,12 @@
     return !!answer && answer.ok === false && answer.error === "invalid";
   }
 
-  function isEntry(entry) {
-    return !!entry && typeof entry === "object" && typeof entry.id === "string" && typeof entry.domain === "string";
+  function isRecord(record) {
+    return !!record && typeof record === "object" && typeof record.id === "string" && typeof record.domain === "string";
+  }
+
+  function entriesOf(records) {
+    return records.filter(isRecord).map(history.toEntry).filter(Boolean);
   }
 
   /* -> { ok: true, entries } for the signed-in user, newest first. */
@@ -38,7 +45,7 @@
       if (!Array.isArray(answer.entries)) {
         return failure("server");
       }
-      return { ok: true, entries: history.normalize(answer.entries.filter(isEntry)) };
+      return { ok: true, entries: history.normalize(entriesOf(answer.entries)) };
     } catch (error) {
       return failure("server");
     }
