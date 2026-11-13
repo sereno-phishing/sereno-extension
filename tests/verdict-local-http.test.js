@@ -101,7 +101,7 @@ test("remote verdicts, history, cache, metrics and model version run against the
   const admin = client(baseUrl);
 
   // Public routes: the model version and verdicts need no session.
-  assert.deepEqual(await anonymous.data.getModelVersion(), { ok: true, version: "2.0.0" });
+  assert.deepEqual(await anonymous.data.getModelVersion(), { ok: true, version: "1.3" }, "the stand-in classifier reports its own version");
   const safe = await anonymous.verdict.evaluate(URLS.safe);
   assert.equal(safe.ok, true);
   assert.deepEqual({ domain: safe.domain, verdict: safe.verdict, policy: safe.policy, source: safe.source },

@@ -49,5 +49,7 @@ Open points to reconcile with the backend when it lands:
 - The local HTTP test passes `'CLASSIFIER': 'fake'` to `create_app` and expects `tienda-servicios.pe` legitimate and the two phishing demo domains phishing from that stand-in, with the block policy set through `PUT /v1/domains`.
 - A mock state stored by an older build keeps history records with `status`; they are left out of the list until the history is cleared.
 
+Parent check (2026-11-13): `node --test` 523 passed against `sereno-backend` at `935f984`. `tests/verdict-local-http.test.js` now expects version `1.3`, the one the backend stand-in classifier reports.
+
 ## Next step
 T2: manual check in Chrome against the local backend (Andrés), after the backend branch serves the contract; then re-run `node --test` to confirm `tests/verdict-local-http.test.js`.
