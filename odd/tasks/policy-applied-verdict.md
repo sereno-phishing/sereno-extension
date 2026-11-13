@@ -35,7 +35,7 @@ The repository test command in its README (509 tests passed before this work).
 ## Progress and evidence
 Branch `feat/policy-applied-verdict` from `026c48a`.
 
-T1 done (route: delegated, one writer).
+T1 done (route: delegated, one writer). Commit `25b4082`.
 - Rule in one place: `Sereno.verdict.applyPolicy(verdict, policy)` in `verdict/domain/verdict.js`. Used by `verdictOutcome.fromResult` (verdict) and `history.toEntry` (history item, called by `historyService.list`). Everything past those two boundaries still works on `seguro` / `advertencia` / `bloqueo`.
 - A history record outside the contract is left out of the list (same treatment malformed records already had); an off-contract verdict degrades as `server`.
 - Cache entries have no policy, so no status: `verdictCache.statusText` shows the model class (`Reevaluado: phishing` / `Reevaluado: legítimo`) or the pending text when `verdict` is null; the table is not keyed by domain.
