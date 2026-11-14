@@ -16,7 +16,8 @@
   var STORAGE_KEY = "sereno.state.v1";
 
   /* What a new installation starts with. currentSite stays null until the
-     service worker publishes the first evaluated navigation. */
+     service worker publishes what the active tab shows: an evaluated site or
+     the not-evaluated site (verdict/domain/outcome.js). */
   var DEFAULT_STATE = {
     onboardingDone: false,
     session: null,

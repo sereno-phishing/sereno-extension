@@ -99,9 +99,14 @@ muestra igual.
 
 Las páginas del propio backend (mismo origen que `baseUrl`: esquema, host y
 puerto) no se evalúan: no hay petición a `/v1/verdict`, aviso, badge ni entrada
-en el historial, y el popup muestra «Aún no hay un sitio evaluado». Solo ese
+en el historial, y el popup muestra «Sereno no evalúa esta página.». Solo ese
 origen queda exento; otras direcciones locales o privadas se evalúan como
-cualquier sitio.
+cualquier sitio. Lo mismo vale para lo que no es http(s) (páginas internas del
+navegador, otras extensiones, archivos locales, `about:blank`): si esa pestaña
+es la activa, la tarjeta «Este sitio» dice «Sereno no evalúa esta página.» en
+vez de conservar el último sitio evaluado, y al volver a una pestaña evaluada
+muestra de nuevo su resultado guardado, sin otra petición. La página de detalle
+de Sereno (el popup abierto en una pestaña) conserva el sitio que explica.
 
 El backend solo dice la clase del modelo, `phishing` o `legitima`, y la política
 del dominio. La extensión aplica esa política (RF-10) en un único lugar,
@@ -225,7 +230,8 @@ sereno-extension/
   `XMLHttpRequest` ni un adaptador. Todo lo demás depende de `Sereno.services`
   (`verdict`, `auth`, `data`, `survey`). `tests/architecture.test.js` lo verifica.
 - **Service worker** (`background/service-worker.js`). Registra de forma síncrona
-  `tabs.onUpdated`, `tabs.onActivated`, `tabs.onRemoved` y `runtime.onMessage`, y
+  `tabs.onUpdated`, `tabs.onActivated`, `tabs.onRemoved`,
+  `windows.onFocusChanged` y `runtime.onMessage`, y
   delega en `Sereno.navigationService`. No guarda estado en variables globales ni
   usa temporizadores: el resultado de cada pestaña vive en `chrome.storage.session`
   (clave `sereno.tab.<tabId>`) y el estado del popup, en el store compartido. Si
@@ -234,7 +240,8 @@ sereno-extension/
   con `chrome.action.setBadgeText` / `setBadgeBackgroundColor` y el `tabId` del
   evento: `✓` seguro, `!` advertencia, `✕` bloqueo, `…` evaluando, `?` protección
   degradada. Al cambiar de pestaña vuelve a pintar el resultado guardado. Solo la
-  pestaña activa alimenta el estado del popup. Una navegación nueva en la misma
+  pestaña activa de la ventana enfocada alimenta el estado del popup (se
+  republica al navegar, al cambiar de pestaña y al cambiar de ventana). Una navegación nueva en la misma
   pestaña invalida un resultado anterior que llegue tarde.
 - **Content script** (`content/content-script.js`, http/https, `document_idle`,
   solo el marco superior). Escucha el mensaje del worker, pide el resultado actual

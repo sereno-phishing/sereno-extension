@@ -63,6 +63,11 @@ async function onTabActivated(activeInfo) {
   await globalThis.Sereno.navigationService.handleTabActivated(buildDeps(), { tabId: activeInfo && activeInfo.tabId });
 }
 
+/* windowId is chrome.windows.WINDOW_ID_NONE (-1) when no browser window has the focus. */
+async function onWindowFocusChanged(windowId) {
+  await globalThis.Sereno.navigationService.handleWindowFocused(buildDeps(), { windowId });
+}
+
 async function onTabRemoved(tabId) {
   await globalThis.Sereno.navigationService.handleTabRemoved(buildDeps(), { tabId });
 }
@@ -85,3 +90,4 @@ chrome.runtime.onMessage.addListener(onRuntimeMessage);
 chrome.tabs.onUpdated.addListener(onTabUpdated);
 chrome.tabs.onActivated.addListener(onTabActivated);
 chrome.tabs.onRemoved.addListener(onTabRemoved);
+chrome.windows.onFocusChanged.addListener(onWindowFocusChanged);

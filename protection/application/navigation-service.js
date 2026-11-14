@@ -6,9 +6,12 @@
 
    deps = { services, store, browser, now, options? }
      services  the composition root (Sereno.services); the provider stays hidden
-     store     state store port: set(patch) publishes currentSite/protectionLevel
+     store     state store port: set(patch) publishes currentSite/protectionLevel;
+               currentSite is the site of an outcome (outcomes.siteOf) or the
+               not-evaluated site (outcomes.notEvaluatedSite)
      browser   port: setBadge(tabId, text, color), notifyTab(tabId, message),
-               getActiveTabId(), loadTabRecord/saveTabRecord/removeTabRecord
+               getActiveTabId(), getTabUrl(tabId), assetUrl(path),
+               loadTabRecord/saveTabRecord/removeTabRecord
      now       () -> Date
      options   passed to Sereno.verdictService.evaluate (pendingAfterMs, timeoutMs)
 
@@ -43,10 +46,18 @@
    "detail" opens the popup page (app/popup/popup.html) in a tab: it is the
    page that shows the verdict facts of the current site.
 
-   Pages of the verdict backend itself (services.verdict.isOwnPage(url)) are
-   never evaluated: no request, no tab message, no badge and no outcome in the
-   tab record, and the popup shows the "no evaluated site" card. The browser
-   already skips pages that are not http(s); those leave the tab untouched.
+   Pages that are never evaluated: anything that is not http(s) (browser pages,
+   other extensions, local files, about:blank) and the pages of the verdict
+   backend itself (services.verdict.isOwnPage(url)). They get no request, no
+   tab message, no badge and no outcome in the tab record, and when their tab
+   is the active one the popup is told so with the not-evaluated site
+   (outcomes.notEvaluatedSite()), never with the site of another tab.
+   Two cases leave the popup state as it is: a tab whose address is unknown
+   (not readable yet, or not a url), and the Sereno detail page, which exists
+   to show the site it was opened for.
+
+   The popup describes the active tab of the focused window, so the state is
+   republished on a tab update, a tab activation and a window focus change.
 
    Every function resolves and never throws: a failing provider, browser or
    store degrades the result, it does not break the navigation (fail-open). */
@@ -116,6 +127,40 @@
     } catch (error) {
       return false;
     }
+  }
+
+  /* True for the extension page that shows the facts of the current site. */
+  function isDetailPage(deps, url) {
+    try {
+      if (typeof deps.browser.assetUrl !== "function") {
+        return false;
+      }
+      var page = new URL(url);
+      var detail = new URL(deps.browser.assetUrl(DETAIL_PAGE));
+      return page.protocol === detail.protocol && page.host === detail.host && page.pathname === detail.pathname;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /* What the navigation use case does with a url:
+       "evaluate"  a web page: it gets a verdict
+       "skip"      a page that is never evaluated (see the header)
+       "ignore"    nothing can be said about it: no address, not a url, or
+                   the Sereno detail page */
+  function treatmentOf(deps, url) {
+    if (typeof url !== "string") {
+      return "ignore";
+    }
+    try {
+      new URL(url);
+    } catch (error) {
+      return "ignore";
+    }
+    if (isDetailPage(deps, url)) {
+      return "ignore";
+    }
+    return isEvaluable(url) && !isOwnPage(deps, url) ? "evaluate" : "skip";
   }
 
   function originOf(url) {
@@ -232,10 +277,11 @@
     return saved;
   }
 
-  /* A backend page: whatever the tab showed before stops applying. The record
-     of the previous page is dropped, which also discards an evaluation still
-     running for it; only the origins the user continued on are kept. The badge
-     is cleared and the active tab tells the popup there is no evaluated site. */
+  /* A page that is never evaluated: whatever the tab showed before stops
+     applying. The record of the previous page is dropped, which also discards
+     an evaluation still running for it; only the origins the user continued on
+     are kept. The badge is cleared and the active tab tells the popup that
+     this page is not evaluated. */
   async function leaveUnevaluated(deps, tabId, url, knownActive) {
     var existing = await loadRecord(deps, tabId);
     if (existing && (existing.url !== url || existing.outcome)) {
@@ -263,7 +309,7 @@
       }
     }
     await attempt(function () {
-      return deps.store.set({ currentSite: null });
+      return deps.store.set({ currentSite: outcomes.notEvaluatedSite() });
     });
   }
 
@@ -271,11 +317,14 @@
     try {
       var tabId = navigation && navigation.tabId;
       var url = navigation && navigation.url;
-      if (typeof tabId !== "number" || !isEvaluable(url)) {
+      if (typeof tabId !== "number") {
         return null;
       }
-      if (isOwnPage(deps, url)) {
+      var treatment = treatmentOf(deps, url);
+      if (treatment === "skip") {
         await leaveUnevaluated(deps, tabId, url, false);
+      }
+      if (treatment !== "evaluate") {
         return null;
       }
       var now = deps.now;
@@ -337,7 +386,9 @@
   }
 
   /* The popup shows the active tab, so switching tabs republishes that tab's
-     stored outcome and refreshes its badge. The modal is not shown again. */
+     stored outcome and refreshes its badge. The modal is not shown again. A
+     tab on a page that is never evaluated says so; a tab without a record is
+     looked up by its address (evaluated, skipped or left alone). */
   async function handleTabActivated(deps, event) {
     try {
       var tabId = event && event.tabId;
@@ -347,11 +398,33 @@
       var record = await loadRecord(deps, tabId);
       if (record && record.outcome) {
         await present(deps, tabId, record.url, record.outcome, ACTIVATED);
-      } else if (record && isOwnPage(deps, record.url)) {
+      } else if (record && treatmentOf(deps, record.url) === "skip") {
         await leaveUnevaluated(deps, tabId, record.url, true);
       } else if (!record && typeof deps.browser.getTabUrl === "function") {
         var url = await deps.browser.getTabUrl(tabId);
-        await handleNavigation(deps, { tabId: tabId, url: url });
+        if (treatmentOf(deps, url) === "skip") {
+          await leaveUnevaluated(deps, tabId, url, true);
+        } else {
+          await handleNavigation(deps, { tabId: tabId, url: url });
+        }
+      }
+    } catch (error) {
+      /* the next navigation or activation repairs the state */
+    }
+  }
+
+  /* Another browser window got the focus: its active tab is now the one the
+     popup describes. event = { windowId }; a negative id (no browser window
+     has the focus) or no active tab leaves the state as it is. */
+  async function handleWindowFocused(deps, event) {
+    try {
+      var windowId = event && event.windowId;
+      if (typeof windowId !== "number" || windowId < 0) {
+        return;
+      }
+      var tabId = await deps.browser.getActiveTabId();
+      if (typeof tabId === "number") {
+        await handleTabActivated(deps, { tabId: tabId });
       }
     } catch (error) {
       /* the next navigation or activation repairs the state */
@@ -462,6 +535,7 @@
     badgeOf: badgeOf,
     handleNavigation: handleNavigation,
     handleTabActivated: handleTabActivated,
+    handleWindowFocused: handleWindowFocused,
     handleTabRemoved: handleTabRemoved
   };
 })(globalThis.Sereno = globalThis.Sereno || {});

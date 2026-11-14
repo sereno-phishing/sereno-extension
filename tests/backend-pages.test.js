@@ -27,6 +27,7 @@ const BASE_URL = "http://127.0.0.1:5000";
 const OWN_PAGE = BASE_URL + "/dev/users";
 const WARNED = "https://paypal-secure-login.com/login";
 const NOW = new Date(2026, 10, 13, 10, 0, 0);
+const NOT_EVALUATED = { currentSite: { kind: "not_evaluated" } };
 
 const SAME_ORIGIN = [BASE_URL, BASE_URL + "/", OWN_PAGE, BASE_URL + "/dev/users?page=2#top", "HTTP://127.0.0.1:5000/v1/model"];
 const OTHER_PORT = ["http://127.0.0.1:5001/dev/users", "http://127.0.0.1/dev/users", "http://127.0.0.1:50000/"];
@@ -138,9 +139,9 @@ test("a page of the backend origin gets no request, no overlay, no badge and no 
   assert.equal(JSON.stringify(backend.state.history), historyBefore);
   assert.equal(deps.browser.records.size, 0);
   assert.deepEqual(await nav.handleMessage(deps, { type: "sereno:get-outcome" }, fromTab(OWN_PAGE)), { ok: true, outcome: null });
-  /* The popup shows the card of "no evaluated site". */
+  /* The popup shows the card of a page that is not evaluated. */
   assert.ok(patches.length > 0);
-  patches.forEach((patch) => assert.deepEqual(patch, { currentSite: null }));
+  patches.forEach((patch) => assert.deepEqual(patch, NOT_EVALUATED));
 });
 
 test("another port, another scheme, another loopback address or a lookalike host is evaluated", async () => {
@@ -169,7 +170,7 @@ test("going from an evaluated site to a backend page clears that tab's verdict",
   assert.ok(deps.browser.calls.some((call) => call.op === "badge" && call.tabId === 1 && call.text === ""), "the badge of the previous page is cleared");
   assert.deepEqual(await nav.handleMessage(deps, { type: "sereno:get-outcome" }, fromTab(OWN_PAGE)), { ok: true, outcome: null });
   assert.equal((await nav.handleMessage(deps, { type: "sereno:continue", url: OWN_PAGE }, fromTab(OWN_PAGE))).ok, false);
-  assert.deepEqual(patches[patches.length - 1], { currentSite: null });
+  assert.deepEqual(patches[patches.length - 1], NOT_EVALUATED);
 
   /* What the user chose on the other origin is still remembered in the tab. */
   await nav.handleNavigation(deps, { tabId: 1, url: WARNED, fresh: true });
@@ -207,13 +208,13 @@ test("a backend page in a background tab does not touch the popup state", async 
   assert.deepEqual(backend.calls, []);
 });
 
-test("activating a tab that shows a backend page publishes the idle state without a request", async () => {
+test("activating a tab that shows a backend page publishes the not-evaluated site without a request", async () => {
   const { backend, deps, patches } = await setup();
   await nav.handleTabActivated(deps, { tabId: 1 });
   assert.deepEqual(backend.calls, []);
   assert.deepEqual(messagesOf(deps), []);
   assert.deepEqual(paintedBadges(deps), []);
-  assert.deepEqual(patches, [{ currentSite: null }]);
+  assert.deepEqual(patches, [NOT_EVALUATED]);
 
   /* Also when the tab keeps a record because the user continued elsewhere. */
   const kept = await setup();
@@ -222,7 +223,7 @@ test("activating a tab that shows a backend page publishes the idle state withou
   await nav.handleNavigation(kept.deps, { tabId: 1, url: OWN_PAGE, fresh: true });
   kept.patches.length = 0;
   await nav.handleTabActivated(kept.deps, { tabId: 1 });
-  assert.deepEqual(kept.patches, [{ currentSite: null }]);
+  assert.deepEqual(kept.patches, [NOT_EVALUATED]);
   assert.deepEqual(verdictRequests(kept.backend), [WARNED]);
 });
 

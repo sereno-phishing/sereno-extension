@@ -105,3 +105,28 @@ test("before the first navigation the popup shows the idle site card, signed out
     assert.doesNotMatch(html, /Evaluando|is-pending|aria-busy|<div class="site-domain"><\/div>/);
   }
 });
+
+const NOT_EVALUATED = { kind: "not_evaluated" };
+const NOT_EVALUATED_CARD =
+  '<div class="site-card is-idle" role="status">' +
+  '<div class="site-label">Este sitio</div>' +
+  '<div class="site-domain">Sereno no evalúa esta página.</div>' +
+  '<div class="site-note">Las páginas internas del navegador y de Sereno no se evalúan.</div>' +
+  "</div>";
+
+test("the not-evaluated card reuses the idle structure: a status that is not busy, with no pill and no domain", () => {
+  ["active", "degraded", undefined].forEach((level) => {
+    assert.equal(Sereno.protectionUi.siteCard(NOT_EVALUATED, level), NOT_EVALUATED_CARD, String(level));
+  });
+  assert.doesNotMatch(NOT_EVALUATED_CARD, /aria-busy|class="pill|site-row|is-pending|is-degraded/);
+  assert.notEqual(Sereno.protectionUi.siteCard(null, "active"), NOT_EVALUATED_CARD);
+});
+
+test("on a page Sereno does not evaluate the popup shows the not-evaluated card, signed out and signed in", () => {
+  for (const session of [null, USER, ADMIN]) {
+    const html = render(session, { currentSite: NOT_EVALUATED });
+    assert.equal(count(html, /class="site-card/g), 1);
+    assert.ok(html.includes(NOT_EVALUATED_CARD));
+    assert.doesNotMatch(html, /tienda-servicios\.pe|Aún no hay un sitio evaluado|Sereno evaluará|Evaluando|aria-busy/);
+  }
+});

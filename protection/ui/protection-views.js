@@ -40,25 +40,29 @@
     );
   }
 
-  /* Shown until the first navigation is evaluated: there is no site yet, so
-     nothing is busy and there is neither a domain nor a status pill. */
-  function idleSiteCard() {
+  /* The card without a site: nothing is busy and there is neither a domain
+     nor a status pill, only a message and the line that explains it. */
+  function quietSiteCard(message, note) {
     return (
       '<div class="site-card is-idle" role="status">' +
       '<div class="site-label">' + t("Este sitio") + '</div>' +
-      '<div class="site-domain">' + t("Aún no hay un sitio evaluado.") + '</div>' +
-      '<div class="site-note">' + t("Sereno evaluará el próximo sitio que visites.") + '</div>' +
+      '<div class="site-domain">' + t(message) + '</div>' +
+      '<div class="site-note">' + t(note) + '</div>' +
       "</div>"
     );
   }
 
-  /* site: the current site, or null before the first evaluated navigation
-     (idle card). level: "degraded" when the verdict service is down (HU-26).
+  /* site: the current site; null before anything is known about the active
+     tab (idle card); the not-evaluated site on a page Sereno skips, whatever
+     the level. level: "degraded" when the verdict service is down (HU-26).
      A status that is still being evaluated is marked busy and announced; a
      degraded level explains that the site could not be checked. */
   function siteCard(site, level) {
     if (!site) {
-      return idleSiteCard();
+      return quietSiteCard("Aún no hay un sitio evaluado.", "Sereno evaluará el próximo sitio que visites.");
+    }
+    if (outcomes.isNotEvaluatedSite(site)) {
+      return quietSiteCard("Sereno no evalúa esta página.", "Las páginas internas del navegador y de Sereno no se evalúan.");
     }
     var current = site;
     var pending = verdict.status(current.status).tone === "neutral";

@@ -135,7 +135,9 @@ test("only http and https pages are evaluated", async () => {
   }
   assert.equal(await nav.handleNavigation(deps, { tabId: undefined, url: "https://a.pe/" }), null);
   assert.deepEqual(deps.services.asked, []);
-  assert.deepEqual(deps.browser.calls, []);
+  /* A page that is never evaluated only gets its badge cleared. */
+  assert.ok(deps.browser.calls.every((call) => call.op === "badge" && call.tabId === 1 && call.text === ""));
+  assert.deepEqual(deps.store.patches, []);
   assert.equal(deps.browser.records.size, 0);
 });
 

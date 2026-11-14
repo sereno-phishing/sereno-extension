@@ -132,6 +132,19 @@
     return { domain: domainOf(url), status: "evaluando", score: null, source: null, ts: stamp };
   }
 
+  /* The currentSite of a page that is never evaluated (a browser page, a local
+     file, a page of the verdict backend). It is a value of its own: null means
+     that nothing is known yet, not that the page is skipped. */
+  var NOT_EVALUATED = "not_evaluated";
+
+  function notEvaluatedSite() {
+    return { kind: NOT_EVALUATED };
+  }
+
+  function isNotEvaluatedSite(site) {
+    return !!site && typeof site === "object" && site.kind === NOT_EVALUATED;
+  }
+
   Sereno.verdictOutcome = {
     REASONS: REASONS,
     PENDING_AFTER_MS: PENDING_AFTER_MS,
@@ -145,6 +158,8 @@
     blocksNavigation: blocksNavigation,
     notice: notice,
     domainOf: domainOf,
-    siteOf: siteOf
+    siteOf: siteOf,
+    notEvaluatedSite: notEvaluatedSite,
+    isNotEvaluatedSite: isNotEvaluatedSite
   };
 })(globalThis.Sereno = globalThis.Sereno || {});

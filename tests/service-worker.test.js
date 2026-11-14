@@ -61,6 +61,10 @@ globalThis.chrome = {
       messages.push({ tabId, message });
     }
   },
+  windows: {
+    WINDOW_ID_NONE: -1,
+    onFocusChanged: event("windows.onFocusChanged")
+  },
   runtime: {
     id: "abc",
     onMessage: event("runtime.onMessage"),
@@ -108,14 +112,15 @@ const registeredRightAway = {
   onUpdated: (listeners.onUpdated || []).length,
   onActivated: (listeners.onActivated || []).length,
   onRemoved: (listeners.onRemoved || []).length,
+  onFocusChanged: (listeners["windows.onFocusChanged"] || []).length,
   onMessage: (listeners["runtime.onMessage"] || []).length
 };
 
 const source = fs.readFileSync(WORKER, "utf8");
 
-test("the three tab listeners are registered synchronously at load", () => {
-  assert.deepEqual(registeredRightAway, { onUpdated: 1, onActivated: 1, onRemoved: 1, onMessage: 1 });
-  [/^chrome\.runtime\.onMessage\.addListener\(/m, /^chrome\.tabs\.onUpdated\.addListener\(/m, /^chrome\.tabs\.onActivated\.addListener\(/m, /^chrome\.tabs\.onRemoved\.addListener\(/m].forEach((pattern) => {
+test("the tab, window and message listeners are registered synchronously at load", () => {
+  assert.deepEqual(registeredRightAway, { onUpdated: 1, onActivated: 1, onRemoved: 1, onFocusChanged: 1, onMessage: 1 });
+  [/^chrome\.windows\.onFocusChanged\.addListener\(/m, /^chrome\.runtime\.onMessage\.addListener\(/m, /^chrome\.tabs\.onUpdated\.addListener\(/m, /^chrome\.tabs\.onActivated\.addListener\(/m, /^chrome\.tabs\.onRemoved\.addListener\(/m].forEach((pattern) => {
     assert.match(source, pattern);
   });
 });
@@ -179,13 +184,18 @@ test("activating an already open tab without a record evaluates its URL", async 
   assert.equal(messages[messages.length - 1].tabId, 42);
 });
 
-test("non web pages and irrelevant tab events are ignored", async () => {
+test("a browser page in a background tab only gets its badge cleared, and irrelevant tab events are ignored", async () => {
   const [onUpdated] = listeners.onUpdated;
-  const before = { badges: badges.length, messages: messages.length };
+  const before = { badges: badges.length, messages: messages.length, requests: verdictRequests.length, state: JSON.stringify(localData["sereno.state.v1"]) };
   await onUpdated(2, { status: "loading", url: "chrome://extensions/" }, { id: 2, url: "chrome://extensions/" });
+  assert.deepEqual(badges.slice(before.badges), [{ tabId: 2, text: "" }]);
   await onUpdated(2, { title: "x" }, { id: 2, url: "https://a.pe/" });
   await onUpdated(2, { status: "complete" }, undefined);
-  assert.deepEqual({ badges: badges.length, messages: messages.length }, before);
+  assert.equal(badges.length, before.badges + 1);
+  assert.equal(messages.length, before.messages);
+  assert.equal(verdictRequests.length, before.requests);
+  assert.equal(JSON.stringify(localData["sereno.state.v1"]), before.state);
+  assert.equal(sessionData.has("sereno.tab.2"), false);
 });
 
 function ask(message, tabId, url) {
@@ -228,7 +238,7 @@ test("messages that are not for the content script are left alone", () => {
   assert.notEqual(onMessage(undefined, undefined, () => {}), true);
 });
 
-test("a page served by the configured backend is left alone and the popup goes idle", async () => {
+test("a page served by the configured backend is left alone and the popup says it is not evaluated", async () => {
   const [onUpdated] = listeners.onUpdated;
   const url = globalThis.Sereno.providers.config.baseUrl + "/dev/users";
   const before = { requests: verdictRequests.length, messages: messages.length };
@@ -239,5 +249,33 @@ test("a page served by the configured backend is left alone and the popup goes i
   assert.equal(messages.length, before.messages);
   assert.deepEqual(badges[badges.length - 1], { tabId: 1, text: "" });
   assert.equal(sessionData.has("sereno.tab.1"), false);
-  assert.equal(localData["sereno.state.v1"].currentSite, null);
+  assert.deepEqual(localData["sereno.state.v1"].currentSite, { kind: "not_evaluated" });
+});
+
+test("a browser page in the active tab clears the badge and tells the popup it is not evaluated", async () => {
+  const [onUpdated] = listeners.onUpdated;
+  const site = "https://pago-servicios-linea.net/checkout";
+  await onUpdated(1, { status: "loading", url: site }, { id: 1, url: site });
+  assert.equal(localData["sereno.state.v1"].currentSite.status, "bloqueo");
+  const before = { requests: verdictRequests.length, messages: messages.length };
+
+  await onUpdated(1, { status: "loading", url: "chrome://newtab/" }, { id: 1, url: "chrome://newtab/" });
+  await onUpdated(1, { status: "complete" }, { id: 1, url: "chrome://newtab/" });
+
+  assert.deepEqual(localData["sereno.state.v1"].currentSite, { kind: "not_evaluated" });
+  assert.deepEqual(badges[badges.length - 1], { tabId: 1, text: "" });
+  assert.equal(sessionData.has("sereno.tab.1"), false);
+  assert.equal(verdictRequests.length, before.requests);
+  assert.equal(messages.length, before.messages);
+});
+
+test("focusing a window republishes its active tab, and losing the focus changes nothing", async () => {
+  const [onFocusChanged] = listeners["windows.onFocusChanged"];
+  await onFocusChanged(-1);
+  assert.deepEqual(localData["sereno.state.v1"].currentSite, { kind: "not_evaluated" });
+
+  /* The active tab (id 1) shows a web page again: it has no record, so it is evaluated. */
+  await onFocusChanged(7);
+  assert.equal(localData["sereno.state.v1"].currentSite.status, "bloqueo");
+  assert.equal(localData["sereno.state.v1"].currentSite.domain, "pago-servicios-linea.net");
 });
