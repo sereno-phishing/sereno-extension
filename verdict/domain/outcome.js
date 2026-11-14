@@ -72,10 +72,13 @@
     return elapsedMs >= PENDING_AFTER_MS;
   }
 
-  /* Status id to display: only a final verdict has its own; everything else
-     reads as the existing pending status. */
+  /* Status id to display: a final verdict has its own, a degraded outcome is
+     the site that could not be checked, and a wait reads as pending. */
   function statusId(outcome) {
-    return outcome && outcome.kind === "verdict" ? outcome.verdict.status : "pendiente";
+    if (outcome && outcome.kind === "verdict") {
+      return outcome.verdict.status;
+    }
+    return outcome && outcome.kind === "degraded" ? verdict.STATUSES.sin_evaluar.id : "pendiente";
   }
 
   /* Anything that is not a clean verdict or a pending wait means the
@@ -129,7 +132,8 @@
       var found = outcome.verdict;
       return { domain: found.domain, status: found.status, score: found.score, source: found.source, ts: stamp };
     }
-    return { domain: domainOf(url), status: "evaluando", score: null, source: null, ts: stamp };
+    var status = outcome && outcome.kind === "degraded" ? verdict.STATUSES.sin_evaluar.id : "evaluando";
+    return { domain: domainOf(url), status: status, score: null, source: null, ts: stamp };
   }
 
   /* The currentSite of a page that is never evaluated (a browser page, a local

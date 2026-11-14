@@ -76,6 +76,10 @@ test("onboarding, protection and history localize without changing backend value
   assert.match(skipped, /<div class="site-domain">Sereno does not evaluate this page\.<\/div>/);
   assert.match(skipped, /<div class="site-note">Browser and Sereno internal pages are not evaluated\.<\/div>/);
   assert.doesNotMatch(skipped, /Checking|aria-busy|No site evaluated|class="pill/);
+  const unchecked = app.protectionUi.siteCard({ domain: "example.es", status: "sin_evaluar" }, "degraded");
+  assert.match(unchecked, /<span>Not evaluated<\/span>/);
+  assert.match(unchecked, /This site could not be checked\. Avoid entering payment information\./);
+  assert.doesNotMatch(unchecked, /Checking|aria-busy|Sin evaluar/);
   assert.match(app.historyUi.listView({ tabsHtml: "", entries: [], filter: app.history.ALL }), /No sites/);
   const detail = app.historyUi.detailView({ domain: "example.es", status: "seguro", score: 0.1, source: "cache", ts: "2026-01-01T00:00:00Z" });
   assert.match(detail, /example\.es/);

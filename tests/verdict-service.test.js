@@ -183,7 +183,7 @@ test("with a store the outcome is published as currentSite and protection level"
   await verdictService.evaluate(failingPort("cache_down"), "https://nuevo.pe/", { store, now: NOW });
   state = await store.get();
   assert.equal(state.currentSite.domain, "nuevo.pe");
-  assert.equal(state.currentSite.status, "evaluando");
+  assert.equal(state.currentSite.status, "sin_evaluar");
   assert.equal(state.protectionLevel, "degraded");
 });
 

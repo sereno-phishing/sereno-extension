@@ -105,3 +105,28 @@ test("the popup ships a loading skeleton that the first render replaces", () => 
   assert.match(html, /class="skeleton /);
   assert.match(read("app/popup/popup.css"), /\.boot-skeleton/);
 });
+
+test("a site that could not be checked is its own state: not busy, with the not-evaluated pill instead of the pending one", () => {
+  const site = Sereno.verdictOutcome.siteOf(Sereno.verdictOutcome.degraded("timeout"), "https://tienda.pe/pago", "2026-11-13T10:00");
+  assert.equal(site.status, "sin_evaluar");
+  /* Also a site published before this status existed, which said "evaluando". */
+  for (const current of [site, { domain: "tienda.pe", status: "evaluando" }, { domain: "tienda.pe", status: "pendiente" }]) {
+    const html = protectionUi.siteCard(current, "degraded");
+    assert.match(html, /^<div class="site-card is-degraded" role="status">/);
+    assert.doesNotMatch(html, /aria-busy|Evaluando|is-pending|◔/);
+    assert.match(html, /<span class="pill pill-md pill-neutral"><span class="art-glyph art-14" aria-hidden="true">\?<\/span><span>Sin evaluar<\/span><\/span>/);
+    assert.match(html, /No se pudo comprobar este sitio\. Evita ingresar datos de pago\./);
+  }
+  /* A pending evaluation keeps its own pill and stays busy. */
+  const pending = protectionUi.siteCard(Sereno.verdictOutcome.siteOf(Sereno.verdictOutcome.pending(), "https://tienda.pe/", "t"), "active");
+  assert.match(pending, /aria-busy="true"/);
+  assert.match(pending, /Evaluando…/);
+  assert.doesNotMatch(pending, /Sin evaluar/);
+});
+
+test("the toolbar badge of a degraded outcome is the caution mark, never the pending dots", () => {
+  load("protection/application/navigation-service.js");
+  const badge = Sereno.navigationService.badgeOf(Sereno.verdictOutcome.degraded("offline"));
+  assert.deepEqual(badge, { text: "?", color: "#D97706" });
+  assert.equal(Sereno.navigationService.badgeOf(Sereno.verdictOutcome.pending()).text, "…");
+});

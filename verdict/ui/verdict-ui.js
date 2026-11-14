@@ -27,6 +27,7 @@
     "verdict.status.advertencia": { es: "Advertencia", en: "Warning" },
     "verdict.status.bloqueo": { es: "Bloqueado", en: "Blocked" },
     "verdict.status.pendiente": { es: "Evaluando…", en: "Checking…" },
+    "verdict.status.sin_evaluar": { es: "Sin evaluar", en: "Not evaluated" },
     "verdict.fact.risk": { es: FACT_LABELS.risk, en: "Risk level" },
     "verdict.fact.score": { es: FACT_LABELS.score, en: "Model score" },
     "verdict.fact.date": { es: FACT_LABELS.date, en: "Classification date" },

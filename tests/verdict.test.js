@@ -6,14 +6,15 @@ const { load } = require("./load");
 
 const { verdict } = load("verdict/domain/verdict.js");
 
-test("catalog exposes the four statuses with their labels and tones", () => {
+test("catalog exposes the three verdicts, the pending status and the not-evaluated status with their labels and tones", () => {
   assert.deepEqual(
     Object.keys(verdict.STATUSES).map((id) => [id, verdict.STATUSES[id].label, verdict.STATUSES[id].tone]),
     [
       ["seguro", "Seguro", "ok"],
       ["advertencia", "Advertencia", "warn"],
       ["bloqueo", "Bloqueado", "bad"],
-      ["pendiente", "Evaluando…", "neutral"]
+      ["pendiente", "Evaluando…", "neutral"],
+      ["sin_evaluar", "Sin evaluar", "neutral"]
     ]
   );
   assert.deepEqual(verdict.VERDICTS, ["seguro", "advertencia", "bloqueo"]);

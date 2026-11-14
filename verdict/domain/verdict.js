@@ -16,7 +16,10 @@
     seguro: { id: "seguro", label: "Seguro", title: "Sitio seguro", glyph: "✓", tone: "ok" },
     advertencia: { id: "advertencia", label: "Advertencia", title: "Advertencia", glyph: "!", tone: "warn" },
     bloqueo: { id: "bloqueo", label: "Bloqueado", title: "Sitio bloqueado", glyph: "✕", tone: "bad" },
-    pendiente: { id: "pendiente", label: "Evaluando…", title: "Evaluación pendiente", glyph: "◔", tone: "neutral" }
+    pendiente: { id: "pendiente", label: "Evaluando…", title: "Evaluación pendiente", glyph: "◔", tone: "neutral" },
+    /* The site could not be checked (degraded protection): not a verdict and
+       not a wait, so it has its own label and never reads as "Evaluando…". */
+    sin_evaluar: { id: "sin_evaluar", label: "Sin evaluar", title: "Sitio sin evaluar", glyph: "?", tone: "neutral" }
   };
 
   /* Final verdicts, in display order. */

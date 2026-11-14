@@ -55,8 +55,9 @@
   /* site: the current site; null before anything is known about the active
      tab (idle card); the not-evaluated site on a page Sereno skips, whatever
      the level. level: "degraded" when the verdict service is down (HU-26).
-     A status that is still being evaluated is marked busy and announced; a
-     degraded level explains that the site could not be checked. */
+     A status that is still being evaluated is marked busy and announced. A
+     degraded level, or a site published as not checked, is its own state: not
+     busy, with the "Sin evaluar" pill and the note that explains it. */
   function siteCard(site, level) {
     if (!site) {
       return quietSiteCard("Aún no hay un sitio evaluado.", "Sereno evaluará el próximo sitio que visites.");
@@ -65,15 +66,16 @@
       return quietSiteCard("Sereno no evalúa esta página.", "Las páginas internas del navegador y de Sereno no se evalúan.");
     }
     var current = site;
-    var pending = verdict.status(current.status).tone === "neutral";
-    var degraded = level === "degraded";
+    var unchecked = verdict.STATUSES.sin_evaluar.id;
+    var degraded = level === "degraded" || current.status === unchecked;
+    var pending = !degraded && verdict.status(current.status).tone === "neutral";
     var live = pending || degraded;
     return (
       '<div class="' + ui.classes(["site-card", degraded ? "is-degraded" : pending && "is-pending"]) + '"' +
-      (live ? ' role="status"' : "") + (pending && !degraded ? ' aria-busy="true"' : "") + ">" +
+      (live ? ' role="status"' : "") + (pending ? ' aria-busy="true"' : "") + ">" +
       '<div class="site-label">' + t("Este sitio") + '</div>' +
       '<div class="site-row"><div class="site-domain">' + ui.esc(current.domain) + "</div>" +
-      local.pill(current.status, "md") + "</div>" +
+      local.pill(degraded ? unchecked : current.status, "md") + "</div>" +
       (degraded ? '<div class="site-note">' + t("No se pudo comprobar este sitio. Evita ingresar datos de pago.") + '</div>' : "") +
       "</div>"
     );

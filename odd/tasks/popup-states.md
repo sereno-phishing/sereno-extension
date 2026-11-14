@@ -26,7 +26,7 @@ Every sentence Sereno shows must be true for the page the user is looking at.
 - [x] WU2 `fix(popup)`: not-evaluated state on pages Sereno skips (route: inline, single writer).
 
 - [x] WU3 `fix(protection)`: a reload always asks again and one navigation makes one request (end-to-end findings 1 and 2).
-- [ ] WU4 `fix(popup)`: a degraded site is not shown as "Evaluando…" (finding 3).
+- [x] WU4 `fix(popup)`: a degraded site is not shown as "Evaluando…" (finding 3).
 - [ ] WU5 `fix(admin)`: metrics section without horizontal overflow (finding 4).
 
 ## Checks
@@ -76,6 +76,18 @@ steps that read and write a tab record run in arrival order per tab
 is a reload that gets a new token, and an answer is stored and shown only while
 the record carries its token. RED: 4 new tests failing in
 `tests/navigation-reload.test.js`. GREEN: `node --test` 505 pass, 0 fail, 0 skipped.
+
+WU3 commit `c91ab86`.
+
+WU4. Cause: `siteOf` published a degraded outcome with the status "evaluando"
+and `statusId` returned "pendiente" for it, so the popup card drew the pending
+pill next to the "could not be checked" note. Fix: a `sin_evaluar` status
+("Sin evaluar" / "Not evaluated", neutral tone, glyph "?") in the verdict
+catalog; `siteOf` and `statusId` use it for a degraded outcome and the site card
+shows that pill, not busy, whenever the level is degraded. The toolbar badge
+was already "?". The extension writes no history: entries come from the backend
+on an answered `/v1/verdict`. RED: 7 failing. GREEN: `node --test` 507 pass, 0
+fail, 0 skipped.
 
 ## Next step
 

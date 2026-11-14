@@ -192,6 +192,7 @@ test("provider failures are degraded, fail open and mark the protection level", 
     assert.deepEqual(outcome, { kind: "degraded", reason });
     assert.deepEqual(badgesOf(deps.browser), [{ op: "badge", tabId: 1, text: "?", color: "#D97706" }]);
     assert.equal(deps.store.patches[0].protectionLevel, "degraded");
+    assert.equal(deps.store.patches[0].currentSite.status, "sin_evaluar", "a site that could not be checked is not shown as being evaluated");
     assert.equal(Sereno.verdictOutcome.blocksNavigation(outcome), false);
     assert.equal(messagesOf(deps.browser)[0].message.outcome.kind, "degraded");
   }

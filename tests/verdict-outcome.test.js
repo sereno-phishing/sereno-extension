@@ -54,7 +54,7 @@ test("pending outcomes carry a reason and read as the pending status", () => {
 
 test("the status to display comes from the existing catalog", () => {
   assert.equal(outcome.statusId(outcome.fromResult(GOOD)), "advertencia");
-  assert.equal(outcome.statusId(outcome.degraded("offline")), "pendiente");
+  assert.equal(outcome.statusId(outcome.degraded("offline")), "sin_evaluar");
   assert.equal(outcome.statusId(null), "pendiente");
 });
 
@@ -104,10 +104,11 @@ test("the site published for an outcome reuses the currentSite shape", () => {
   });
   assert.deepEqual(outcome.siteOf(outcome.degraded("offline"), "https://www.B.pe/x", "t"), {
     domain: "b.pe",
-    status: "evaluando",
+    status: "sin_evaluar",
     score: null,
     source: null,
     ts: "t"
   });
+  assert.equal(outcome.siteOf(outcome.pending(), "https://a.pe/", "t").status, "evaluando");
   assert.equal(outcome.domainOf("not a url"), "not a url");
 });
