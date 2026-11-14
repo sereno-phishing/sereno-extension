@@ -9,6 +9,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { createRestFake } = require("./rest-fake");
 
 const ROOT = path.join(__dirname, "..");
 const WORKER = path.join(ROOT, "background", "service-worker.js");
@@ -90,23 +91,15 @@ globalThis.chrome = {
   }
 };
 
-/* The default config serves verdicts from the backend, so the worker's
-   requests go to a fake backend that answers the verdict route with the mock's
-   scenario verdicts (the same ones the backend's FakeClassifier returns). */
+/* The worker asks the configured backend for verdicts, so its requests go to
+   the test-only REST fake (tests/rest-fake.js), created once the worker has
+   loaded the provider config. */
 const verdictRequests = [];
-let fakeVerdicts = null;
+let backend = null;
 globalThis.fetch = async (url, init) => {
-  const Sereno = globalThis.Sereno;
   verdictRequests.push({ url, method: init.method, credentials: init.credentials });
-  if (url !== Sereno.providers.config.baseUrl + "/v1/verdict" || init.method !== "POST") {
-    return { ok: false, status: 404, json: async () => ({ error: "server" }) };
-  }
-  fakeVerdicts = fakeVerdicts || Sereno.providers.mock.create({
-    store: Sereno.stateStore.create({ storage: Sereno.storage.memoryStorage(), key: "fake-backend", defaults: Sereno.seed.defaultState }),
-    delayMs: 0
-  });
-  const verdict = await fakeVerdicts.verdict.evaluate(JSON.parse(init.body).url);
-  return { ok: true, status: 200, json: async () => verdict };
+  backend = backend || createRestFake({ baseUrl: globalThis.Sereno.providers.config.baseUrl });
+  return backend(url, init);
 };
 
 /* No await between the require and the assertions: registration is synchronous. */

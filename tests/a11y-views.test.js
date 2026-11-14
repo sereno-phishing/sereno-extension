@@ -9,10 +9,10 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { load } = require("./load");
+const fixtures = require("./fixtures");
 
 const Sereno = load(
   "ui/atoms.js", "ui/molecules.js", "ui/dom.js",
-  "platform/seed.js",
   "time/domain/time.js", "verdict/domain/verdict.js", "verdict/domain/outcome.js",
   "account/domain/account.js", "history/domain/history.js", "survey/domain/sus.js",
   "onboarding/domain/onboarding.js", "protection/domain/protection.js",
@@ -83,7 +83,7 @@ const count = (html, pattern) => (html.match(pattern) || []).length;
 
 const USER = { username: "ana", isAdmin: false };
 const ADMIN = { username: "admin", isAdmin: true };
-const ENTRIES = Sereno.seed.defaultState.history["andres.torres"];
+const ENTRIES = fixtures.history()["andres.torres"].map(Sereno.history.toEntry);
 const BASE = { historyFilter: Sereno.history.ALL, onboardingStep: 1, surveyIndex: 0, surveyAnswers: [3], historyEntries: ENTRIES, detailId: "h-000001" };
 
 function popupCases() {
@@ -248,8 +248,8 @@ test("the score bar in the detail is decorative and its value is read as text", 
 /* ---------------- admin ---------------- */
 
 function adminHtml(section, extra) {
-  const model = { section, metrics: Sereno.seed.metrics, domainsDraft: Sereno.seed.defaultState.domains, addPolicy: "advertencia",
-    cache: Sereno.seed.defaultState.cache, load: {}, ...extra };
+  const model = { section, metrics: fixtures.metrics(), domainsDraft: fixtures.domains(), addPolicy: "advertencia",
+    cache: fixtures.cache(), load: {}, ...extra };
   return adminViews.page(model, { session: ADMIN });
 }
 

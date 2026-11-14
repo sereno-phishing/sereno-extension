@@ -15,7 +15,6 @@ const { load } = require("./load");
 
 const Sereno = load(
   "ui/atoms.js", "ui/molecules.js", "ui/dom.js",
-  "platform/seed.js",
   "time/domain/time.js", "verdict/domain/verdict.js", "verdict/domain/outcome.js",
   "account/domain/account.js", "history/domain/history.js", "survey/domain/sus.js",
   "administration/domain/domain-policy.js", "administration/domain/verdict-cache.js",

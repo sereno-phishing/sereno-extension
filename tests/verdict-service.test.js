@@ -1,11 +1,13 @@
 "use strict";
 
 /* Verdict use case: one call, one normalized outcome, never throws. Runs over
-   both adapters (mock with an injected failure, remote with a fake fetch). */
+   the remote adapter (against the test-only REST fake or a failing fetch) and
+   over ports that fail the way a backend would. */
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { load } = require("./load");
+const { createRestFake } = require("./rest-fake");
 
 const Sereno = load(
   "time/domain/time.js",
@@ -17,18 +19,15 @@ const Sereno = load(
   "administration/domain/domain-policy.js",
   "administration/domain/verdict-cache.js",
   "protection/domain/protection.js",
-  "demo-store/domain/scenarios.js",
   "account/application/account-service.js",
   "history/application/history-service.js",
   "survey/application/survey-service.js",
   "administration/application/administration-service.js",
   "protection/application/protection-service.js",
   "platform/storage.js",
-  "platform/seed.js",
   "platform/state-store.js",
   "platform/providers/config.js",
   "platform/providers/ports.js",
-  "platform/providers/mock.js",
   "platform/providers/remote.js",
   "platform/providers/index.js",
   "verdict/application/verdict-service.js"
@@ -42,27 +41,30 @@ function openStore() {
   return Sereno.stateStore.create({
     storage: Sereno.storage.memoryStorage(),
     key: Sereno.stateStore.STORAGE_KEY,
-    defaults: Sereno.seed.defaultState
+    defaults: { session: null, currentSite: null }
   });
 }
 
-function mockServices() {
-  return { verdict: providers.mock.create({ store: openStore(), now: NOW }).verdict };
+const BASE_URL = "https://api.sereno.test";
+
+/* The remote adapter over a fresh fake backend. */
+function backendServices() {
+  return { verdict: providers.remote.create({ baseUrl: BASE_URL, timeoutMs: 50, fetch: createRestFake({ baseUrl: BASE_URL, now: NOW }) }).verdict };
 }
 
-/* Mock adapter whose verdict port fails the way a backend would. */
-function failingMock(error) {
+/* A verdict port that fails the way a backend would. */
+function failingPort(error) {
   return { verdict: { evaluate: async () => ({ ok: false, error }) } };
 }
 
 function remoteServices(fetchImpl, timeoutMs) {
-  return { verdict: providers.remote.create({ baseUrl: "https://api.sereno.test", timeoutMs: timeoutMs || 30, fetch: fetchImpl }).verdict };
+  return { verdict: providers.remote.create({ baseUrl: BASE_URL, timeoutMs: timeoutMs || 30, fetch: fetchImpl }).verdict };
 }
 
 const reply = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 
-test("the mock adapter yields a verdict outcome", async () => {
-  const out = await verdictService.evaluate(mockServices(), BLOCKED_URL);
+test("a phishing verdict under a block policy yields a blocking verdict outcome", async () => {
+  const out = await verdictService.evaluate(backendServices(), BLOCKED_URL);
   assert.equal(out.kind, "verdict");
   assert.equal(out.verdict.status, "bloqueo");
   assert.equal(out.verdict.domain, "pago-servicios-linea.net");
@@ -87,8 +89,8 @@ test("the remote adapter applies the domain policy of a phishing body and degrad
 });
 
 ["timeout", "offline", "server", "cache_down"].forEach((reason) => {
-  test("mock failure " + reason + " degrades without blocking", async () => {
-    const out = await verdictService.evaluate(failingMock(reason), BLOCKED_URL);
+  test("port failure " + reason + " degrades without blocking", async () => {
+    const out = await verdictService.evaluate(failingPort(reason), BLOCKED_URL);
     assert.deepEqual(out, { kind: "degraded", reason });
     assert.equal(Sereno.verdictOutcome.blocksNavigation(out), false);
   });
@@ -134,7 +136,7 @@ test("evaluate never throws, even if the provider rejects or throws", async () =
     const out = await verdictService.evaluate(services, "https://a.pe/");
     assert.deepEqual(out, { kind: "degraded", reason: "server" });
   }
-  const noUrl = await verdictService.evaluate(mockServices(), undefined);
+  const noUrl = await verdictService.evaluate(backendServices(), undefined);
   assert.ok(["verdict", "degraded"].includes(noUrl.kind));
 });
 
@@ -147,7 +149,7 @@ test("onPending fires only when the provider is slower than the threshold", asyn
   assert.deepEqual(seen, [{ kind: "pending", reason: "evaluating" }]);
 
   const quick = [];
-  await verdictService.evaluate(mockServices(), "https://a.pe/", { pendingAfterMs: 50, onPending: (o) => quick.push(o) });
+  await verdictService.evaluate(backendServices(), "https://a.pe/", { pendingAfterMs: 50, onPending: (o) => quick.push(o) });
   await new Promise((resolve) => setTimeout(resolve, 70));
   assert.deepEqual(quick, []);
 });
@@ -166,19 +168,19 @@ test("a throwing onPending callback does not break the evaluation", async () => 
 test("nothing is persisted unless a store is passed", async () => {
   const store = openStore();
   const before = await store.get();
-  await verdictService.evaluate(mockServices(), BLOCKED_URL);
+  await verdictService.evaluate(backendServices(), BLOCKED_URL);
   assert.deepEqual(await store.get(), before);
 });
 
 test("with a store the outcome is published as currentSite and protection level", async () => {
   const store = openStore();
-  await verdictService.evaluate(mockServices(), BLOCKED_URL, { store, now: NOW });
+  await verdictService.evaluate(backendServices(), BLOCKED_URL, { store, now: NOW });
   let state = await store.get();
   assert.equal(state.currentSite.domain, "pago-servicios-linea.net");
   assert.equal(state.currentSite.status, "bloqueo");
   assert.equal(state.currentSite.ts, "2026-09-21T11:30");
   assert.equal(state.protectionLevel, "active");
-  await verdictService.evaluate(failingMock("cache_down"), "https://nuevo.pe/", { store, now: NOW });
+  await verdictService.evaluate(failingPort("cache_down"), "https://nuevo.pe/", { store, now: NOW });
   state = await store.get();
   assert.equal(state.currentSite.domain, "nuevo.pe");
   assert.equal(state.currentSite.status, "evaluando");
@@ -187,6 +189,6 @@ test("with a store the outcome is published as currentSite and protection level"
 
 test("a failing store does not make evaluate throw", async () => {
   const brokenStore = { set: async () => { throw new Error("quota"); } };
-  const out = await verdictService.evaluate(mockServices(), BLOCKED_URL, { store: brokenStore, now: NOW });
+  const out = await verdictService.evaluate(backendServices(), BLOCKED_URL, { store: brokenStore, now: NOW });
   assert.equal(out.kind, "verdict");
 });

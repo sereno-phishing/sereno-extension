@@ -1,12 +1,14 @@
 "use strict";
 
 /* Use cases reach backend-owned data through ports. History/model/admin use
-   data; survey submission uses the remote-only survey port. The remaining data
-   cases run against mock and remote adapters to preserve their swap contract. */
+   data; survey submission uses the survey port. The use cases run over the
+   remote adapter against the test-only REST fake (tests/rest-fake.js). */
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { load } = require("./load");
+const { createRestFake } = require("./rest-fake");
+const fixtures = require("./fixtures");
 
 const Sereno = load(
   "time/domain/time.js",
@@ -17,18 +19,15 @@ const Sereno = load(
   "administration/domain/domain-policy.js",
   "administration/domain/verdict-cache.js",
   "protection/domain/protection.js",
-  "demo-store/domain/scenarios.js",
   "history/application/history-service.js",
   "survey/application/survey-service.js",
   "protection/application/protection-service.js",
   "administration/application/administration-service.js",
   "platform/storage.js",
-  "platform/seed.js",
   "platform/state-store.js",
   "platform/providers/config.js",
   "platform/providers/ports.js",
   "platform/providers/errors.js",
-  "platform/providers/mock.js",
   "platform/providers/remote.js",
   "platform/providers/index.js",
   "ui/atoms.js",
@@ -49,7 +48,7 @@ function openStore() {
   return Sereno.stateStore.create({
     storage: Sereno.storage.memoryStorage(),
     key: Sereno.stateStore.STORAGE_KEY,
-    defaults: Sereno.seed.defaultState
+    defaults: { session: null, survey: { byUser: {} } }
   });
 }
 
@@ -57,51 +56,13 @@ function reply(status, body) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
 }
 
-/* Serves the REST contract of remote.js by delegating to a mock adapter. Like
-   the real backend, history answers 401 invalid without a session. */
-function fakeBackend(mock) {
-  const signedIn = (action) => async () => ((await mock.auth.session()).session ? action() : { ok: false, error: "invalid" });
-  const routes = {
-    "POST /v1/verdict": (body) => mock.verdict.evaluate(body.url),
-    "POST /v1/auth/login": (body) => mock.auth.login(body.username, body.password),
-    "GET /v1/history": signedIn(() => mock.data.listHistory()),
-    "DELETE /v1/history": signedIn(() => mock.data.deleteHistory()),
-    "GET /v1/domains": () => mock.data.getDomainPolicies(),
-    "PUT /v1/domains": (body) => mock.data.putDomainPolicies(body.domains),
-    "GET /v1/cache": () => mock.data.getCache(),
-    "PUT /v1/cache/ttl": (body) => mock.data.setCacheTtl(body.ttlPhishingDays, body.ttlLegitHours),
-    "POST /v1/cache/invalidations": (body) => mock.data.invalidateCache(body.domain),
-    "GET /v1/metrics": () => mock.data.getMetrics(),
-    "GET /v1/model": () => mock.data.getModelVersion(),
-    "GET /v1/survey": () => ({ ok: true, submitted: false }),
-    "POST /v1/survey": () => ({ ok: true })
-  };
-  return async (url, init) => {
-    const key = ((init && init.method) || "GET") + " " + url.slice(BASE_URL.length);
-    const route = routes[key];
-    if (!route) {
-      return reply(404, { error: "server" });
-    }
-    const out = await route(init && init.body ? JSON.parse(init.body) : undefined);
-    return out.ok ? reply(200, out) : reply(401, out);
-  };
+/* { services, store, backend }: the remote adapter over a fresh fake backend,
+   plus the state store the use cases write to. */
+function setup() {
+  const backend = createRestFake({ baseUrl: BASE_URL, now: NOW });
+  const remote = providers.remote.create({ baseUrl: BASE_URL, timeoutMs: 50, fetch: backend });
+  return { services: { data: remote.data, verdict: remote.verdict, auth: remote.auth, survey: remote.survey }, store: openStore(), backend };
 }
-
-/* { services, store, mock } for each adapter, sharing one state store. */
-const SETUPS = {
-  mock() {
-    const store = openStore();
-    const adapter = providers.mock.create({ store, delayMs: 0, now: NOW });
-    const remote = providers.remote.create({ baseUrl: BASE_URL, timeoutMs: 50, fetch: fakeBackend(adapter) });
-    return { services: { data: adapter.data, verdict: adapter.verdict, auth: adapter.auth, survey: remote.survey }, store, adapter };
-  },
-  remote() {
-    const store = openStore();
-    const adapter = providers.mock.create({ store, delayMs: 0, now: NOW });
-    const remote = providers.remote.create({ baseUrl: BASE_URL, timeoutMs: 50, fetch: fakeBackend(adapter) });
-    return { services: { data: remote.data, verdict: remote.verdict, auth: remote.auth, survey: remote.survey }, store, adapter };
-  }
-};
 
 function failingServices(fetchImpl) {
   const remote = providers.remote.create({ baseUrl: BASE_URL, timeoutMs: 30, fetch: fetchImpl });
@@ -131,14 +92,14 @@ test("error messages are Spanish and unknown codes read as a server problem", ()
 });
 
 test("history.normalize applies the dedupe window and the capacity to an external list", () => {
-  const record = (id, domain, ts) => Sereno.history.createRecord({ domain, verdict: "legitima", policy: "advertencia", score: 0.1 }, id, ts);
+  const record = (id, domain, ts) => ({ id, domain, verdict: "legitima", policy: "advertencia", score: 0.1, source: "modelo", ts, latencyMs: null });
   const list = [record("h-2", "a.pe", "2026-09-21T10:01"), record("h-1", "a.pe", "2026-09-21T10:00"), record("h-0", "b.pe", "2026-09-21T09:00")];
   assert.deepEqual(Sereno.history.normalize(list).map((entry) => entry.id), ["h-2", "h-0"]);
   const many = Array.from({ length: 250 }, (_, index) => record("h-" + index, "d" + index + ".pe", "2026-09-01T10:00"));
   const capped = Sereno.history.normalize(many);
-  assert.equal(capped.length, Sereno.history.CAPACITY);
+  assert.equal(capped.length, 200);
   assert.equal(capped[0].id, "h-0");
-  assert.equal(Sereno.history.normalize(Sereno.seed.defaultState.history["andres.torres"]).length, 6);
+  assert.equal(Sereno.history.normalize(fixtures.history()["andres.torres"]).length, 6);
   assert.deepEqual(Sereno.history.normalize(undefined), []);
 });
 
@@ -157,53 +118,53 @@ test("historyService.list applies the domain policy to what the port returns and
   assert.deepEqual(Object.keys(listed.entries[0]).sort(), ["domain", "id", "latencyMs", "score", "source", "status", "ts"]);
 });
 
-Object.keys(SETUPS).forEach((name) => {
-  test(name + ": historyService.list returns nothing when signed out and the user's entries when signed in", async () => {
-    const { services } = SETUPS[name]();
-    assert.deepEqual(await historyService.list(services), { ok: true, entries: [] });
-    await services.auth.login("andres.torres", "sereno123");
-    const listed = await historyService.list(services);
-    assert.equal(listed.ok, true);
-    assert.equal(listed.entries.length, 6);
-    assert.equal(listed.entries[0].domain, "pago-servicios-linea.net");
-    assert.deepEqual(listed.entries.map((entry) => entry.status), ["bloqueo", "seguro", "advertencia", "seguro", "advertencia", "seguro"]);
-  });
+test("historyService.list returns nothing when signed out and the user's entries when signed in", async () => {
+  const { services } = setup();
+  assert.deepEqual(await historyService.list(services), { ok: true, entries: [] });
+  await services.auth.login("andres.torres", "sereno123");
+  const listed = await historyService.list(services);
+  assert.equal(listed.ok, true);
+  assert.equal(listed.entries.length, 6);
+  assert.equal(listed.entries[0].domain, "pago-servicios-linea.net");
+  assert.deepEqual(listed.entries.map((entry) => entry.status), ["bloqueo", "seguro", "advertencia", "seguro", "advertencia", "seguro"]);
+});
 
-  test(name + ": historyService.clear empties the signed-in user's history", async () => {
-    const { services } = SETUPS[name]();
-    await services.auth.login("andres.torres", "sereno123");
-    assert.deepEqual(await historyService.clear(services), { ok: true });
-    assert.deepEqual(await historyService.list(services), { ok: true, entries: [] });
-  });
+test("historyService.clear empties the signed-in user's history", async () => {
+  const { services } = setup();
+  await services.auth.login("andres.torres", "sereno123");
+  assert.deepEqual(await historyService.clear(services), { ok: true });
+  assert.deepEqual(await historyService.list(services), { ok: true, entries: [] });
+});
 
-  test(name + ": an evaluated site is recorded in the signed-in user's history, deduplicated", async () => {
-    const { services } = SETUPS[name]();
-    await services.verdict.evaluate("https://paypal-secure-login.com/");
-    assert.deepEqual((await historyService.list(services)).entries, []);
-    await services.auth.login("andres.torres", "sereno123");
-    await services.verdict.evaluate("https://paypal-secure-login.com/");
-    await services.verdict.evaluate("https://paypal-secure-login.com/");
-    const entries = (await historyService.list(services)).entries;
-    assert.equal(entries.length, 7);
-    assert.equal(entries[0].domain, "paypal-secure-login.com");
-    assert.equal(entries[0].status, "advertencia");
-    assert.match(entries[0].id, /^h-/);
-  });
+test("an evaluated site is recorded in the signed-in user's history, deduplicated", async () => {
+  const { services } = setup();
+  await services.verdict.evaluate("https://paypal-secure-login.com/");
+  assert.deepEqual((await historyService.list(services)).entries, []);
+  await services.auth.login("andres.torres", "sereno123");
+  await services.verdict.evaluate("https://paypal-secure-login.com/");
+  await services.verdict.evaluate("https://paypal-secure-login.com/");
+  const entries = (await historyService.list(services)).entries;
+  assert.equal(entries.length, 7);
+  assert.equal(entries[0].domain, "paypal-secure-login.com");
+  assert.equal(entries[0].status, "advertencia");
+  assert.match(entries[0].id, /^h-/);
+});
 
-  test(name + ": surveyService.submit sends the answers remotely and stamps only the signed-in account", async () => {
-    const { services, store } = SETUPS[name]();
-    const answers = [5, 1, 5, 1, 5, 1, 5, 1, 5, 1];
-    await services.auth.login("andres.torres", "sereno123");
-    assert.deepEqual(await surveyService.submit(services, store, "andres.torres", answers, NOW()), { ok: true });
-    assert.deepEqual((await store.get()).survey, { byUser: { "andres.torres": { answers, completedAt: "2026-09-21T11:30" } } });
-  });
+test("surveyService.submit sends the answers remotely and stamps only the signed-in account", async () => {
+  const { services, store } = setup();
+  const answers = [5, 1, 5, 1, 5, 1, 5, 1, 5, 1];
+  const login = await services.auth.login("andres.torres", "sereno123");
+  await store.set({ session: { username: "andres.torres", isAdmin: false, loginAt: "t", token: login.token } });
+  assert.deepEqual(await surveyService.submit(services, store, "andres.torres", answers, NOW()), { ok: true });
+  assert.deepEqual((await store.get()).survey, { byUser: { "andres.torres": { answers, completedAt: "2026-09-21T11:30" } } });
+  assert.deepEqual(await surveyService.status(services), { ok: true, submitted: true });
+});
 
-  test(name + ": protectionService.loadModelVersion reads the version from the port", async () => {
-    const { services, store } = SETUPS[name]();
-    assert.deepEqual(await protectionService.loadModelVersion(services), { ok: true, version: "2.0.0" });
-    await store.set({ session: { username: "andres.torres", isAdmin: false, loginAt: "t", token: "x" } });
-    assert.deepEqual(await protectionService.loadModelVersion(services), { ok: true, version: "2.0.0" });
-  });
+test("protectionService.loadModelVersion reads the version from the port", async () => {
+  const { services, store } = setup();
+  assert.deepEqual(await protectionService.loadModelVersion(services), { ok: true, version: "2.0.0" });
+  await store.set({ session: { username: "andres.torres", isAdmin: false, loginAt: "t", token: "x" } });
+  assert.deepEqual(await protectionService.loadModelVersion(services), { ok: true, version: "2.0.0" });
 });
 
 test("surveyService.saveDraft stores partial answers for the signed-in account without completing the survey", async () => {
@@ -263,7 +224,7 @@ test("a failing survey submission leaves no completion stamp and broken ports do
 
 test("history list shows loading and error states and keeps the happy path markup", () => {
   const { historyUi } = Sereno;
-  const entries = [Sereno.history.toEntry(Sereno.history.createRecord({ domain: "a.pe", verdict: "legitima", policy: "advertencia", score: 0.1 }, "h-1", "2026-09-21T10:00"))];
+  const entries = [Sereno.history.toEntry({ id: "h-1", domain: "a.pe", verdict: "legitima", policy: "advertencia", score: 0.1, source: "modelo", ts: "2026-09-21T10:00", latencyMs: null })];
   const happy = historyUi.listView({ tabsHtml: "<tabs>", entries, filter: "todas" });
   assert.match(happy, /history-item/);
   assert.doesNotMatch(happy, /role="alert"/);
@@ -328,50 +289,62 @@ test("the model version comes from the backend and the notice follows it", () =>
 
 /* ---------------- administration (HU-21, HU-28, HU-29) ---------------- */
 
-Object.keys(SETUPS).forEach((name) => {
-  test(name + ": administrationService loads and saves the domain policy", async () => {
-    const { services } = SETUPS[name]();
-    const loaded = await administrationService.loadDomains(services);
-    assert.equal(loaded.ok, true);
-    assert.equal(loaded.domains.length, 3);
-    assert.deepEqual(Object.keys(loaded.domains[0]).sort(), ["domain", "policy", "updatedAt"]);
-    const added = await administrationService.addDomain(services, { domain: "nuevo.pe", policy: "bloqueo", updatedAt: "2026-09-21" });
-    assert.equal(added.ok, true);
-    assert.deepEqual(added.domains[0], { domain: "nuevo.pe", policy: "bloqueo", updatedAt: "2026-09-21" });
-    assert.equal(added.domains.length, 4);
-    assert.deepEqual(await administrationService.saveDomains(services, []), { ok: true });
-    assert.deepEqual(await administrationService.loadDomains(services), { ok: true, domains: [] });
-  });
+test("administrationService loads and saves the domain policy", async () => {
+  const { services } = setup();
+  await services.auth.login("admin.sereno", "sereno123");
+  const loaded = await administrationService.loadDomains(services);
+  assert.equal(loaded.ok, true);
+  assert.equal(loaded.domains.length, 3);
+  assert.deepEqual(Object.keys(loaded.domains[0]).sort(), ["domain", "policy", "updatedAt"]);
+  const added = await administrationService.addDomain(services, { domain: "nuevo.pe", policy: "bloqueo", updatedAt: "2026-09-21" });
+  assert.equal(added.ok, true);
+  assert.deepEqual(added.domains[0], { domain: "nuevo.pe", policy: "bloqueo", updatedAt: "2026-09-21" });
+  assert.equal(added.domains.length, 4);
+  assert.deepEqual(await administrationService.saveDomains(services, []), { ok: true });
+  assert.deepEqual(await administrationService.loadDomains(services), { ok: true, domains: [] });
+});
 
-  test(name + ": administrationService adding a listed domain moves it first without duplicating", async () => {
-    const { services } = SETUPS[name]();
-    const listed = (await administrationService.loadDomains(services)).domains[2];
-    const added = await administrationService.addDomain(services, { domain: listed.domain, policy: "bloqueo", updatedAt: "2026-09-22" });
-    assert.equal(added.domains.length, 3);
-    assert.deepEqual(added.domains[0], { domain: listed.domain, policy: "bloqueo", updatedAt: "2026-09-22" });
-  });
+test("administrationService adding a listed domain moves it first without duplicating", async () => {
+  const { services } = setup();
+  await services.auth.login("admin.sereno", "sereno123");
+  const listed = (await administrationService.loadDomains(services)).domains[2];
+  const added = await administrationService.addDomain(services, { domain: listed.domain, policy: "bloqueo", updatedAt: "2026-09-22" });
+  assert.equal(added.domains.length, 3);
+  assert.deepEqual(added.domains[0], { domain: listed.domain, policy: "bloqueo", updatedAt: "2026-09-22" });
+});
 
-  test(name + ": administrationService manages the verdict cache", async () => {
-    const { services } = SETUPS[name]();
-    const initial = await administrationService.loadCache(services);
-    assert.equal(initial.ok, true);
-    assert.equal(initial.cache.ttlPhishingDays, 7);
-    const ttl = await administrationService.saveTtl(services, "14", "0");
-    assert.equal(ttl.ok, true);
-    assert.equal(ttl.cache.ttlPhishingDays, 14);
-    assert.equal(ttl.cache.ttlLegitHours, 24);
-    const invalidated = await administrationService.invalidateDomain(services, "ejemplo.pe");
-    assert.equal(invalidated.ok, true);
-    assert.deepEqual(invalidated.cache.invalidations[0], { domain: "ejemplo.pe", verdict: null, date: "21/09/2026" });
-    assert.deepEqual((await administrationService.loadCache(services)).cache, invalidated.cache);
-  });
+test("administrationService manages the verdict cache", async () => {
+  const { services } = setup();
+  await services.auth.login("admin.sereno", "sereno123");
+  const initial = await administrationService.loadCache(services);
+  assert.equal(initial.ok, true);
+  assert.equal(initial.cache.ttlPhishingDays, 7);
+  const ttl = await administrationService.saveTtl(services, "14", "0");
+  assert.equal(ttl.ok, true);
+  assert.equal(ttl.cache.ttlPhishingDays, 14);
+  assert.equal(ttl.cache.ttlLegitHours, 24);
+  const invalidated = await administrationService.invalidateDomain(services, "ejemplo.pe");
+  assert.equal(invalidated.ok, true);
+  assert.deepEqual(invalidated.cache.invalidations[0], { domain: "ejemplo.pe", verdict: null, date: "21/09/2026" });
+  assert.deepEqual((await administrationService.loadCache(services)).cache, invalidated.cache);
+});
 
-  test(name + ": administrationService loads the metrics", async () => {
-    const { services } = SETUPS[name]();
-    const metrics = await administrationService.loadMetrics(services);
-    assert.equal(metrics.ok, true);
-    assert.equal(metrics.metrics.analyzed, 1284);
-  });
+test("administrationService loads the metrics", async () => {
+  const { services } = setup();
+  await services.auth.login("admin.sereno", "sereno123");
+  const metrics = await administrationService.loadMetrics(services);
+  assert.equal(metrics.ok, true);
+  assert.equal(metrics.metrics.analyzed, 1284);
+});
+
+test("administration use cases report the backend's refusal to a user who is not an administrator", async () => {
+  const { services } = setup();
+  await services.auth.login("andres.torres", "sereno123");
+  const forbidden = { ok: false, error: "forbidden", message: providers.errors.message("forbidden") };
+  assert.deepEqual(await administrationService.loadDomains(services), forbidden);
+  assert.deepEqual(await administrationService.loadCache(services), forbidden);
+  assert.deepEqual(await administrationService.invalidateDomain(services, "a.pe"), forbidden);
+  assert.deepEqual(await administrationService.loadMetrics(services), forbidden);
 });
 
 test("domain policy authorization failures preserve the administrator-only message", async () => {
@@ -437,7 +410,7 @@ function adminModel(extra) {
   return Object.assign(
     {
       section: "dominios",
-      metrics: Sereno.seed.metrics,
+      metrics: fixtures.metrics(),
       cache: { ttlPhishingDays: 7, ttlLegitHours: 24, invalidations: [] },
       domainsDraft: [{ domain: "a.pe", policy: "bloqueo", updatedAt: "2026-09-21" }],
       addPolicy: "advertencia",
