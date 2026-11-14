@@ -405,7 +405,7 @@ añade).
 
 | Método | Ruta | Petición | Respuesta | Errores |
 | --- | --- | --- | --- | --- |
-| POST | `/v1/verdict` | `{ url }` | `{ domain, verdict, policy, score, source, latencyMs }` | 400 `invalid`, 500 `server`, 503 `cache_down` |
+| POST | `/v1/verdict` | `{ url }` | `{ domain, verdict, policy, score, source, latencyMs }` | 400 `invalid`, 500 `server` (si el caché falla, responde el modelo) |
 | POST | `/v1/auth/login` | `{ username, password }` | `{ user, token }` | 401 `{ error: "invalid" }` |
 | POST | `/v1/auth/register` | `{ username, password }` | `{ user, token }` | 409 `duplicate`, 400 `invalid` |
 | POST | `/v1/auth/logout` | `{}` | `{}` | |

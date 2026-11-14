@@ -131,11 +131,14 @@ test("remote verdicts, history, cache, metrics and model version run against the
   assert.equal(metrics.metrics.queries.length, 6);
   assert.ok(Array.isArray(metrics.metrics.hourly) && metrics.metrics.sparklines);
 
-  // A broken cache store is reported as cache_down, never as a verdict: first
-  // unreadable entries in Redis, then an unreadable settings table in PostgreSQL.
+  // A broken cache store never interrupts verdicts (RF-20): the model answers
+  // instead. First unreadable entries in Redis, then an unreadable settings
+  // table in PostgreSQL. The administrator's cache view still reports cache_down.
   assert.ok(backend.corruptCacheEntries() > 0);
-  assert.deepEqual(await anonymous.verdict.evaluate(URLS.block), { ok: false, error: "cache_down" });
+  const blockWithoutCache = await anonymous.verdict.evaluate(URLS.block);
+  assert.deepEqual([blockWithoutCache.verdict, blockWithoutCache.policy, blockWithoutCache.source], ["phishing", "bloqueo", "modelo"]);
   backend.sql("ALTER TABLE configuracion_cache RENAME TO configuracion_cache_broken");
   assert.deepEqual(await admin.data.getCache(), { ok: false, error: "cache_down" });
-  assert.deepEqual(await anonymous.verdict.evaluate(URLS.warn), { ok: false, error: "cache_down" });
+  const warnWithoutCache = await anonymous.verdict.evaluate(URLS.warn);
+  assert.deepEqual([warnWithoutCache.verdict, warnWithoutCache.policy, warnWithoutCache.source], ["phishing", "advertencia", "modelo"]);
 });
