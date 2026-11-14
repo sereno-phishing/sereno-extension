@@ -39,8 +39,10 @@ files per unit).
   deleted. Commit 3aa85b3.
 - [x] T4 Verdict modal moved next to its caller; demo shell and fixed score
   widths removed; content assets rebuilt. Commit ca58b99.
-- [x] T5 README describes the backend-only product. Commit: the one that
-  contains this line.
+- [x] T5 README describes the backend-only product. Commit dcde458.
+- [x] T6 The three tests that spawn the sibling backend run on isolated
+  storage (follow-up, after the backend became PostgreSQL and Redis only).
+  Commit: the one that contains this line.
 
 ## Decisions taken while working
 
@@ -83,6 +85,28 @@ files per unit).
 - Not verified: real Chrome behaviour (popup before the first navigation, page
   dialog after the stylesheet trim).
 
+### T6 evidence
+
+- Cause of the earlier failures: the backend ignored the removed JSON settings,
+  so the tests ran on the development database and found data from earlier runs.
+- `tests/local-backend.js` gives each file its own database
+  (`sereno_extension_test_admin`, `_auth`, `_verdict`; dropped and created
+  before `create_app`, dropped at the end) and Redis index (12, 13, 14; flushed
+  before and after), because `node --test` runs files in parallel. Roles are
+  changed with SQL. Without the virtual environment or the services the tests
+  skip with a reason naming `docker compose up -d --wait`.
+- File-storage assertions now read the database: stored policies before and
+  after refused, invalid and demoted writes; survey answers stored without an
+  account plus a separate participant row; one server session after
+  registration and none after the logouts; cache entries (Redis), settings and
+  invalidations unchanged by refused user requests. `cache_down` is provoked by
+  overwriting the cached entries with unparseable JSON (verdict route) and by
+  renaming the cache settings table (cache route), both in the isolated store.
+- `node --test` with the services up, twice in a row: 463 tests, 463 pass,
+  0 fail, 0 skipped each time. Afterwards the server lists only `postgres`,
+  `sereno` and `sereno_test`; `sereno` still has 0 public tables; Redis
+  indexes 0, 12, 13, 14 and 15 are empty.
+
 ## Open questions
 
 - Before the first navigation the popup reuses the pending site card: label
@@ -95,4 +119,4 @@ files per unit).
 
 ## Next step
 
-Re-point the three `*-local-http.test.js` files once the backend change lands.
+Idle state of the popup site card before the first evaluated site.

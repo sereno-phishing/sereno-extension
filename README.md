@@ -17,7 +17,7 @@ has the local setup.
 vistas (HTML y DOM simulado), el service worker, el content script y el
 adaptador remoto contra un backend falso solo de pruebas (`tests/rest-fake.js`)
 que responde el contrato REST. Isolated Node HTTP tests also exercise the
-real local backend with throwaway JSON data through the remote adapter: auth,
+real local backend on throwaway PostgreSQL databases through the remote adapter: auth,
 surveys, policies, verdicts, history, cache, metrics and model version.
 **Real Chrome cookie behavior remains unverified**; Node supplies its own test
 cookie jar and does not enforce browser cookie policy. Manual checks remain in
@@ -29,7 +29,9 @@ cookie jar and does not enforce browser cookie policy. Manual checks remain in
   `inert`). También debería funcionar en navegadores basados en Chromium (Edge,
   Brave, Opera), sin probar.
 - The sibling Flask backend must be running locally for verdicts, data and sign-in.
-- Para correr las pruebas, Node 18 o superior, sin dependencias.
+- Para correr las pruebas, Node 18 o superior, sin dependencias. Las tres
+  pruebas contra el backend real necesitan además su entorno virtual y sus
+  contenedores de PostgreSQL y Redis; sin ellos se omiten con un aviso.
 - Carga la carpeta tal cual, sin instalar dependencias ni compilar.
 
 ## Instalación
@@ -288,20 +290,17 @@ sereno-extension/
 
 ### Inicio rápido: backend local
 
-1. From the sibling `sereno-backend/`, with its existing virtual environment:
+1. From the sibling `sereno-backend/`, run its launcher:
 
    ```powershell
-   $env:STORAGE_DRIVER = "json"
-   $env:DATA_FILE = "data/db.json"
-   $env:AUTH_LOCAL_HTTP = "1"
-   .venv/Scripts/python.exe -m flask --app app:create_app run --host 127.0.0.1 --port 5000 --no-debugger --no-reload
+   .\start.ps1
    ```
 
-   Use one process and throwaway accounts only. The backend keeps the cache,
-   history and query log in `cache.json`, `history.json` and `queries.json` next
-   to `DATA_FILE` unless `CACHE_DATA_FILE`, `HISTORY_DATA_FILE` and
-   `QUERY_LOG_DATA_FILE` say otherwise. The backend README covers environment
-   setup and JSON storage limits. Do not expose this server publicly.
+   It starts the PostgreSQL and Redis containers (`docker compose up -d --wait`,
+   so Docker Desktop must be running) and serves the backend on
+   `127.0.0.1:5000` for loopback development. Use throwaway accounts only. The
+   backend README covers the environment setup, the settings and the storage.
+   Do not expose this server publicly.
 
 2. Keep the shipped `platform/providers/config.js` configuration:
 
@@ -325,27 +324,32 @@ sereno-extension/
    grants `http://127.0.0.1:5000/*`, matching the local auth origin. Register a
    new account, close/reopen the popup, log out, and log in again. Backend
    accounts are created only by registration; newly registered users have `isAdmin: false`. To promote
-   a throwaway account, stop the server and follow the sibling
-   [`sereno-backend/README.md`](../sereno-backend/README.md): back up its temporary
-   auth JSON, change that user's stored role from `user` to `admin` (never a Spanish value),
-   and restart. Never edit the runtime JSON while the server is running. Existing
+   a throwaway account, follow the sibling
+   [`sereno-backend/README.md`](../sereno-backend/README.md): its development tools
+   page changes a user's role, and the stored role is `user` or `admin` (never a Spanish value). Existing
    server sessions reload the current role (exposed as `isAdmin`) on each request, so promotion or demotion
    takes effect without logging in again. El caché y las métricas son solo para
    administradores. El historial es de la cuenta con sesión; sin sesión el popup
-   no muestra historial. Las respuestas SUS se agregan al JSON aislado del backend y la
+   no muestra historial. Las respuestas SUS se guardan en el backend sin la cuenta y la
    participación se registra por separado para impedir envíos repetidos. El estado
    local conserva borradores por usuario, pero nunca decide si una cuenta puede participar.
 
-4. Run `node --test` from this repository. `tests/auth-local-http.test.js` starts
-   the sibling backend on an ephemeral loopback port with temporary JSON, runs
-   el adaptador remoto real para autenticación y encuestas. `tests/admin-local-http.test.js`
-   usa el mismo aislamiento para denegación de usuario, promoción/democión manual,
-   persistencia y fallos sin fallback de políticas. `tests/verdict-local-http.test.js`
-   cubre veredictos (legítimo, phishing con política de advertencia y de bloqueo, y acierto de caché), historial,
-   caché, métricas (administrador y `forbidden` para usuario), versión del modelo y
-   `cache_down`. Al terminar detienen el servidor y eliminan sus datos temporales.
-   Requieren el entorno virtual del backend hermano; de lo contrario informan un
-   `skip`. Nunca acceden a `data/*.json`. El resto de las pruebas del adaptador
+4. Run `node --test` from this repository. Tres pruebas levantan el backend
+   hermano en un puerto efímero de loopback y ejecutan el adaptador remoto real:
+   `tests/auth-local-http.test.js` (autenticación y encuestas),
+   `tests/admin-local-http.test.js` (denegación de usuario, promoción/democión
+   manual, persistencia y fallos sin fallback de políticas) y
+   `tests/verdict-local-http.test.js` (veredictos: legítimo, phishing con política
+   de advertencia y de bloqueo, y acierto de caché; historial; caché; métricas de
+   administrador y `forbidden` para usuario; versión del modelo y `cache_down`).
+   Necesitan el entorno virtual del backend y sus contenedores de PostgreSQL y
+   Redis: si faltan, informan un `skip` que pide ejecutar
+   `docker compose up -d --wait` en `..\sereno-backend`. Cada archivo usa su
+   propio almacenamiento (`tests/local-backend.js`): una base de datos
+   `sereno_extension_test_<nombre>`, creada de cero al empezar y eliminada al
+   terminar, y un índice de Redis propio (12, 13 y 14), vaciado antes y después.
+   Nunca tocan los datos de desarrollo (base `sereno`, índice 0) ni los de la
+   suite del backend (`sereno_test`, índice 15). El resto de las pruebas del adaptador
    remoto usa `tests/rest-fake.js`, un backend falso solo de pruebas que responde
    el contrato REST con las mismas reglas de sesión y de administrador.
 
