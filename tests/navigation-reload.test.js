@@ -276,3 +276,95 @@ test("a loading event is a new navigation; complete only repeats it", () => {
   assert.equal(nav.fromTabUpdate(3, { status: "loading" }, undefined), null);
   assert.deepEqual(nav.fromTabUpdate(3, { status: "complete" }, { url: "https://a.pe/x" }), { tabId: 3, url: "https://a.pe/x" });
 });
+
+/* ---- Event sequences recorded in Chromium 145 (tab.pendingUrl undefined) ---- */
+
+/* The backend stand-in behind a delay per request, in arrival order. */
+function delayed(deps, delays) {
+  let index = 0;
+  return Object.assign({}, deps, {
+    services: {
+      verdict: {
+        async evaluate(url) {
+          const wait = delays[Math.min(index, delays.length - 1)];
+          index += 1;
+          await new Promise((resolve) => setTimeout(resolve, wait));
+          return deps.services.verdict.evaluate(url);
+        }
+      }
+    }
+  });
+}
+
+test("a reload asks again when the page completed before its verdict arrived", async () => {
+  const { backend, deps } = setup();
+  const slow = delayed(deps, [30, 0]);
+
+  /* A page that loads faster than the backend answers. */
+  const first = tabUpdated(slow, { status: "loading", url: URL_A }, { id: TAB, url: URL_A });
+  await tabUpdated(slow, { title: "Login" }, { id: TAB, url: URL_A });
+  assert.equal(await tabUpdated(slow, { status: "complete" }, { id: TAB, url: URL_A }), null);
+  assert.equal((await first).verdict.status, "advertencia");
+  assert.equal(verdictRequests(backend), 1);
+
+  setPolicy(backend, "bloqueo");
+  await reload(slow, URL_A);
+
+  assert.equal(verdictRequests(backend), 2);
+  assert.equal(lastMessage(deps).outcome.verdict.status, "bloqueo");
+  assert.equal(deps.browser.records.get(TAB).outcome.verdict.status, "bloqueo");
+  assert.equal(lastBadge(deps).text, "✕");
+});
+
+test("a reload that starts while the first verdict is in flight ends with the answer of the newest request", async () => {
+  const { backend, deps, patches } = setup();
+  const slow = delayed(deps, [60, 5]);
+
+  const first = tabUpdated(slow, { status: "loading", url: URL_A }, { id: TAB, url: URL_A });
+  await tabUpdated(slow, { status: "complete" }, { id: TAB, url: URL_A });
+  setPolicy(backend, "bloqueo");
+  const second = tabUpdated(slow, { status: "loading" }, { id: TAB, url: URL_A });
+  await tabUpdated(slow, { status: "complete" }, { id: TAB, url: URL_A });
+
+  assert.equal((await second).verdict.status, "bloqueo");
+  assert.equal(await first, null, "the older answer is discarded");
+  assert.equal(verdictRequests(backend), 2);
+  assert.deepEqual(messagesOf(deps).map((message) => message.outcome.verdict.status), ["bloqueo"]);
+  assert.equal(deps.browser.records.get(TAB).outcome.verdict.status, "bloqueo");
+  assert.equal(lastBadge(deps).text, "✕");
+  assert.equal(patches[patches.length - 1].currentSite.status, "bloqueo");
+});
+
+/* Fires the events of one sequence without waiting for each handler, as the
+   browser does when they are a millisecond apart. */
+function burst(deps, events, url) {
+  return Promise.all(events.map((changeInfo) => tabUpdated(deps, changeInfo, { id: TAB, url })));
+}
+
+test("the events of one navigation fired a millisecond apart cause one request", async () => {
+  const { backend, deps } = setup();
+  await burst(deps, [{ status: "loading", url: URL_A }, { title: "Login" }, { status: "complete" }], URL_A);
+  assert.equal(verdictRequests(backend), 1);
+  assert.deepEqual(overlayAfter(messagesOf(deps)), { renders: 1, shown: "advertencia" });
+  assert.equal(deps.browser.records.get(TAB).navigating, undefined, "complete closed the navigation");
+
+  /* A reload right after is still a new navigation. */
+  await burst(deps, [{ status: "loading" }, { status: "complete" }], URL_A);
+  assert.equal(verdictRequests(backend), 2);
+});
+
+test("a hash change and a pushState route are each evaluated exactly once", async () => {
+  const { backend, deps } = setup();
+  await firstVisit(deps, URL_A);
+  assert.equal(verdictRequests(backend), 1);
+
+  const hash = URL_A + "#frag";
+  await burst(deps, [{ status: "loading", url: hash }, { status: "complete" }], hash);
+  assert.equal(verdictRequests(backend), 2);
+
+  const route = "https://" + DOMAIN + "/spa-route";
+  await burst(deps, [{ status: "loading", url: route }, { status: "complete" }], route);
+  assert.equal(verdictRequests(backend), 3);
+  assert.equal(deps.browser.records.get(TAB).url, route);
+  assert.equal(lastMessage(deps).outcome.verdict.status, "advertencia");
+});

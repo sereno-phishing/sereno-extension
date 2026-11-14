@@ -25,6 +25,10 @@ Every sentence Sereno shows must be true for the page the user is looking at.
 - [x] WU1 `fix(verdict)`: truthful pending and degraded copy (route: inline, single writer).
 - [x] WU2 `fix(popup)`: not-evaluated state on pages Sereno skips (route: inline, single writer).
 
+- [x] WU3 `fix(protection)`: a reload always asks again and one navigation makes one request (end-to-end findings 1 and 2).
+- [ ] WU4 `fix(popup)`: a degraded site is not shown as "Evaluando…" (finding 3).
+- [ ] WU5 `fix(admin)`: metrics section without horizontal overflow (finding 4).
+
 ## Checks
 
 - `node --test` from the repository root: 0 failures, 0 skipped.
@@ -59,6 +63,19 @@ RED: 12 failing across `tests/not-evaluated-pages.test.js`,
 `tests/backend-pages.test.js`, `tests/popup-site-card.test.js` and
 `tests/popup-i18n.test.js` before the fix (the service worker tests were added
 with the fix). GREEN: `node --test` 501 pass, 0 fail, 0 skipped.
+
+WU2 commit `c1160c7`.
+
+WU3 (found in Chromium 145). Cause 1: `complete` closed the navigation only when
+an outcome was already stored, so on a page that completes before its verdict
+the record stayed `navigating` and a reload within 10 s was taken for a repeated
+`loading`. Cause 2: `loading` and `complete` arrive 1 ms apart and both read the
+tab record before either wrote it, so both started an evaluation. Fix: the
+steps that read and write a tab record run in arrival order per tab
+(`inTabOrder`), `complete` always closes the navigation, a `loading` after it
+is a reload that gets a new token, and an answer is stored and shown only while
+the record carries its token. RED: 4 new tests failing in
+`tests/navigation-reload.test.js`. GREEN: `node --test` 505 pass, 0 fail, 0 skipped.
 
 ## Next step
 

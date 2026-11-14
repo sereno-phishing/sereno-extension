@@ -511,11 +511,13 @@ worker (`chrome://extensions` → «service worker») y revisa:
 - [ ] Cambio de política: con una advertencia en pantalla, cambiar el dominio a
       `bloqueo` en el panel y recargar la misma pestaña; debe salir el bloqueo,
       también si antes se eligió «Continuar bajo riesgo». Una sola petición a
-      `/v1/verdict` por recarga y sin parpadeo del modal.
-- [ ] Navegación en una SPA (`pushState`): el worker solo ve `loading` y
-      `complete`, así que un cambio de ruta del lado del cliente no se vuelve a
-      evaluar. Confirmar el comportamiento y decidir si se usa
-      `webNavigation.onHistoryStateUpdated`.
+      `/v1/verdict` por recarga y sin parpadeo del modal. Probar también con una
+      página que carga más rápido de lo que responde el backend y recargando
+      antes de 10 s: la recarga siempre vuelve a consultar.
+- [ ] Navegación en una SPA (`pushState`) y cambio de `#fragmento`: Chrome
+      informa un `loading` con la URL nueva y un `complete` uno o dos
+      milisegundos después, así que cada ruta nueva se evalúa una vez (una sola
+      petición a `/v1/verdict`). Confirmar que no salen dos peticiones.
 - [ ] Foco e `inert`: el foco entra al diálogo, no sale con Tab, vuelve al cerrar
       y el fondo no responde. Revisar también el popup (pestañas con flechas,
       menú de cuenta, confirmación de borrado) y el panel (enlace para saltar).

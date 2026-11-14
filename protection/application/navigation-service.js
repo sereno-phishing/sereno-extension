@@ -1,7 +1,7 @@
 /* Protection · navigation use case: turns a real http(s) navigation into a
    verdict, a tab badge, a popup-visible site and a message for the content
    script. Classic script that registers Sereno.navigationService. Runs in the
-   service worker, which is ephemeral, so nothing lives in module state: the
+   service worker, which is ephemeral, so no data lives in module state: the
    outcome of each tab is kept through the browser port.
 
    deps = { services, store, browser, now, options? }
@@ -22,16 +22,23 @@
    because a content script injected at document_idle misses the first one, so
    receivers must treat equal outcomes as idempotent.
 
-   One navigation, several events. A "loading" tab update opens a navigation
-   (a new url or a reload of the same one) and is evaluated against the
-   backend, so the domain policy in force is the one applied; the backend
-   caches by url, which keeps that cheap. "complete" and a tab activation only
-   repeat the navigation that is already open: they show the stored outcome.
-   Chrome may report "loading" twice for one navigation (when the tab starts
-   loading and when it commits), so the tab record is marked navigating from
-   the first "loading" until its "complete"; a second "loading" for the same
-   url inside that window (bounded by IN_FLIGHT_MS, in case "complete" never
-   arrives) is a repeat, not a reload.
+   One navigation, several events, one request. A "loading" tab update opens a
+   navigation (a new url, a hash change, a pushState route or a reload of the
+   same url) and is evaluated against the backend, so the domain policy in
+   force is the one applied; the backend caches by url, which keeps that
+   cheap. "complete" and a tab activation only repeat the navigation that is
+   already open: they show the stored outcome, or join the evaluation that is
+   still running. Chrome may report "loading" twice for one navigation (when
+   the tab starts loading and when it commits), so the tab record is marked
+   navigating from the first "loading" until its "complete", which closes the
+   navigation whether or not the verdict has arrived. A "loading" for the same
+   url while the navigation is open is a repeat; after "complete" it is a
+   reload and asks again. IN_FLIGHT_MS only bounds a navigation whose
+   "complete" never arrives.
+   The events of a tab are handled in arrival order (inTabOrder) and every
+   evaluation carries a token kept in the tab record: an answer is stored and
+   shown only while the record still carries its token, so the tab always ends
+   with the answer of its newest request.
 
    Requests from the content script (handleMessage), sent with
    chrome.runtime.sendMessage; the sender tab says which record they concern:
@@ -219,6 +226,30 @@
     }
   }
 
+  /* Tab events arrive a millisecond apart ("loading" and "complete" of a fast
+     page, a pushState route), faster than a tab record is read and written
+     back. Every step that reads the record and acts on it therefore runs in
+     arrival order per tab; the verdict request itself runs outside the order,
+     so a slow backend never holds the next event back. The queue holds no
+     data: it only chains the steps of the events a live worker is handling,
+     and is gone with the worker. */
+  var tabOrder = new Map();
+
+  function inTabOrder(tabId, step) {
+    var run = (tabOrder.get(tabId) || Promise.resolve()).then(step);
+    var settled = run.then(
+      function () {},
+      function () {}
+    );
+    tabOrder.set(tabId, settled);
+    settled.then(function () {
+      if (tabOrder.get(tabId) === settled) {
+        tabOrder.delete(tabId);
+      }
+    });
+    return run;
+  }
+
   function newToken(now) {
     return now().getTime().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
   }
@@ -322,67 +353,113 @@
       }
       var treatment = treatmentOf(deps, url);
       if (treatment === "skip") {
-        await leaveUnevaluated(deps, tabId, url, false);
+        await inTabOrder(tabId, function () {
+          return leaveUnevaluated(deps, tabId, url, false);
+        });
       }
       if (treatment !== "evaluate") {
         return null;
       }
-      var now = deps.now;
-      var fresh = navigation.fresh === true;
-      var existing = await loadRecord(deps, tabId);
-      if (existing && existing.url === url) {
-        var recent = now().getTime() - existing.startedAt < IN_FLIGHT_MS;
-        if (!existing.outcome && recent) {
-          return null;
-        }
-        var sameNavigation = !fresh || (existing.navigating === true && recent);
-        if (existing.outcome && sameNavigation) {
-          if (!fresh && existing.navigating === true) {
-            /* "complete" closes the navigation: the next "loading" is a reload. */
-            await saveRecord(deps, tabId, recordOf(Object.assign({}, existing, { navigating: false }), existing.continued));
-          }
-          await present(deps, tabId, url, existing.outcome, NOTIFY);
-          return existing.outcome;
-        }
+      var opened = await inTabOrder(tabId, function () {
+        return openNavigation(deps, tabId, url, navigation.fresh === true);
+      });
+      if (!opened.token) {
+        return opened.outcome;
       }
-
-      var token = newToken(now);
-      var tracked = await saveRecord(
-        deps,
-        tabId,
-        recordOf(
-          { token: token, url: url, startedAt: now().getTime(), outcome: null, navigating: fresh },
-          existing && existing.continued
-        )
-      );
       var pendingJob = Promise.resolve();
       var settings = Object.assign({}, deps.options, {
         onPending: function (pending) {
-          pendingJob = present(deps, tabId, url, pending, NOTIFY);
+          pendingJob = inTabOrder(tabId, function () {
+            return showPending(deps, tabId, url, pending, opened);
+          });
         }
       });
       var outcome = await Sereno.verdictService.evaluate(deps.services, url, settings);
       await pendingJob;
-
-      if (tracked) {
-        var current = await loadRecord(deps, tabId);
-        if (!current || current.token !== token) {
-          return null;
-        }
-        await saveRecord(
-          deps,
-          tabId,
-          recordOf(
-            { token: token, url: url, startedAt: current.startedAt, outcome: outcome, navigating: current.navigating },
-            current.continued
-          )
-        );
-      }
-      await present(deps, tabId, url, outcome, NOTIFY);
-      return outcome;
+      return await inTabOrder(tabId, function () {
+        return closeEvaluation(deps, tabId, url, outcome, opened);
+      });
     } catch (error) {
       return null;
     }
+  }
+
+  /* First step of an event, in tab order: decides from the tab record whether
+     the event belongs to a navigation that is already known or starts an
+     evaluation.
+       -> { outcome }          a known navigation: its stored outcome was shown
+                               again, or null while its evaluation is running
+       -> { token, tracked }   a new evaluation was registered in the record
+     A "loading" event repeats a navigation only while that navigation is open
+     (no "complete" yet, bounded by IN_FLIGHT_MS); after "complete" it is a
+     reload and always asks again, also while an earlier answer is still on its
+     way: the new token makes that answer stale. "complete" closes the
+     navigation whether or not the verdict has arrived, and never asks again
+     unless the evaluation it would join is dead. */
+  async function openNavigation(deps, tabId, url, fresh) {
+    var now = deps.now;
+    var existing = await loadRecord(deps, tabId);
+    if (existing && existing.url === url) {
+      var recent = now().getTime() - existing.startedAt < IN_FLIGHT_MS;
+      var known = fresh ? existing.navigating === true && recent : !!existing.outcome || recent;
+      if (known) {
+        if (!fresh && existing.navigating === true) {
+          await saveRecord(deps, tabId, recordOf(Object.assign({}, existing, { navigating: false }), existing.continued));
+        }
+        if (existing.outcome) {
+          await present(deps, tabId, url, existing.outcome, NOTIFY);
+        }
+        return { outcome: existing.outcome || null };
+      }
+    }
+    var token = newToken(now);
+    var tracked = await saveRecord(
+      deps,
+      tabId,
+      recordOf(
+        { token: token, url: url, startedAt: now().getTime(), outcome: null, navigating: fresh },
+        existing && existing.continued
+      )
+    );
+    return { token: token, tracked: tracked };
+  }
+
+  /* True while the tab record still belongs to this evaluation. A record that
+     could not be saved cannot say, so the evaluation is taken as current. */
+  function isCurrent(opened, record) {
+    return !opened.tracked || (!!record && record.token === opened.token);
+  }
+
+  /* The wait became noticeable: shown only while this evaluation is the one
+     the tab waits for. */
+  async function showPending(deps, tabId, url, pending, opened) {
+    var current = opened.tracked ? await loadRecord(deps, tabId) : null;
+    if (isCurrent(opened, current) && !(current && current.outcome)) {
+      await present(deps, tabId, url, pending, NOTIFY);
+    }
+  }
+
+  /* Last step of an evaluation, in tab order: the outcome is stored and shown
+     only if the tab record still carries this evaluation's token. A newer
+     navigation (another url, a reload, a page that is never evaluated)
+     replaced the token, so an answer that arrives late is dropped: -> null. */
+  async function closeEvaluation(deps, tabId, url, outcome, opened) {
+    if (opened.tracked) {
+      var current = await loadRecord(deps, tabId);
+      if (!isCurrent(opened, current)) {
+        return null;
+      }
+      await saveRecord(
+        deps,
+        tabId,
+        recordOf(
+          { token: opened.token, url: url, startedAt: current.startedAt, outcome: outcome, navigating: current.navigating },
+          current.continued
+        )
+      );
+    }
+    await present(deps, tabId, url, outcome, NOTIFY);
+    return outcome;
   }
 
   /* The popup shows the active tab, so switching tabs republishes that tab's
@@ -395,15 +472,21 @@
       if (typeof tabId !== "number") {
         return;
       }
-      var record = await loadRecord(deps, tabId);
-      if (record && record.outcome) {
-        await present(deps, tabId, record.url, record.outcome, ACTIVATED);
-      } else if (record && treatmentOf(deps, record.url) === "skip") {
-        await leaveUnevaluated(deps, tabId, record.url, true);
-      } else if (!record && typeof deps.browser.getTabUrl === "function") {
+      var unknown = await inTabOrder(tabId, async function () {
+        var record = await loadRecord(deps, tabId);
+        if (record && record.outcome) {
+          await present(deps, tabId, record.url, record.outcome, ACTIVATED);
+        } else if (record && treatmentOf(deps, record.url) === "skip") {
+          await leaveUnevaluated(deps, tabId, record.url, true);
+        }
+        return !record;
+      });
+      if (unknown && typeof deps.browser.getTabUrl === "function") {
         var url = await deps.browser.getTabUrl(tabId);
         if (treatmentOf(deps, url) === "skip") {
-          await leaveUnevaluated(deps, tabId, url, true);
+          await inTabOrder(tabId, function () {
+            return leaveUnevaluated(deps, tabId, url, true);
+          });
         } else {
           await handleNavigation(deps, { tabId: tabId, url: url });
         }
@@ -437,8 +520,10 @@
       if (typeof tabId !== "number") {
         return;
       }
-      await attempt(function () {
-        return deps.browser.removeTabRecord(tabId);
+      await inTabOrder(tabId, function () {
+        return attempt(function () {
+          return deps.browser.removeTabRecord(tabId);
+        });
       });
     } catch (error) {
       /* a leftover record is cleared when the browser session ends */
@@ -518,7 +603,9 @@
         return await replyWithOutcome(deps, tabId);
       }
       if (message.type === CONTINUE) {
-        return await acceptContinue(deps, tabId, message.url);
+        return await inTabOrder(tabId, function () {
+          return acceptContinue(deps, tabId, message.url);
+        });
       }
       return await openDetail(deps);
     } catch (error) {
