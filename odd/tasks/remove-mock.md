@@ -40,9 +40,12 @@ files per unit).
 - [x] T4 Verdict modal moved next to its caller; demo shell and fixed score
   widths removed; content assets rebuilt. Commit ca58b99.
 - [x] T5 README describes the backend-only product. Commit dcde458.
+- [x] T7 Idle state of the popup site card before the first evaluated site
+  (owner decision, 2026-11-13: it must not say "Evaluando…" and must not ask
+  the user to do anything). Commit: the one that contains this line.
 - [x] T6 The three tests that spawn the sibling backend run on isolated
   storage (follow-up, after the backend became PostgreSQL and Redis only).
-  Commit: the one that contains this line.
+  Commit da0cf57.
 
 ## Decisions taken while working
 
@@ -107,16 +110,31 @@ files per unit).
   `sereno` and `sereno_test`; `sereno` still has 0 public tables; Redis
   indexes 0, 12, 13, 14 and 15 are empty.
 
+### T7 evidence
+
+- With `currentSite: null` the site card renders `site-card is-idle` with
+  `role="status"`, no `aria-busy`, no pill and no domain line: "Este sitio",
+  "Aún no hay un sitio evaluado." and "Sereno evaluará el próximo sitio que
+  visites." (English: "No site evaluated yet." / "Sereno will evaluate the next
+  site you visit."). It reuses the neutral surface of the pending card and the
+  muted text token; no new colour, icon or layout.
+- Test first: the idle view test (`tests/degraded-protection.test.js`), the
+  English copy (`tests/popup-i18n.test.js`) and the fresh-installation popup
+  test (`tests/popup-site-card.test.js`) failed before the change and pass
+  after it. `node --test`: 464 tests, 464 pass, 0 fail, 0 skipped.
+- Only the popup view reads `currentSite`. The toolbar badge is painted per
+  tab from the outcome of a navigation, so before the first one it stays empty.
+- The popup has no dark theme, so there is nothing to check there.
+- Not verified in Chrome: the look of the idle card in the popup (signed out,
+  user, administrator), its switch to the real site after the first
+  navigation, and how a screen reader announces it.
+
 ## Open questions
 
-- Before the first navigation the popup reuses the pending site card: label
-  "Este sitio", no domain, "Evaluando…" pill, announced as busy. It is an
-  existing state, not a new one, but it says "evaluating" while nothing is
-  being evaluated. A dedicated empty state would be new UI and was not built.
 - `platform/storage.js` (localStorage branch) and `browser.openPage`
   (`window.open` branch) still support pages opened outside the extension; they
   were not in the inventory and were left.
 
 ## Next step
 
-Idle state of the popup site card before the first evaluated site.
+Manual check in Chrome of the idle site card and of the page dialog.

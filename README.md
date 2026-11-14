@@ -62,8 +62,9 @@ lista de extensiones usa el idioma del navegador, independientemente del selecto
    carga o recarga la extensión.
 2. Abre el popup de Sereno. La primera vez verás el onboarding de 3 pasos
    (qué hace, qué permiso necesita y cómo leer una alerta). Pulsa **Empezar**.
-   Antes de la primera navegación, la tarjeta «Este sitio» no nombra ningún
-   dominio y muestra «Evaluando…».
+   Antes de la primera navegación, la tarjeta «Este sitio» está en reposo:
+   dice «Aún no hay un sitio evaluado.» y «Sereno evaluará el próximo sitio que
+   visites.», sin dominio ni estado.
 3. Create a throwaway account in the popup. Backend registration always creates
    a regular user (`isAdmin: false`). To test the administrator panel, promote
    the throwaway account offline as documented in [Conectar el backend](#conectar-el-backend).

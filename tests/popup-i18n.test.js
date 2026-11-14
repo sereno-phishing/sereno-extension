@@ -66,6 +66,11 @@ test("onboarding, protection and history localize without changing backend value
   assert.match(app.onboardingUi.stepCounter(2), /Step/);
   assert.match(app.protectionUi.siteCard({ domain: "example.es", status: "seguro" }, "active"), /example\.es/);
   assert.match(app.protectionUi.siteCard({ domain: "example.es", status: "seguro" }, "active"), /Safe/);
+  const idle = app.protectionUi.siteCard(null, "active");
+  assert.match(idle, /This site/);
+  assert.match(idle, /<div class="site-domain">No site evaluated yet\.<\/div>/);
+  assert.match(idle, /<div class="site-note">Sereno will evaluate the next site you visit\.<\/div>/);
+  assert.doesNotMatch(idle, /Checking|aria-busy/);
   assert.match(app.historyUi.listView({ tabsHtml: "", entries: [], filter: app.history.ALL }), /No sites/);
   const detail = app.historyUi.detailView({ domain: "example.es", status: "seguro", score: 0.1, source: "cache", ts: "2026-01-01T00:00:00Z" });
   assert.match(detail, /example\.es/);

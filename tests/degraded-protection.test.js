@@ -74,6 +74,22 @@ test("the site card marks a pending evaluation as busy and announces it", () => 
   assert.doesNotMatch(protectionUi.siteCard({ domain: "tienda.pe", status: "seguro" }), /is-pending|aria-busy/);
 });
 
+test("without an evaluated site the card is idle: a status that is not busy, with no pill and no domain line", () => {
+  for (const site of [null, undefined]) {
+    const html = protectionUi.siteCard(site);
+    assert.equal(html,
+      '<div class="site-card is-idle" role="status">' +
+      '<div class="site-label">Este sitio</div>' +
+      '<div class="site-domain">Aún no hay un sitio evaluado.</div>' +
+      '<div class="site-note">Sereno evaluará el próximo sitio que visites.</div>' +
+      "</div>");
+  }
+  assert.doesNotMatch(protectionUi.siteCard({ domain: "tienda.pe", status: "seguro" }), /is-idle/);
+  const css = fs.readFileSync(path.join(ROOT, "app", "popup", "popup.css"), "utf8");
+  assert.match(css, /\.site-card\.is-pending,\s*\.site-card\.is-idle\s*\{\s*background:\s*var\(--slate-50\)/, "the idle card reuses the neutral surface");
+  assert.match(css, /\.site-card\.is-idle \.site-note\s*\{\s*color:\s*var\(--muted\)/, "its note is muted, not a warning");
+});
+
 test("the site card says the site could not be checked when protection is degraded", () => {
   const html = protectionUi.siteCard({ domain: "tienda.pe", status: "pendiente" }, "degraded");
   assert.match(html, /class="site-card is-degraded"/);

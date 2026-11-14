@@ -374,7 +374,8 @@ button {
   border-radius: var(--radius-lg);
 }
 
-.site-card.is-pending {
+.site-card.is-pending,
+.site-card.is-idle {
   background: var(--slate-50);
 }
 
@@ -387,6 +388,10 @@ button {
   font-size: 12px;
   line-height: 1.4;
   color: var(--amber-800);
+}
+
+.site-card.is-idle .site-note {
+  color: var(--muted);
 }
 
 .site-row {

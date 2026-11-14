@@ -96,10 +96,12 @@ test("an old saved state with modelNoticeDismissed true does not show the notice
   assert.match(html, /Modelo v1\.3/);
 });
 
-test("before the first navigation the site card names no site and reads as pending", async () => {
+test("before the first navigation the popup shows the idle site card, signed out and signed in", async () => {
   const fresh = await Sereno.stateStore.open().ready();
-  const html = popupViews.page({ ...BASE, modelVersion: "1.3" }, fresh);
-  assert.equal(count(html, /class="site-card is-pending"/g), 1);
-  assert.match(html, /<div class="site-domain"><\/div>/);
-  assert.match(html, /Evaluando/);
+  for (const session of [null, USER, ADMIN]) {
+    const html = popupViews.page({ ...BASE, modelVersion: "1.3" }, { ...fresh, session });
+    assert.equal(count(html, /class="site-card is-idle"/g), 1);
+    assert.match(html, /Aún no hay un sitio evaluado\./);
+    assert.doesNotMatch(html, /Evaluando|is-pending|aria-busy|<div class="site-domain"><\/div>/);
+  }
 });

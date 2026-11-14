@@ -40,11 +40,27 @@
     );
   }
 
-  /* level: "degraded" when the verdict service is down (HU-26). A status that
-     is still being evaluated is marked busy and announced; a degraded level
-     explains that the site could not be checked. */
+  /* Shown until the first navigation is evaluated: there is no site yet, so
+     nothing is busy and there is neither a domain nor a status pill. */
+  function idleSiteCard() {
+    return (
+      '<div class="site-card is-idle" role="status">' +
+      '<div class="site-label">' + t("Este sitio") + '</div>' +
+      '<div class="site-domain">' + t("Aún no hay un sitio evaluado.") + '</div>' +
+      '<div class="site-note">' + t("Sereno evaluará el próximo sitio que visites.") + '</div>' +
+      "</div>"
+    );
+  }
+
+  /* site: the current site, or null before the first evaluated navigation
+     (idle card). level: "degraded" when the verdict service is down (HU-26).
+     A status that is still being evaluated is marked busy and announced; a
+     degraded level explains that the site could not be checked. */
   function siteCard(site, level) {
-    var current = site || {};
+    if (!site) {
+      return idleSiteCard();
+    }
+    var current = site;
     var pending = verdict.status(current.status).tone === "neutral";
     var degraded = level === "degraded";
     var live = pending || degraded;
