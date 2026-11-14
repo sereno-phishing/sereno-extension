@@ -298,6 +298,7 @@ p {
 
 .skeleton-stat-bars {
   width: 200px;
+  max-width: 100%;
   height: 36px;
   border-radius: 2px;
 }
@@ -405,8 +406,12 @@ p {
 
 /* ---------------- Stat cards ---------------- */
 
+/* As many equal columns as fit: four in a wide window, then two, then one.
+   A card never gets narrower than its 200px sparkline plus padding unless the
+   container itself is narrower than that. */
 .stat-grid {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
   gap: 16px;
 }
 
@@ -449,13 +454,17 @@ p {
   flex: 0 0 auto;
   align-items: flex-end;
   gap: 3px;
-  width: 200px;
+  width: 100%;
+  max-width: 200px;
   height: 36px;
 }
 
+/* Seven bars of 26px with 3px gaps fill the 200px strip; in a narrower card
+   they shrink with it instead of sticking out. */
 .stat-bar {
   display: block;
-  flex: 0 0 26px;
+  flex: 0 1 26px;
+  min-width: 0;
   border-radius: 2px;
   background: var(--indigo-600);
 }
@@ -888,4 +897,48 @@ p {
   margin: 0;
   font-size: 14px;
   color: var(--muted);
+}
+
+/* ---------------- Narrow windows ---------------- */
+
+/* Below this width the 240px sidebar would leave no room for the content: it
+   stacks above it, the content padding halves, card heads and legends wrap,
+   and a table keeps its column widths by scrolling inside its own card, so
+   the page itself never scrolls sideways. */
+@media (max-width: 720px) {
+  .options-shell {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .sidebar-foot {
+    margin-top: 16px;
+  }
+
+  .options-content {
+    padding: 16px;
+  }
+
+  .card-head {
+    flex-wrap: wrap;
+  }
+
+  .legend {
+    flex-wrap: wrap;
+  }
+
+  .table-card {
+    overflow-x: auto;
+  }
+
+  .data-table {
+    min-width: 640px;
+  }
 }

@@ -27,7 +27,7 @@ Every sentence Sereno shows must be true for the page the user is looking at.
 
 - [x] WU3 `fix(protection)`: a reload always asks again and one navigation makes one request (end-to-end findings 1 and 2).
 - [x] WU4 `fix(popup)`: a degraded site is not shown as "Evaluando…" (finding 3).
-- [ ] WU5 `fix(admin)`: metrics section without horizontal overflow (finding 4).
+- [x] WU5 `fix(admin)`: metrics section without horizontal overflow (finding 4).
 
 ## Checks
 
@@ -88,6 +88,20 @@ shows that pill, not busy, whenever the level is degraded. The toolbar badge
 was already "?". The extension writes no history: entries come from the backend
 on an answered `/v1/verdict`. RED: 7 failing. GREEN: `node --test` 507 pass, 0
 fail, 0 skipped.
+
+WU4 commit `66d5763`.
+
+WU5. Cause (from the CSS, not seen in a browser): the sparkline strip was
+`width: 200px` with seven bars of `flex: 0 0 26px`, inside stat cards that
+shrink (`flex: 1 1 0; min-width: 0`). A card holds 200px only when the
+viewport is at least about 1288 CSS px (240 sidebar + 64 padding + 4 cards of
+234 + 3 gaps of 16), plus the scrollbar; below that the bars stick out and the
+last card pushes the page wider. A 1360px window reaches that with display
+scaling or zoom above 100%. Fix: the strip is `width: 100%; max-width: 200px`
+and the bars shrink; the stat grid wraps into equal columns; under 720px the
+sidebar stacks, heads and legends wrap and tables scroll inside their card.
+RED: 4 of 5 failing in `tests/admin-layout.test.js` (the fifth is a guard).
+GREEN: `node --test` 512 pass, 0 fail, 0 skipped. Visual result unverified.
 
 ## Next step
 
