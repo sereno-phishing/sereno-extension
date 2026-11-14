@@ -43,6 +43,11 @@
    "detail" opens the popup page (app/popup/popup.html) in a tab: it is the
    page that shows the verdict facts of the current site.
 
+   Pages of the verdict backend itself (services.verdict.isOwnPage(url)) are
+   never evaluated: no request, no tab message, no badge and no outcome in the
+   tab record, and the popup shows the "no evaluated site" card. The browser
+   already skips pages that are not http(s); those leave the tab untouched.
+
    Every function resolves and never throws: a failing provider, browser or
    store degrades the result, it does not break the navigation (fail-open). */
 
@@ -100,6 +105,17 @@
       return { tabId: tabId, url: tab.url };
     }
     return null;
+  }
+
+  /* True for a page of the backend the verdicts come from. The port decides;
+     services without the predicate exempt nothing. */
+  function isOwnPage(deps, url) {
+    try {
+      var port = deps.services.verdict;
+      return typeof port.isOwnPage === "function" && port.isOwnPage(url) === true;
+    } catch (error) {
+      return false;
+    }
   }
 
   function originOf(url) {
@@ -216,11 +232,50 @@
     return saved;
   }
 
+  /* A backend page: whatever the tab showed before stops applying. The record
+     of the previous page is dropped, which also discards an evaluation still
+     running for it; only the origins the user continued on are kept. The badge
+     is cleared and the active tab tells the popup there is no evaluated site. */
+  async function leaveUnevaluated(deps, tabId, url, knownActive) {
+    var existing = await loadRecord(deps, tabId);
+    if (existing && (existing.url !== url || existing.outcome)) {
+      if (Array.isArray(existing.continued) && existing.continued.length > 0) {
+        await saveRecord(
+          deps,
+          tabId,
+          recordOf({ token: newToken(deps.now), url: url, startedAt: deps.now().getTime(), outcome: null }, existing.continued)
+        );
+      } else {
+        await attempt(function () {
+          return deps.browser.removeTabRecord(tabId);
+        });
+      }
+    }
+    await attempt(function () {
+      return deps.browser.setBadge(tabId, "", Sereno.verdictUi.toolbarBadge("pendiente").color);
+    });
+    if (!knownActive) {
+      var activeId = await attempt(function () {
+        return deps.browser.getActiveTabId();
+      });
+      if (activeId === undefined || activeId === null || activeId !== tabId) {
+        return;
+      }
+    }
+    await attempt(function () {
+      return deps.store.set({ currentSite: null });
+    });
+  }
+
   async function handleNavigation(deps, navigation) {
     try {
       var tabId = navigation && navigation.tabId;
       var url = navigation && navigation.url;
       if (typeof tabId !== "number" || !isEvaluable(url)) {
+        return null;
+      }
+      if (isOwnPage(deps, url)) {
+        await leaveUnevaluated(deps, tabId, url, false);
         return null;
       }
       var now = deps.now;
@@ -292,6 +347,8 @@
       var record = await loadRecord(deps, tabId);
       if (record && record.outcome) {
         await present(deps, tabId, record.url, record.outcome, ACTIVATED);
+      } else if (record && isOwnPage(deps, record.url)) {
+        await leaveUnevaluated(deps, tabId, record.url, true);
       } else if (!record && typeof deps.browser.getTabUrl === "function") {
         var url = await deps.browser.getTabUrl(tabId);
         await handleNavigation(deps, { tabId: tabId, url: url });

@@ -33,6 +33,8 @@
    "forbidden" is accepted only from the administrator-only requests and
    "already_submitted" only from POST /v1/survey.
    HTTP 504 maps to "timeout"; any other failure maps to "server".
+   verdict.isOwnPage(url) makes no request: it says whether url is a page of
+   this backend, comparing origins (scheme, host and port) with baseUrl.
    create({ baseUrl, timeoutMs, fetch }) never throws to its callers: a network
    failure resolves "offline"; no answer within timeoutMs aborts the request
    and resolves "timeout".
@@ -69,8 +71,19 @@
     return allowed.indexOf(code) >= 0 ? code : "server";
   }
 
+  /* Origin of an absolute http(s) url, null for anything else. */
+  function originOf(url) {
+    try {
+      var parsed = new URL(String(url));
+      return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.origin : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
   function create(options) {
     var settings = options || {};
+    var ownOrigin = originOf(settings.baseUrl);
     var baseUrl = String(settings.baseUrl || "").replace(/\/+$/, "");
     var timeoutMs = settings.timeoutMs > 0 ? settings.timeoutMs : DEFAULT_TIMEOUT_MS;
     var fetchImpl =
@@ -123,6 +136,9 @@
       verdict: {
         evaluate: function (url) {
           return request("POST", "/v1/verdict", { url: url });
+        },
+        isOwnPage: function (url) {
+          return typeof url === "string" && ownOrigin !== null && originOf(url) === ownOrigin;
         }
       },
       auth: {

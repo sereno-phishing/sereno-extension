@@ -97,6 +97,12 @@ no se actualiza sola. «Continuar bajo riesgo» se recuerda por pestaña y orige
 pero solo omite una advertencia: si la política pasa a `bloqueo`, el bloqueo se
 muestra igual.
 
+Las páginas del propio backend (mismo origen que `baseUrl`: esquema, host y
+puerto) no se evalúan: no hay petición a `/v1/verdict`, aviso, badge ni entrada
+en el historial, y el popup muestra «Aún no hay un sitio evaluado». Solo ese
+origen queda exento; otras direcciones locales o privadas se evalúan como
+cualquier sitio.
+
 El backend solo dice la clase del modelo, `phishing` o `legitima`, y la política
 del dominio. La extensión aplica esa política (RF-10) en un único lugar,
 `applyPolicy` de `verdict/domain/verdict.js`: un sitio legítimo queda «seguro» y

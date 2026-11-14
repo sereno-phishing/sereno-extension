@@ -227,3 +227,17 @@ test("messages that are not for the content script are left alone", () => {
   assert.notEqual(onMessage({ type: "other" }, { id: "abc" }, () => {}), true);
   assert.notEqual(onMessage(undefined, undefined, () => {}), true);
 });
+
+test("a page served by the configured backend is left alone and the popup goes idle", async () => {
+  const [onUpdated] = listeners.onUpdated;
+  const url = globalThis.Sereno.providers.config.baseUrl + "/dev/users";
+  const before = { requests: verdictRequests.length, messages: messages.length };
+  await onUpdated(1, { status: "loading", url }, { id: 1, url });
+  await onUpdated(1, { status: "complete" }, { id: 1, url });
+
+  assert.equal(verdictRequests.length, before.requests);
+  assert.equal(messages.length, before.messages);
+  assert.deepEqual(badges[badges.length - 1], { tabId: 1, text: "" });
+  assert.equal(sessionData.has("sereno.tab.1"), false);
+  assert.equal(localData["sereno.state.v1"].currentSite, null);
+});

@@ -3,7 +3,8 @@
    composition root can check conformance). There is no runtime class: a port
    is the shape documented here.
 
-   Every method is async and never throws. Success resolves { ok: true, ... };
+   Every method is async and never throws, except verdict.isOwnPage, a
+   synchronous predicate that makes no request. Success resolves { ok: true, ... };
    failure resolves { ok: false, error } where error is one of
      transport  "timeout" | "offline" | "server" | "cache_down"
      domain     "invalid" (login/session; history when signed out) |
@@ -21,6 +22,10 @@
                                  "advertencia" or "bloqueo".
                                  The backend also records the visit in the signed-in
                                  user's history; clients never write history.
+     isOwnPage(url)           -> boolean, synchronous, never throws: true when url is a page
+                                 served by the verdict backend itself (same scheme, host and
+                                 port). Those pages are never evaluated; nothing else is
+                                 exempt, not even other loopback or private addresses.
 
    auth port
      login(username, password)    -> { ok, user: { username, isAdmin, createdAt }, token }
@@ -55,7 +60,7 @@
   Sereno.providers.ports = {
     ERRORS: ["timeout", "offline", "server", "cache_down"],
     METHODS: {
-      verdict: ["evaluate"],
+      verdict: ["evaluate", "isOwnPage"],
       auth: ["login", "register", "logout", "session"],
       data: [
         "listHistory",
