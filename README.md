@@ -492,8 +492,12 @@ pasa de 300 ms.
 
 ### Verificación manual en Chrome
 
-Nada de esto se ha hecho. Cárgala descomprimida, abre las DevTools del service
-worker (`chrome://extensions` → «service worker») y revisa:
+La extensión ya se cargó en Chrome real en dos ocasiones: una primera revisión del
+popup y una sesión de QA manual. Sus hallazgos están corregidos y registrados en
+`odd/tasks/front-backend-ready.md` (T9) y `odd/tasks/qa-findings.md`. Ninguno de
+los puntos de esta lista tiene un registro de verificación, así que todos siguen
+pendientes. Cárgala descomprimida, abre las DevTools del service worker
+(`chrome://extensions` → «service worker») y revisa:
 
 - [ ] Carga sin errores ni avisos en `chrome://extensions`; el nombre, la
       descripción y la versión salen como en el manifest.
