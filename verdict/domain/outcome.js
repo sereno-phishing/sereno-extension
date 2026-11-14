@@ -123,7 +123,7 @@
     return host.toLowerCase().replace(/^www\./, "");
   }
 
-  /* The currentSite shape (see platform/seed.js) for an outcome. */
+  /* The currentSite shape ({ domain, status, score, source, ts }) for an outcome. */
   function siteOf(outcome, url, stamp) {
     if (outcome && outcome.kind === "verdict") {
       var found = outcome.verdict;

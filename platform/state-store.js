@@ -7,13 +7,23 @@
      transact(fn)       -> fn(snapshot) returns { patch?, result }; resolves result
      subscribe(cb)      -> cb(snapshot) after every change; returns unsubscribe
    Every mutation re-reads storage first and runs in a serial queue, because
-   another page (popup, admin panel, demo store) may have written meanwhile
-   and the whole state is persisted on each commit. */
+   another page (popup, admin panel) or the service worker may have written
+   meanwhile and the whole state is persisted on each commit. */
 
 (function (Sereno) {
   "use strict";
 
   var STORAGE_KEY = "sereno.state.v1";
+
+  /* What a new installation starts with. currentSite stays null until the
+     service worker publishes the first evaluated navigation. */
+  var DEFAULT_STATE = {
+    onboardingDone: false,
+    session: null,
+    survey: { byUser: {} },
+    currentSite: null,
+    lastSeenModelVersion: null
+  };
 
   function clone(value) {
     return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
@@ -157,13 +167,14 @@
     };
   }
 
-  /* The store every page opens: detected storage, shared key, seed defaults. */
+  /* The store every page opens: detected storage, shared key, default state. */
   function open() {
-    return create({ storage: Sereno.storage.detect(), key: STORAGE_KEY, defaults: Sereno.seed.defaultState });
+    return create({ storage: Sereno.storage.detect(), key: STORAGE_KEY, defaults: DEFAULT_STATE });
   }
 
   Sereno.stateStore = {
     STORAGE_KEY: STORAGE_KEY,
+    DEFAULT_STATE: DEFAULT_STATE,
     create: create,
     open: open
   };

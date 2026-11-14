@@ -40,7 +40,8 @@
                                           pending; several entries may share a domain)
      setCacheTtl(phishingDays, legitHours) -> { ok, cache }
      invalidateCache(domain)           -> { ok, cache }
-     getMetrics()                      -> { ok, metrics }   (dashboard shape of Sereno.seed.metrics)
+     getMetrics()                      -> { ok, metrics }   (dashboard shape: { analyzed, deltaPct, phishingPct, phishingCount,
+                                          latencyMs, latencyTargetMs, cacheHitPct, sparklines, hourly, queries })
      getModelVersion()                 -> { ok, version }
 
    survey port

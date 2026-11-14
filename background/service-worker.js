@@ -13,7 +13,6 @@
 importScripts(
   "../platform/storage.js",
   "../platform/i18n.js",
-  "../platform/seed.js",
   "../platform/state-store.js",
   "../platform/browser.js",
   "../platform/providers/config.js",
@@ -38,7 +37,7 @@ function openStore() {
   return Sereno.stateStore.create({
     storage: { get: storage.get, set: storage.set },
     key: Sereno.stateStore.STORAGE_KEY,
-    defaults: Sereno.seed.defaultState
+    defaults: Sereno.stateStore.DEFAULT_STATE
   });
 }
 

@@ -71,3 +71,14 @@ test("external writes notify listeners once and ignore echoes", async () => {
   external({ a: 5 });
   assert.deepEqual(seen, [{ a: 5 }]);
 });
+
+test("a new installation opens with no session, no current site and no model version seen", async () => {
+  assert.deepEqual(stateStore.DEFAULT_STATE, {
+    onboardingDone: false,
+    session: null,
+    survey: { byUser: {} },
+    currentSite: null,
+    lastSeenModelVersion: null
+  });
+  assert.deepEqual(await stateStore.open().ready(), stateStore.DEFAULT_STATE);
+});

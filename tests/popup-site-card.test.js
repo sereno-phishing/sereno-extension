@@ -9,6 +9,7 @@ const { load } = require("./load");
 
 const Sereno = load(
   "ui/atoms.js", "ui/molecules.js", "ui/dom.js",
+  "platform/storage.js", "platform/state-store.js",
   "time/domain/time.js", "verdict/domain/verdict.js", "verdict/domain/outcome.js",
   "account/domain/account.js", "history/domain/history.js", "survey/domain/sus.js",
   "onboarding/domain/onboarding.js", "protection/domain/protection.js",
@@ -93,4 +94,12 @@ test("an old saved state with modelNoticeDismissed true does not show the notice
   const html = render(USER, { modelNoticeDismissed: true });
   assert.doesNotMatch(html, /Modelo actualizado/);
   assert.match(html, /Modelo v1\.3/);
+});
+
+test("before the first navigation the site card names no site and reads as pending", async () => {
+  const fresh = await Sereno.stateStore.open().ready();
+  const html = popupViews.page({ ...BASE, modelVersion: "1.3" }, fresh);
+  assert.equal(count(html, /class="site-card is-pending"/g), 1);
+  assert.match(html, /<div class="site-domain"><\/div>/);
+  assert.match(html, /Evaluando/);
 });

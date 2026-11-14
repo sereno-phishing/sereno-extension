@@ -4,8 +4,8 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { load } = require("./load");
 
-const { protectionService, seed } = load(
-  "platform/providers/errors.js", "platform/seed.js", "protection/domain/protection.js",
+const { protectionService } = load(
+  "platform/providers/errors.js", "protection/domain/protection.js",
   "protection/application/protection-service.js"
 );
 
@@ -19,10 +19,4 @@ test("dismissing without a known version changes nothing", async () => {
   const patches = [];
   await protectionService.dismissModelNotice({ set: (patch) => { patches.push(patch); } }, null);
   assert.deepEqual(patches, []);
-});
-
-test("the seed starts one version behind the constant the mock backend reports", () => {
-  assert.equal(seed.defaultState.lastSeenModelVersion, "1.2");
-  assert.equal(seed.modelVersion, "2.0.0");
-  assert.equal("modelNoticeDismissed" in seed.defaultState, false);
 });
