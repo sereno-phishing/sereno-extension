@@ -23,7 +23,7 @@
         "ui/atoms.js",
         "content/content-assets.generated.js",
         "verdict/ui/verdict-ui.js",
-        "demo-store/ui/verdict-modal.js",
+        "verdict/ui/verdict-modal.js",
         "verdict/ui/page-overlay.js",
         "content/content-script.js"
       ],

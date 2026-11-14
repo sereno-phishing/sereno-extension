@@ -13,7 +13,7 @@ const Sereno = load(
   "verdict/domain/outcome.js",
   "ui/atoms.js",
   "verdict/ui/verdict-ui.js",
-  "demo-store/ui/verdict-modal.js",
+  "verdict/ui/verdict-modal.js",
   "verdict/ui/page-overlay.js"
 );
 

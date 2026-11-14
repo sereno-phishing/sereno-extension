@@ -14,7 +14,7 @@
   /* Toolbar badge background per tone. */
   var BADGE_COLORS = { ok: "#16A34A", warn: "#D97706", bad: "#DC2626", neutral: "#6B7280" };
 
-  /* Labels of the verdict facts shown in the popup detail and the demo modals. */
+  /* Labels of the verdict facts shown in the history detail of the popup. */
   var FACT_LABELS = {
     risk: "Nivel de riesgo",
     score: "Score del modelo",

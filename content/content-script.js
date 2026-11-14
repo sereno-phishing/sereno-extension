@@ -1,9 +1,9 @@
 /* Content script · container that shows the verdict UI on a real page.
    Classic script that registers Sereno.contentScript and, inside a browser
    page, starts itself. It receives { type: "sereno:outcome", outcome } from the
-   service worker and renders it with the same views the demo store uses; it
-   never reaches a backend and does not know which provider produced the
-   verdict. The user's choices go back to the worker as messages:
+   service worker and renders it with the verdict views (page overlay and
+   verdict modal); it never reaches a backend and does not know where the
+   verdict came from. The user's choices go back to the worker as messages:
      { type: "sereno:get-outcome" }          current outcome (page opened first)
      { type: "sereno:continue", url }        continue past a warning (never a block)
      { type: "sereno:detail", url }          open the Sereno detail page

@@ -45,8 +45,8 @@ test("the content script js list is in dependency order and ends with the contai
   assert.ok(at("platform/browser.js") < at("content/content-script.js"));
   assert.ok(at("verdict/domain/verdict.js") < at("verdict/domain/outcome.js"));
   assert.ok(at("ui/atoms.js") < at("verdict/ui/verdict-ui.js"));
-  assert.ok(at("verdict/ui/verdict-ui.js") < at("demo-store/ui/verdict-modal.js"));
-  assert.ok(at("demo-store/ui/verdict-modal.js") < at("verdict/ui/page-overlay.js"));
+  assert.ok(at("verdict/ui/verdict-ui.js") < at("verdict/ui/verdict-modal.js"));
+  assert.ok(at("verdict/ui/verdict-modal.js") < at("verdict/ui/page-overlay.js"));
   assert.ok(at("verdict/ui/page-overlay.js") < at("content/content-script.js"));
 });
 
@@ -121,4 +121,24 @@ test("host_permissions name the configured backend origin and allow HTTP only fo
   const url = new URL(CONFIG.baseUrl);
   assert.ok(url.protocol === "https:" || CONFIG.baseUrl === "http://127.0.0.1:5000", "HTTP is local development only");
   assert.deepEqual(manifest.host_permissions, [url.origin + "/*"]);
+});
+
+test("every file the manifest, the pages and the service worker load is a real file", () => {
+  const missing = [];
+  const check = (owner, file) => {
+    if (!exists(file)) missing.push(owner + " -> " + file);
+  };
+  manifest.content_scripts[0].js.forEach((file) => check("manifest.json", file));
+  check("manifest.json", manifest.background.service_worker);
+  for (const page of [manifest.action.default_popup, manifest.options_page]) {
+    const html = fs.readFileSync(path.join(ROOT, page), "utf8");
+    const references = Array.from(html.matchAll(/<(?:script|link|img)\b[^>]*?\b(?:src|href)="([^"#?]+)"/g)).map((match) => match[1]);
+    assert.ok(references.length > 5, page + " lists its scripts and styles");
+    references.forEach((reference) => check(page, path.posix.join(path.posix.dirname(page), reference)));
+  }
+  const worker = fs.readFileSync(path.join(ROOT, manifest.background.service_worker), "utf8");
+  const imports = Array.from(worker.matchAll(/^  "(\.\.\/[^"]+\.js)",?$/gm)).map((match) => match[1]);
+  assert.ok(imports.length > 10, "the worker lists its imports");
+  imports.forEach((file) => check(manifest.background.service_worker, path.posix.join("background", file)));
+  assert.deepEqual(missing, []);
 });

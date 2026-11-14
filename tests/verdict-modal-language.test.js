@@ -8,7 +8,7 @@ const assert = require("node:assert/strict");
 const { load } = require("./load");
 
 test("the verdict dialog translates UI but preserves domain and numeric values", () => {
-  const s = load("platform/i18n.js", "verdict/domain/verdict.js", "ui/atoms.js", "verdict/ui/verdict-ui.js", "demo-store/ui/verdict-modal.js");
+  const s = load("platform/i18n.js", "verdict/domain/verdict.js", "ui/atoms.js", "verdict/ui/verdict-ui.js", "verdict/ui/verdict-modal.js");
   const verdict = { domain: "paypal-secure-login.com", status: "advertencia", score: 0.92, source: "modelo" };
   s.i18n.use("en");
   const html = s.verdictModal.renderDialog(verdict);

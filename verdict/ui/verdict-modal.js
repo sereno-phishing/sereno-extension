@@ -1,21 +1,18 @@
-/* Verdict modal · presentational in-page verdict view (warning and block),
-   shared by the demo store and the real pages. Both verdicts share one card;
-   the copy differs per verdict and the domain, risk, score and source come
-   from the scenario or the outcome. Classic script that registers
-   Sereno.verdictModal. Two shells wrap the same card:
-     render        demo overlay (div + section[role=dialog]), rendered hidden
-     renderDialog  native <dialog> for real pages; the container opens it with
-                   showModal(), which makes the page inert, traps focus and
-                   restores it on close. The block dialog is not closable. */
+/* Verdict modal · presentational in-page verdict view (warning and block).
+   Both verdicts share one card; the copy differs per verdict and the domain,
+   risk, score and source come from the verdict of the outcome. Classic script
+   that registers Sereno.verdictModal.
+     renderDialog  native <dialog>; the container opens it with showModal(),
+                   which makes the page inert, traps focus and restores it on
+                   close. The block dialog is not closable. */
 
 (function (Sereno) {
   "use strict";
 
   var ui = Sereno.ui;
   var verdict = Sereno.verdict;
-  var verdictUi = Sereno.verdictUi;
 
-  /* key prefixes the element ids the container drives (<key>-overlay, -details, -stamp). */
+  /* key prefixes the element ids the container drives (<key>-dialog, -details, -stamp). */
   var COPY = {
     advertencia: {
       key: "warning",
@@ -91,30 +88,30 @@
     return statusId === "advertencia";
   }
 
-  /* options: { dialogRole, openDetail }. dialogRole puts role="dialog" on the
-     card (the demo overlay); a native <dialog> already has it. openDetail adds
-     the link that opens the full detail from the details panel. */
-  function card(scenario, options) {
+  /* found: the verdict of an outcome ({ domain, status, score, source }).
+     options: { openDetail } adds the link that opens the full detail from the
+     details panel. The card carries no dialog role: the native <dialog> around
+     it already has one. */
+  function card(found, options) {
     var settings = options || {};
-    var copy = COPY[scenario.status];
-    var tone = verdict.status(scenario.status).tone;
+    var copy = COPY[found.status];
+    var tone = verdict.status(found.status).tone;
     var key = copy.key;
     var facts = { risk: "risk", score: "score", date: "date", source: "source" };
-    var warning = scenario.status === "advertencia";
-    var risk = verdict.riskLevel(scenario);
+    var warning = found.status === "advertencia";
+    var risk = verdict.riskLevel(found);
     var riskKey = { Alto: "riskHigh", Medio: "riskMedium", Bajo: "riskLow" }[risk] || "riskUnknown";
     var lowerRiskKey = riskKey === "riskUnknown" ? riskKey : riskKey + "Lower";
-    var sourceKey = scenario.source === "cache" ? "sourceCache" : "sourceModel";
-    var percent = verdict.scorePercent(scenario.score);
+    var sourceKey = found.source === "cache" ? "sourceCache" : "sourceModel";
+    var percent = verdict.scorePercent(found.score);
     return (
-      '<section class="verdict-modal"' +
-      (settings.dialogRole ? ' role="dialog" aria-modal="true" aria-labelledby="' + key + '-title"' : "") + ">\n" +
+      '<section class="verdict-modal">\n' +
       '<header class="verdict-band verdict-band-' + tone + '">\n' +
       sizedIcon("alert-" + tone + "-44", "verdict-icon", 44) + "\n" +
       '<h2 class="verdict-title verdict-title-' + tone + '" id="' + key + '-title">' + marked(warning ? "titleWarning" : "titleBlock") + "</h2>\n" +
       "</header>\n" +
       '<div class="verdict-body">\n' +
-      '<div class="verdict-domain-row">\n<span class="verdict-domain">' + ui.esc(scenario.domain) + "</span>\n" +
+      '<div class="verdict-domain-row">\n<span class="verdict-domain">' + ui.esc(found.domain) + "</span>\n" +
       '<span class="verdict-pill verdict-pill-' + tone + '">' + sizedIcon("alert-" + tone + "-14", "", 14) +
       marked("riskPrefix") + marked(lowerRiskKey) + "</span>\n</div>\n" +
       '<p class="verdict-text" id="' + key + '-text">' + marked(warning ? "textWarning" : "textBlock") + "</p>\n" +
@@ -123,8 +120,8 @@
       detailRow(
         facts.score,
         '<span class="verdict-score">\n<span class="verdict-score-track"><span class="verdict-score-fill verdict-score-fill-' + tone +
-          " score-" + percent + '" data-percent="' + percent + '"></span></span>\n' +
-          detailValue(Number(scenario.score).toFixed(2)) + "\n</span>"
+          '" data-percent="' + percent + '"></span></span>\n' +
+          detailValue(Number(found.score).toFixed(2)) + "\n</span>"
       ) +
       detailRow(facts.date, detailValue("—", key + "-stamp")) +
       detailRow(facts.source, '<span class="verdict-source">' + marked(sourceKey) + "</span>") +
@@ -145,30 +142,23 @@
     );
   }
 
-  function render(scenario) {
-    var key = COPY[scenario.status].key;
-    return '<div class="demo-overlay" id="' + key + '-overlay" hidden>\n' + card(scenario, { dialogRole: true }) + "\n</div>";
-  }
-
   /* Native dialog shell. A block dialog says closedby="none" and data-closable
      "false" so neither Esc nor a close request dismisses it. */
-  function renderDialog(scenario, options) {
-    var key = COPY[scenario.status].key;
-    var closable = isClosable(scenario.status);
+  function renderDialog(found, options) {
+    var key = COPY[found.status].key;
+    var closable = isClosable(found.status);
     return (
       '<dialog class="verdict-dialog" id="' + key + '-dialog" aria-labelledby="' + key + '-title" aria-describedby="' + key +
       '-text" closedby="' + (closable ? "closerequest" : "none") + '" data-closable="' + closable + '">\n' +
-      card(scenario, { dialogRole: false, openDetail: !!(options && options.openDetail) }) + "\n</dialog>"
+      card(found, { openDetail: !!(options && options.openDetail) }) + "\n</dialog>"
     );
   }
 
   Sereno.verdictModal = {
     translate: translate,
-    text: text,
     keyOf: keyOf,
     isClosable: isClosable,
     canContinue: canContinue,
-    render: render,
     renderDialog: renderDialog
   };
 })(globalThis.Sereno = globalThis.Sereno || {});

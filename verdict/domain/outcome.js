@@ -1,5 +1,5 @@
 /* Verdict · outcome model: the one normalized result every caller (service
-   worker, popup, demo store) gets from the verdict use case. Classic script
+   worker, popup, content script) gets from the verdict use case. Classic script
    that registers Sereno.verdictOutcome. Pure: no DOM, no storage, no network.
      { kind: "verdict",  verdict: { domain, status, score, source, latencyMs } }
      { kind: "pending",  reason: "evaluating" }

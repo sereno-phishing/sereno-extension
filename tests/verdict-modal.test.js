@@ -1,7 +1,7 @@
 "use strict";
 
-/* The verdict modal view is shared by the demo store (overlay) and the real
-   pages (native dialog). Both come from the same card markup. */
+/* The verdict modal view: one card for the warning and the block verdict,
+   wrapped in a native dialog. */
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -12,22 +12,14 @@ const Sereno = load(
   "verdict/domain/verdict.js",
   "ui/atoms.js",
   "verdict/ui/verdict-ui.js",
-  "demo-store/ui/verdict-modal.js"
+  "verdict/ui/verdict-modal.js"
 );
 
 const modal = Sereno.verdictModal;
 const WARNING = { domain: "paypal-secure-login.com", status: "advertencia", score: 0.92, source: "modelo" };
 const BLOCK = { domain: "pago-servicios-linea.net", status: "bloqueo", score: 0.97, source: "cache" };
 
-test("the demo overlay keeps its markup: hidden overlay with a labelled dialog section", () => {
-  const html = modal.render(WARNING);
-  assert.match(html, /<div class="demo-overlay" id="warning-overlay" hidden>/);
-  assert.match(html, /<section class="verdict-modal" role="dialog" aria-modal="true" aria-labelledby="warning-title"/);
-  assert.match(html, /data-action="continuar"/);
-  assert.match(modal.render(BLOCK), /id="block-overlay"/);
-});
-
-test("the dialog shell reuses the same card inside a native dialog without a second dialog role", () => {
+test("the dialog shell wraps the card in a native dialog without a second dialog role", () => {
   const html = modal.renderDialog(WARNING);
   assert.match(html, /^<dialog class="verdict-dialog" id="warning-dialog" aria-labelledby="warning-title" aria-describedby="warning-text"/);
   assert.doesNotMatch(html, /role="dialog"/);
@@ -68,7 +60,8 @@ test("the open-detail link is added only when asked", () => {
 });
 
 test("the score bar carries its percentage so the container can size it without inline styles", () => {
-  assert.match(modal.renderDialog({ ...WARNING, score: 0.63 }), /data-percent="63"/);
+  const html = modal.renderDialog({ ...WARNING, score: 0.63 });
+  assert.match(html, /class="verdict-score-fill verdict-score-fill-warn" data-percent="63"/);
 });
 
 test("icons follow the asset root, which a content script points at the extension", () => {

@@ -1,21 +1,10 @@
-/* Sereno verdict modal: warning and block card shared by the demo store
-   (div.demo-overlay) and the real pages (dialog.verdict-dialog, styled in
-   content/content.css). Pixel values come from the Figma frames HU-05/20/22.
-   Loads after ui/tokens.css. No external resources, no @import. */
+/* Sereno verdict modal: the warning and block card of the in-page dialog
+   (dialog.verdict-dialog, styled in content/content.css). Pixel values come
+   from the Figma frames HU-05/20/22. Loads after ui/tokens.css. No external
+   resources, no @import. */
 
 /* ---------- alert panel (HU-05 / HU-20 / HU-22) ---------- */
 
-.demo-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  padding: 24px;
-  overflow-y: auto;
-  background: rgba(15, 23, 42, 0.5);
-}
-
-.demo-overlay[hidden],
 .verdict-details[hidden] {
   display: none;
 }
@@ -185,14 +174,6 @@
 
 .verdict-score-fill-bad {
   background: #DC2626;
-}
-
-.score-92 {
-  width: 92%;
-}
-
-.score-97 {
-  width: 97%;
 }
 
 .verdict-source {

@@ -1,5 +1,5 @@
-/* Verdict: the status catalog every surface shares (popup, admin panel, demo
-   store) plus the derived risk level and source labels. Classic script that
+/* Verdict: the status catalog every surface shares (popup, admin panel,
+   in-page overlay) plus the derived risk level and source labels. Classic script that
    registers Sereno.verdict. Pure: no DOM, no storage.
 
    The backend answers the two-class model verdict ("phishing" | "legitima")

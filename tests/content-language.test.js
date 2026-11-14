@@ -2,7 +2,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { load } = require("./load");
-const s = load("platform/storage.js", "platform/i18n.js", "time/domain/time.js", "verdict/domain/verdict.js", "verdict/domain/outcome.js", "ui/atoms.js", "content/content-assets.generated.js", "verdict/ui/verdict-ui.js", "demo-store/ui/verdict-modal.js", "verdict/ui/page-overlay.js", "content/content-script.js");
+const s = load("platform/storage.js", "platform/i18n.js", "time/domain/time.js", "verdict/domain/verdict.js", "verdict/domain/outcome.js", "ui/atoms.js", "content/content-assets.generated.js", "verdict/ui/verdict-ui.js", "verdict/ui/verdict-modal.js", "verdict/ui/page-overlay.js", "content/content-script.js");
 
 test("pending and degraded overlays follow the selected language without changing outcome data", () => {
   const pending = { kind: "pending", reason: "evaluating" };
@@ -57,5 +57,5 @@ test("content manifest loads storage and i18n before outcome and shared modal", 
   const files = manifest.content_scripts[0].js;
   assert.ok(files.indexOf("platform/storage.js") < files.indexOf("platform/i18n.js"));
   assert.ok(files.indexOf("platform/i18n.js") < files.indexOf("verdict/domain/outcome.js"));
-  assert.ok(files.indexOf("platform/i18n.js") < files.indexOf("demo-store/ui/verdict-modal.js"));
+  assert.ok(files.indexOf("platform/i18n.js") < files.indexOf("verdict/ui/verdict-modal.js"));
 });
