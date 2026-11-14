@@ -164,7 +164,7 @@
   color: var(--muted);
 }
 
-.sereno-toast-retry {
+.sereno-toast-status {
   font-size: 12px;
   font-weight: 500;
   color: var(--slate-600);

@@ -24,13 +24,13 @@
   var PENDING_COPY = {
     title: "Evaluación pendiente",
     text: "Aún no pudimos revisar este sitio. Evita ingresar datos de pago hasta que termine.",
-    retry: "Reintentando automáticamente..."
+    status: "Sereno sigue evaluando este sitio."
   };
 
   if (Sereno.i18n) Sereno.i18n.register({
     "overlay.pending.title": { es: PENDING_COPY.title, en: "Pending evaluation" },
     "overlay.pending.text": { es: PENDING_COPY.text, en: "We haven't checked this site yet. Avoid entering payment details until the check finishes." },
-    "overlay.pending.retry": { es: PENDING_COPY.retry, en: "Retrying automatically..." },
+    "overlay.pending.status": { es: PENDING_COPY.status, en: "Sereno is still evaluating this site." },
     "overlay.dismiss": { es: "Entendido", en: "Got it" },
     "overlay.detail.show": { es: "Ver detalle", en: "Show details" },
     "overlay.detail.hide": { es: "Ocultar detalle", en: "Hide details" }
@@ -64,7 +64,7 @@
       '<div class="sereno-toast-body">\n' +
       '<p class="sereno-toast-title" data-overlay-i18n="overlay.pending.title">' + ui.esc(text("overlay.pending.title", PENDING_COPY.title)) + "</p>\n" +
       '<p class="sereno-toast-text" data-overlay-i18n="overlay.pending.text">' + ui.esc(text("overlay.pending.text", PENDING_COPY.text)) + "</p>\n" +
-      '<p class="sereno-toast-retry" data-overlay-i18n="overlay.pending.retry">' + ui.esc(text("overlay.pending.retry", PENDING_COPY.retry)) + "</p>\n" +
+      '<p class="sereno-toast-status" data-overlay-i18n="overlay.pending.status">' + ui.esc(text("overlay.pending.status", PENDING_COPY.status)) + "</p>\n" +
       "</div>\n</aside>"
     );
   }
