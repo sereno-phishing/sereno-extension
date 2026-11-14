@@ -41,7 +41,7 @@ not exempt.
 - [x] T1 `fix(protection)`: apply the current domain policy when a tab reloads.
       Route: inline (single writer). Files: `protection/application/navigation-service.js`,
       tests.
-- [ ] T2 `fix(verdict)`: explain a verdict only with data the extension has.
+- [x] T2 `fix(verdict)`: explain a verdict only with data the extension has.
       Files: `verdict/ui/verdict-modal.js`, tests, generated assets if needed.
 - [ ] T3 `fix(protection)`: never evaluate the backend's own pages.
       Files: `platform/providers/*`, `protection/application/navigation-service.js`, tests.
@@ -54,7 +54,7 @@ not exempt.
 
 ## Evidence
 
-### T1
+### T1 (commit `2725226`)
 
 - Cause: `handleNavigation` returned the stored outcome whenever the tab record
   had the same url (base `protection/application/navigation-service.js:190-194`),
@@ -70,6 +70,22 @@ not exempt.
 - GREEN: same command: 9 pass. `node --test`: 473 tests, 473 pass, 0 fail, 0 skipped.
 - Not verified in real Chrome: the exact `tabs.onUpdated` sequence of a reload.
 
+### T2
+
+- Cause: the explanation paragraph of the verdict dialog was fixed demo copy
+  (`verdict/ui/verdict-modal.js:20,29,36,38` on the base): the warning named a
+  reason and the block claimed that no data had been sent. Nothing computes either.
+- Fix: both paragraphs now state the class and the policy only, in Spanish and
+  English. Title, risk level, score, date and source were already data driven.
+  No other verdict explanation exists (popup site card and history detail show
+  status, risk, score, date and source only); no element was removed.
+- `content/content-assets.generated.js` has no copy in it (styles and icons):
+  `node tools/build-content-assets.js --check` reports it up to date.
+- RED: `node --test tests/verdict-copy.test.js`: 2 tests, 0 pass, 2 fail.
+- GREEN: same command: 2 pass. `node --test`: 475 tests, 475 pass, 0 fail, 0 skipped.
+- Left as is, reported: the pending toast line "Reintentando automáticamente..."
+  (`verdict/ui/page-overlay.js`) is not a verdict explanation, but nothing retries.
+
 ## Next step
 
-T2.
+T3.

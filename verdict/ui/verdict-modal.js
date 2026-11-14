@@ -17,7 +17,7 @@
     advertencia: {
       key: "warning",
       title: "Este sitio puede ser phishing",
-      text: "El dominio imita a un sitio de pagos conocido. Si ingresas tus datos aquí, podrían robarlos.",
+      text: "Sereno detectó señales de phishing en la dirección de este sitio. Puedes volver o continuar bajo tu propio riesgo.",
       actions: [
         { cls: "verdict-btn-dark", label: "Volver", action: "volver" },
         { cls: "verdict-btn-ghost", label: "Continuar bajo riesgo", action: "continuar" }
@@ -26,16 +26,16 @@
     bloqueo: {
       key: "block",
       title: "Sitio bloqueado",
-      text: "Este dominio está clasificado como phishing y la política no permite continuar. Tus datos no se enviaron.",
+      text: "Sereno detectó señales de phishing en la dirección de este sitio y el administrador configuró el bloqueo para este dominio.",
       actions: [{ cls: "verdict-btn-danger", label: "Volver a un sitio seguro", action: "volver" }]
     }
   };
 
   var MESSAGES = {
     titleWarning: { es: "Este sitio puede ser phishing", en: "This site may be phishing" },
-    textWarning: { es: "El dominio imita a un sitio de pagos conocido. Si ingresas tus datos aquí, podrían robarlos.", en: "The domain imitates a known payment site. If you enter your data here, it could be stolen." },
+    textWarning: { es: "Sereno detectó señales de phishing en la dirección de este sitio. Puedes volver o continuar bajo tu propio riesgo.", en: "Sereno detected signs of phishing in this site's address. You can go back or continue at your own risk." },
     titleBlock: { es: "Sitio bloqueado", en: "Site blocked" },
-    textBlock: { es: "Este dominio está clasificado como phishing y la política no permite continuar. Tus datos no se enviaron.", en: "This domain is classified as phishing and the policy does not allow you to continue. Your data was not sent." },
+    textBlock: { es: "Sereno detectó señales de phishing en la dirección de este sitio y el administrador configuró el bloqueo para este dominio.", en: "Sereno detected signs of phishing in this site's address and the administrator set this domain to be blocked." },
     back: { es: "Volver", en: "Go back" }, continue: { es: "Continuar bajo riesgo", en: "Continue at your own risk" },
     safe: { es: "Volver a un sitio seguro", en: "Return to a safe site" },
     risk: { es: "Nivel de riesgo", en: "Risk level" }, score: { es: "Score del modelo", en: "Model score" },
