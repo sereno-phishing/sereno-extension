@@ -19,6 +19,17 @@
    because a content script injected at document_idle misses the first one, so
    receivers must treat equal outcomes as idempotent.
 
+   One navigation, several events. A "loading" tab update opens a navigation
+   (a new url or a reload of the same one) and is evaluated against the
+   backend, so the domain policy in force is the one applied; the backend
+   caches by url, which keeps that cheap. "complete" and a tab activation only
+   repeat the navigation that is already open: they show the stored outcome.
+   Chrome may report "loading" twice for one navigation (when the tab starts
+   loading and when it commits), so the tab record is marked navigating from
+   the first "loading" until its "complete"; a second "loading" for the same
+   url inside that window (bounded by IN_FLIGHT_MS, in case "complete" never
+   arrives) is a repeat, not a reload.
+
    Requests from the content script (handleMessage), sent with
    chrome.runtime.sendMessage; the sender tab says which record they concern:
      { type: "sereno:get-outcome" }       -> { ok, outcome|null, acknowledged? }
@@ -68,12 +79,22 @@
   }
 
   /* chrome.tabs.onUpdated payload -> { tabId, url } or null. A navigation
-     starts with a "loading" event that carries the new url; "complete" repeats
-     it once the document is ready. */
+     starts with a "loading" event (fresh: true); "complete" repeats it once the
+     document is ready. The event carries the url only when it changed: a
+     reload reports the status alone and the url is read from the tab. Before a
+     navigation to another url commits, the tab still reports the page being
+     left (and the next one as pendingUrl): that event is skipped, the commit
+     brings the new url. */
   function fromTabUpdate(tabId, changeInfo, tab) {
     var change = changeInfo || {};
-    if (change.status === "loading" && change.url) {
-      return { tabId: tabId, url: change.url };
+    if (change.status === "loading") {
+      if (change.url) {
+        return { tabId: tabId, url: change.url, fresh: true };
+      }
+      if (tab && tab.url && (!tab.pendingUrl || tab.pendingUrl === tab.url)) {
+        return { tabId: tabId, url: tab.url, fresh: true };
+      }
+      return null;
     }
     if (change.status === "complete" && tab && tab.url) {
       return { tabId: tabId, url: tab.url };
@@ -104,9 +125,14 @@
     );
   }
 
-  /* A record with the origins the user continued on, when there are any. */
+  /* A record with the origins the user continued on, when there are any.
+     navigating is kept only while the navigation that started the evaluation
+     is still open (see "One navigation, several events"). */
   function recordOf(base, continued) {
     var record = { token: base.token, url: base.url, startedAt: base.startedAt, outcome: base.outcome };
+    if (base.navigating === true) {
+      record.navigating = true;
+    }
     if (Array.isArray(continued) && continued.length > 0) {
       record.continued = continued.slice();
     }
@@ -198,14 +224,21 @@
         return null;
       }
       var now = deps.now;
+      var fresh = navigation.fresh === true;
       var existing = await loadRecord(deps, tabId);
       if (existing && existing.url === url) {
-        if (existing.outcome) {
+        var recent = now().getTime() - existing.startedAt < IN_FLIGHT_MS;
+        if (!existing.outcome && recent) {
+          return null;
+        }
+        var sameNavigation = !fresh || (existing.navigating === true && recent);
+        if (existing.outcome && sameNavigation) {
+          if (!fresh && existing.navigating === true) {
+            /* "complete" closes the navigation: the next "loading" is a reload. */
+            await saveRecord(deps, tabId, recordOf(Object.assign({}, existing, { navigating: false }), existing.continued));
+          }
           await present(deps, tabId, url, existing.outcome, NOTIFY);
           return existing.outcome;
-        }
-        if (now().getTime() - existing.startedAt < IN_FLIGHT_MS) {
-          return null;
         }
       }
 
@@ -213,7 +246,10 @@
       var tracked = await saveRecord(
         deps,
         tabId,
-        recordOf({ token: token, url: url, startedAt: now().getTime(), outcome: null }, existing && existing.continued)
+        recordOf(
+          { token: token, url: url, startedAt: now().getTime(), outcome: null, navigating: fresh },
+          existing && existing.continued
+        )
       );
       var pendingJob = Promise.resolve();
       var settings = Object.assign({}, deps.options, {
@@ -232,7 +268,10 @@
         await saveRecord(
           deps,
           tabId,
-          recordOf({ token: token, url: url, startedAt: current.startedAt, outcome: outcome }, current.continued)
+          recordOf(
+            { token: token, url: url, startedAt: current.startedAt, outcome: outcome, navigating: current.navigating },
+            current.continued
+          )
         );
       }
       await present(deps, tabId, url, outcome, NOTIFY);

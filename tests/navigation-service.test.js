@@ -309,9 +309,9 @@ test("closing a tab drops its stored outcome", async () => {
 });
 
 test("tab update events map to a navigation only when the url is real", () => {
-  assert.deepEqual(nav.fromTabUpdate(3, { status: "loading", url: "https://a.pe/" }, { url: "https://a.pe/" }), { tabId: 3, url: "https://a.pe/" });
+  assert.deepEqual(nav.fromTabUpdate(3, { status: "loading", url: "https://a.pe/" }, { url: "https://a.pe/" }), { tabId: 3, url: "https://a.pe/", fresh: true });
   assert.deepEqual(nav.fromTabUpdate(3, { status: "complete" }, { url: "https://a.pe/x" }), { tabId: 3, url: "https://a.pe/x" });
-  assert.equal(nav.fromTabUpdate(3, { status: "loading" }, { url: "https://a.pe/" }), null);
+  assert.equal(nav.fromTabUpdate(3, { status: "loading" }, undefined), null);
   assert.equal(nav.fromTabUpdate(3, { title: "x" }, { url: "https://a.pe/" }), null);
   assert.equal(nav.fromTabUpdate(3, { status: "complete" }, {}), null);
   assert.equal(nav.fromTabUpdate(3, { status: "complete" }, undefined), null);

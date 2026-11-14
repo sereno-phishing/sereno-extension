@@ -88,6 +88,15 @@ evalúa su URL sin necesidad de refrescarla. Si la página se abrió antes de
 cargar la extensión, el aviso dentro de la página puede requerir una recarga
 para instalar el content script; el badge y el popup no la requieren.
 
+Cada navegación nueva de una pestaña, incluida la recarga de la misma URL,
+vuelve a consultar al backend, así que se aplica la política vigente del
+dominio (el backend guarda el veredicto en caché por URL, por lo que la consulta
+es barata). Los demás eventos de esa misma navegación (`complete`, activar la
+pestaña) reutilizan el resultado guardado. Una pestaña abierta que no se recarga
+no se actualiza sola. «Continuar bajo riesgo» se recuerda por pestaña y origen,
+pero solo omite una advertencia: si la política pasa a `bloqueo`, el bloqueo se
+muestra igual.
+
 El backend solo dice la clase del modelo, `phishing` o `legitima`, y la política
 del dominio. La extensión aplica esa política (RF-10) en un único lugar,
 `applyPolicy` de `verdict/domain/verdict.js`: un sitio legítimo queda «seguro» y
@@ -486,6 +495,10 @@ worker (`chrome://extensions` → «service worker») y revisa:
       restringidos): el modal conserva estilos (hoja construida) e íconos (SVG en
       línea). Si falta el estilo, el navegador no admitió la hoja construida y cayó
       al `<style>`, que esa CSP puede bloquear.
+- [ ] Cambio de política: con una advertencia en pantalla, cambiar el dominio a
+      `bloqueo` en el panel y recargar la misma pestaña; debe salir el bloqueo,
+      también si antes se eligió «Continuar bajo riesgo». Una sola petición a
+      `/v1/verdict` por recarga y sin parpadeo del modal.
 - [ ] Navegación en una SPA (`pushState`): el worker solo ve `loading` y
       `complete`, así que un cambio de ruta del lado del cliente no se vuelve a
       evaluar. Confirmar el comportamiento y decidir si se usa
