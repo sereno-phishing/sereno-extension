@@ -3,21 +3,20 @@
 Sereno es una extensión anti-phishing para Chrome (Manifest V3). Evalúa cada
 página http/https que abres y muestra el resultado de tres formas: el badge del
 ícono, un aviso dentro de la página y el detalle en el popup. Incluye el popup
-completo, el panel de administración, la política de privacidad y una tienda de
-demo para probar los flujos.
+completo, el panel de administración y la política de privacidad.
 
 Todos los datos vienen del backend local hermano en `http://127.0.0.1:5000`:
 veredictos, historial, caché, métricas, versión del modelo, autenticación,
-encuestas SUS y políticas por dominio. El backend decide los veredictos con un
-`FakeClassifier` determinista (los mismos resultados que el mock) mientras el
-modelo de ML está pendiente; esto no es protección real contra phishing. Start
+encuestas SUS y políticas por dominio. La extensión no clasifica ni trae datos
+de ejemplo: con el backend apagado, la protección queda degradada y el popup y
+el panel muestran el error de conexión. Start
 the backend before using the extension; [Conectar el backend](#conectar-el-backend)
-has the local setup. La demo sin conexión sigue disponible con todos los
-proveedores en `"mock"`.
+has the local setup.
 
 **Estado de la verificación.** `node --test` cubre dominios, casos de uso,
-vistas (HTML y DOM simulado), el service worker, el content script y la
-equivalencia entre mock y remote. Isolated Node HTTP tests also exercise the
+vistas (HTML y DOM simulado), el service worker, el content script y el
+adaptador remoto contra un backend falso solo de pruebas (`tests/rest-fake.js`)
+que responde el contrato REST. Isolated Node HTTP tests also exercise the
 real local backend with throwaway JSON data through the remote adapter: auth,
 surveys, policies, verdicts, history, cache, metrics and model version.
 **Real Chrome cookie behavior remains unverified**; Node supplies its own test
@@ -29,7 +28,7 @@ cookie jar and does not enforce browser cookie policy. Manual checks remain in
 - Google Chrome 102 o superior (Manifest V3, `chrome.storage.session` e
   `inert`). También debería funcionar en navegadores basados en Chromium (Edge,
   Brave, Opera), sin probar.
-- Local sign-in requires the sibling Flask backend; verdicts/data need no internet.
+- The sibling Flask backend must be running locally for verdicts, data and sign-in.
 - Para correr las pruebas, Node 18 o superior, sin dependencias.
 - Carga la carpeta tal cual, sin instalar dependencias ni compilar.
 
@@ -55,120 +54,83 @@ dependen del idioma). Los datos
 devueltos por el backend no se traducen. La descripción que Chrome muestra en la
 lista de extensiones usa el idioma del navegador, independientemente del selector.
 
-## Cómo probar la demo
+## Cómo probarla
 
-1. Abre el popup de Sereno. La primera vez verás el onboarding de 3 pasos
+1. Enciende el backend local (ver [Conectar el backend](#conectar-el-backend)) y
+   carga o recarga la extensión.
+2. Abre el popup de Sereno. La primera vez verás el onboarding de 3 pasos
    (qué hace, qué permiso necesita y cómo leer una alerta). Pulsa **Empezar**.
-2. Start the backend and create a throwaway account in the popup. Backend
-   registration always creates a regular user (`isAdmin: false`); demo credentials and mock administrator
-   accounts do not authenticate against it. To test the administrator panel,
-   promote the throwaway account offline as documented in [Conectar el backend](#conectar-el-backend).
-   For the entirely offline demo only,
-   set `authProvider: "mock"` and `policyProvider: "mock"` as described below to use `andres.torres` or
-   `admin.sereno` with password `sereno123`.
-3. Abre la tienda de demo directamente en
-   `chrome-extension://<ID>/app/demo-store/store.html`, reemplazando `<ID>` por el ID de
-   la extensión que muestra `chrome://extensions`.
-4. Prueba los 4 escenarios del simulador, en la esquina inferior izquierda:
-   - Sitio seguro: badge verde `✓` y tooltip «Sereno: sitio seguro».
-   - Advertencia: modal ámbar con la opción de **Ver detalle** o
-     **Continuar bajo riesgo**.
-   - Bloqueo: modal rojo sin opción de continuar.
-   - Pendiente: toast «Evaluación pendiente».
-   Cada escenario pasa por un estado «Evaluando…» de ~0.7 s antes del veredicto.
-5. Vuelve al popup para ver el estado del sitio y el historial de la navegación
-   que simulaste. En el panel de administración puedes ver las métricas, las
-   políticas y el caché que sirve el backend. Con `andres.torres` ves la experiencia
-   de usuario (pestañas Inicio/Historial); con `admin.sereno` ves la tarjeta de
-   administración que abre el panel. La tarjeta «Este sitio» aparece con y sin sesión.
+   Antes de la primera navegación, la tarjeta «Este sitio» no nombra ningún
+   dominio y muestra «Evaluando…».
+3. Create a throwaway account in the popup. Backend registration always creates
+   a regular user (`isAdmin: false`). To test the administrator panel, promote
+   the throwaway account offline as documented in [Conectar el backend](#conectar-el-backend).
+4. Navega a cualquier página http/https. El service worker pide el veredicto al
+   backend, pinta el badge de la pestaña y publica el sitio en el popup; con
+   sesión iniciada, el backend registra la visita en el historial de la cuenta.
+5. Vuelve al popup para ver el estado del sitio y el historial. Con una cuenta
+   de usuario ves las pestañas Inicio/Historial; con una cuenta de administrador
+   ves además la tarjeta que abre el panel, con las métricas, las políticas y
+   el caché que sirve el backend. La tarjeta «Este sitio» aparece con y sin sesión.
 
-Para empezar de cero, borra el historial desde el popup. También puedes quitar
-y volver a cargar la extensión en `chrome://extensions` para restaurar los datos
-semilla.
+Para empezar de cero, borra el historial desde el popup. Quitar y volver a
+cargar la extensión en `chrome://extensions` borra el estado local (sesión,
+onboarding y borradores de encuesta); los datos del backend no cambian.
 
 ### En pestañas reales
 
-El service worker evalúa cada navegación http/https con el mismo proveedor. Con
-la configuración entregada pregunta al backend, cuyo `FakeClassifier` devuelve
-los mismos veredictos que el mock para los dominios de la tabla. Al
-activar una pestaña ya abierta sin resultado guardado, también evalúa su URL sin
-necesidad de refrescarla. Si la página se abrió antes de cargar la extensión,
-el aviso dentro de la página puede requerir una recarga para instalar el content
-script; el badge y el popup no la requieren. El mock solo conoce los dominios de los escenarios y los hosts de prueba
-`*.localhost`; cualquier otro dominio da «seguro».
+El service worker evalúa cada navegación http/https a través del puerto
+`verdict`. Al activar una pestaña ya abierta sin resultado guardado, también
+evalúa su URL sin necesidad de refrescarla. Si la página se abrió antes de
+cargar la extensión, el aviso dentro de la página puede requerir una recarga
+para instalar el content script; el badge y el popup no la requieren.
 
-| Dominio | Respuesta (mock y `FakeClassifier`) | Lo que muestra la extensión |
-| --- | --- | --- |
-| `tienda-servicios.pe` | `legitima` | Seguro |
-| `paypal-secure-login.com` | `phishing`, política `advertencia` | Advertencia |
-| `pago-servicios-linea.net` | `phishing`, política `bloqueo` | Bloqueo |
-| cualquier otro | `legitima` | Seguro |
-
-El backend (y el mock, que responde con la misma forma) solo dice la clase del
-modelo, `phishing` o `legitima`, y la política del dominio. La extensión aplica
-esa política (RF-10) en un único lugar, `applyPolicy` de
-`verdict/domain/verdict.js`: un sitio legítimo queda «seguro» y uno de phishing
-queda en «advertencia» o «bloqueo» según la política. Con el backend, la
+El backend solo dice la clase del modelo, `phishing` o `legitima`, y la política
+del dominio. La extensión aplica esa política (RF-10) en un único lugar,
+`applyPolicy` de `verdict/domain/verdict.js`: un sitio legítimo queda «seguro» y
+uno de phishing queda en «advertencia» o «bloqueo» según la política. La
 política sale de la lista del panel de administración (por defecto,
-`advertencia`); en el mock, del escenario.
+`advertencia`).
 
-Los dominios de la tabla no resuelven en internet, así que el aviso en página no
-aparece con ellos: el badge se pinta al empezar la navegación, pero la página
-no llega a cargar. Para ver el aviso, usa los hosts `*.localhost` de la
-siguiente sección. Esto no se ha probado en Chrome real.
-
-### Probar advertencia, bloqueo, pendiente y degradado en páginas reales
-
-Chrome resuelve cualquier `*.localhost` a tu propio equipo, así que la página
-carga y el content script puede dibujar el aviso. Con el proveedor `mock` el
-adaptador reconoce estos hosts (el puerto se ignora):
-
-1. En cualquier carpeta, levanta un servidor local: `python -m http.server 8080`.
-2. Abre cada host en una pestaña, con la extensión cargada y recargada:
-
-| URL | Resultado esperado |
+| Respuesta del backend | Lo que muestra la extensión |
 | --- | --- |
-| `http://seguro.localhost:8080` | Badge verde `✓`, sin aviso en página |
-| `http://advertencia.localhost:8080` | Badge ámbar `!` y modal de advertencia (Volver, Ver detalle, Continuar bajo riesgo) |
-| `http://bloqueo.localhost:8080` | Badge rojo `✕` y modal de bloqueo, sin opción de continuar |
-| `http://pendiente.localhost:8080` | Badge `…` y toast «Evaluación pendiente» durante ~1.5 s; después, seguro `✓` |
-| `http://degradado.localhost:8080` | Badge `?` y aviso «Protección degradada»; la página no se bloquea |
+| `legitima` | Seguro: badge verde `✓`, sin aviso en página |
+| `phishing`, política `advertencia` | Advertencia: badge ámbar `!` y modal con Volver, Ver detalle y Continuar bajo riesgo |
+| `phishing`, política `bloqueo` | Bloqueo: badge rojo `✕` y modal sin opción de continuar |
+| sin respuesta pasados 300 ms | Badge `…` y toast «Evaluación pendiente» hasta que llega el veredicto |
+| error de red, tiempo agotado, servidor o caché | Badge `?` y aviso «Protección degradada»; la página no se bloquea |
 
-Notas:
-
-- Solo funciona con `provider: "mock"`; un backend real ignora estos hosts.
-- La página puede ser un listado o un 404 del servidor: solo importa el host.
-- El popup y el historial muestran el host (por ejemplo `bloqueo.localhost`).
-- Los hosts están definidos en `TEST_HOSTS` de `platform/providers/mock.js`.
+El aviso en página solo aparece si la página llega a cargar: con un dominio que
+no resuelve, el badge se pinta al empezar la navegación, pero el content script
+no se ejecuta. Esto no se ha probado en Chrome real.
 
 ## Mapa de vistas ↔ HU
 
-Todo funciona con el mock y con el backend local. «Backend» indica qué dato
-sirve el backend; las vistas no cambian. Los veredictos del backend salen de un
-`FakeClassifier` hasta que exista el modelo de ML.
+Todos los datos los sirve el backend local; las vistas no dependen de quién
+los produce. «Estado» indica lo que falta verificar.
 
 | Vista o flujo | HU | Dónde se ve | Estado |
 | --- | --- | --- | --- |
 | Cargar Sereno en Chrome | HU-01 | `manifest.json`, `chrome://extensions` | Listo |
 | Onboarding de 3 pasos | HU-03 | Popup, primera apertura | Listo |
-| Sitio seguro | HU-04 | Badge de la pestaña, popup (estado), tooltip de la tienda de demo | Listo con mock; badge real sin probar en Chrome |
-| Advertencia | HU-05 | Modal ámbar en la página y en la tienda de demo | Listo con mock; modal real sin probar en Chrome |
+| Sitio seguro | HU-04 | Badge de la pestaña, popup (estado) | Listo; badge real sin probar en Chrome |
+| Advertencia | HU-05 | Modal ámbar en la página | Listo; modal real sin probar en Chrome |
 | Crear cuenta | HU-13 | Popup → Crear cuenta | Local backend; Chrome verification pending |
 | Iniciar sesión | HU-14 | Popup → Iniciar sesión | Local backend; Chrome verification pending |
 | Cerrar sesión | HU-15 | Popup → menú de cuenta → Cerrar sesión | Listo; sale en local aunque el backend no responda |
-| Historial | HU-17 | Popup → pestaña Historial | Listo con mock; backend guarda las visitas |
+| Historial | HU-17 | Popup → pestaña Historial | Listo; el backend guarda las visitas |
 | Filtrar historial | HU-18 | Popup → Historial → chips de filtro | Listo |
-| Borrar historial | HU-19 | Popup → Historial → Borrar historial | Listo con mock; backend |
+| Borrar historial | HU-19 | Popup → Historial → Borrar historial | Listo; borra en el backend |
 | Detalle del veredicto | HU-20 | Popup → detalle del historial y «Ver detalle» del aviso | Listo |
 | Política por dominio | HU-21 | Panel de administración → Política por dominio | Backend local; solo administrador; Chrome pendiente |
-| Bloqueo | HU-22 | Modal rojo en la página y en la tienda de demo | Listo con mock; modal real sin probar en Chrome |
+| Bloqueo | HU-22 | Modal rojo en la página | Listo; modal real sin probar en Chrome |
 | Política de privacidad | HU-23 | `privacy/ui/privacy-views.js`, vista dentro del popup desde el enlace del pie | Listo |
 | Estado de la protección | HU-24 | Popup → tarjeta «Protección activa» y estado del sitio | Listo |
-| Evaluación pendiente | HU-25 | Badge `…`, toast en página, estado «Evaluando…» | Listo con mock |
+| Evaluación pendiente | HU-25 | Badge `…`, toast en página, estado «Evaluando…» | Listo |
 | Protección degradada | HU-26 | Badge `?`, aviso en página, tarjeta ámbar del popup | Listo; el popup no explica la causa (ver abajo) |
 | Versión del modelo | HU-27 | Pie del popup (misma versión con y sin sesión) y aviso «Modelo actualizado» (solo con sesión, cuando la versión del backend difiere de la última vista) | Solo la lectura (`GET /v1/model`); el entrenamiento queda fuera |
-| Caché | HU-28 | Panel de administración → Caché | Listo con mock; backend |
-| Métricas de operación | HU-29 | Panel de administración → Métricas | Listo con mock; el cálculo es del backend |
+| Caché | HU-28 | Panel de administración → Caché | Listo; solo administrador |
+| Métricas de operación | HU-29 | Panel de administración → Métricas | Listo; solo administrador; el cálculo es del backend |
 | Encuesta SUS | HU-32 | Popup → menú de cuenta → Encuesta de opinión | Envío al backend local; tras confirmar la participación, la opción desaparece para esa cuenta; borradores locales por cuenta; Chrome pendiente |
 
 Pendiente conocido en HU-26: el popup muestra «Protección degradada» sin la
@@ -189,12 +151,11 @@ sereno-extension/
 ├── manifest.json                 # MV3: worker, content script, popup, options_page, permisos y CSP
 ├── app/                          # Raíces de composición: una carpeta por página
 │   ├── popup/                    # popup.html/.css, popup-views.js (plantilla), popup-page.js (contenedor)
-│   ├── admin/                    # admin.html/.css, admin-views.js (plantilla), admin-page.js (contenedor)
-│   └── demo-store/               # store.html/.css, store-page.js (contenedor del simulador)
+│   └── admin/                    # admin.html/.css, admin-views.js (plantilla), admin-page.js (contenedor)
 ├── background/                   # service-worker.js: escucha las pestañas y delega en navigation-service
 ├── content/                      # content-script.js (contenedor del aviso en página), content.css y content-assets.generated.js (estilos e íconos empaquetados; no se edita)
 ├── tools/                        # build-content-assets.js: genera content-assets.generated.js (paso de desarrollo)
-├── verdict/                      # Veredicto y su resultado normalizado (outcome), caso de uso verdict-service, aviso en página, pills y badge
+├── verdict/                      # Veredicto y su resultado normalizado (outcome), caso de uso verdict-service, aviso en página, modal de veredicto, pills y badge
 ├── account/                      # Usuarios, sesión con token, roles; formularios y menú de cuenta
 ├── history/                      # Historial: deduplicación 60 s, tope 200, filtros; lista y detalle
 ├── survey/                       # Encuesta SUS: escala y puntaje; vistas bilingües de la encuesta
@@ -202,28 +163,25 @@ sereno-extension/
 ├── onboarding/                   # Recorrido de 3 pasos
 ├── protection/                   # Sitio actual, nivel de protección, versión del modelo; navigation-service (navegación → veredicto, badge, mensaje)
 ├── administration/               # Política por dominio y caché (reglas, casos de uso, secciones del panel)
-├── demo-store/                   # Escenarios del simulador y modal de veredicto (compartido con las páginas reales)
 ├── time/                         # Fechas y sellos de tiempo (funciones puras)
 ├── platform/                     # Bordes técnicos
 │   ├── providers/                # La costura del backend (ver «Conectar el backend»)
-│   │   ├── config.js             # Independent provider/authProvider/policyProvider axes, baseUrl, timeoutMs
-│   │   ├── ports.js              # Contrato de los puertos (verdict, auth, data)
-│   │   ├── mock.js               # Adaptador con datos de ejemplo
+│   │   ├── config.js             # Dirección del backend (baseUrl) y plazo de las peticiones (timeoutMs)
+│   │   ├── ports.js              # Contrato de los puertos (verdict, auth, data, survey)
 │   │   ├── remote.js             # Adaptador REST (HTTP + JSON)
 │   │   ├── errors.js             # Códigos de error de transporte y su texto en español
 │   │   └── index.js              # Raíz de composición: crea Sereno.services
 │   ├── storage.js                # Puerto de almacenamiento: chrome.storage, localStorage o memoria
-│   ├── state-store.js            # Store reactivo compartido entre páginas (cola, sync externo)
+│   ├── state-store.js            # Store reactivo compartido entre páginas (cola, sync externo) y estado inicial
 │   ├── browser.js                # Badge por pestaña, mensajes al content script, registros por pestaña
-│   ├── preferences.js            # Preferencias de UI del popup (pestaña recordada)
-│   └── seed.js                   # Datos semilla: usuarios, historial, dominios, caché, métricas
+│   └── preferences.js            # Preferencias de UI del popup (pestaña recordada)
 ├── ui/                           # Sistema de diseño
 │   ├── tokens.css                # Design tokens y clases base
-│   ├── verdict-modal.css         # Estilos del modal, compartidos por la tienda y las páginas reales
+│   ├── verdict-modal.css         # Estilos del modal de veredicto del aviso en página
 │   ├── atoms.js                  # Átomos: esc, imagen/ícono, botón, chip, pill, input, banner
 │   ├── molecules.js              # Moléculas: campo con etiqueta, ítem de leyenda, tarjeta con tabla
 │   └── dom.js                    # Arranque de página y delegación de clics (data-action)
-├── tests/                        # Pruebas con node:test (dominios, casos de uso, vistas, worker, manifest, arquitectura, cambio de proveedor)
+├── tests/                        # Pruebas con node:test (dominios, casos de uso, vistas, worker, manifest, arquitectura); rest-fake.js y fixtures.js son ayudas solo de pruebas
 ├── odd/tasks/                    # Seguimiento del trabajo (tareas, decisiones y evidencia)
 ├── assets/                       # Logo, íconos SVG y fuente Inter
 └── icons/                        # icon16, icon32, icon48, icon128
@@ -253,7 +211,7 @@ sereno-extension/
   delega en `Sereno.navigationService`. No guarda estado en variables globales ni
   usa temporizadores: el resultado de cada pestaña vive en `chrome.storage.session`
   (clave `sereno.tab.<tabId>`) y el estado del popup, en el store compartido. Si
-  el proveedor falla, la navegación sigue (ver «Regla fail-open»).
+  el backend falla, la navegación sigue (ver «Regla fail-open»).
 - **Badge en pestañas reales.** El worker pinta el badge de la pestaña que navega
   con `chrome.action.setBadgeText` / `setBadgeBackgroundColor` y el `tabId` del
   evento: `✓` seguro, `!` advertencia, `✕` bloqueo, `…` evaluando, `?` protección
@@ -282,7 +240,9 @@ sereno-extension/
     `{ type: "sereno:detail", url }` (abre el popup en una pestaña).
 - **Estado local.** Se guarda en `chrome.storage.local` bajo la clave
   `sereno.state.v1`. El store también acepta `localStorage` o memoria para probarlo
-  en Node. La sesión guarda el usuario sin contraseña y un token opaco.
+  en Node. La sesión guarda el usuario sin contraseña y un token opaco. Una
+  instalación nueva empieza sin sesión y sin sitio actual (`DEFAULT_STATE` en
+  `platform/state-store.js`).
 - **Permisos** (el mínimo que usa el código):
   - `storage`: estado compartido (`local`) y resultados por pestaña (`session`).
   - `tabs`: leer `tab.url` y `changeInfo.url` en el worker. Sin este permiso (ni
@@ -306,8 +266,8 @@ sereno-extension/
   `shadow.adoptedStyleSheets` (una hoja construida no depende del `style-src` de la
   página). Si el navegador no la admite, usa un `<style>` con el mismo texto. Los
   íconos se dibujan como `<svg>` en línea (`Sereno.ui.setInlineAssets`), no como
-  `<img>`, y el logo del pie del modal es la marca `brand` en SVG. El popup, el
-  panel y la tienda de demo no cambian: siguen cargando sus archivos desde su propia
+  `<img>`, y el logo del pie del modal es la marca `brand` en SVG. El popup y el
+  panel no cambian: siguen cargando sus archivos desde su propia
   página. **El archivo generado se versiona.** Tras editar `ui/tokens.css`,
   `ui/verdict-modal.css`, `content/content.css` o un ícono del aviso, ejecuta
   `node tools/build-content-assets.js` (`--check` solo verifica). Si lo olvidas,
@@ -321,10 +281,6 @@ sereno-extension/
   saltar al contenido, anillo de foco, movimiento reducido y contrastes AA
   comprobados por prueba. Las pruebas son de cadena y DOM simulado; no se usó un
   lector de pantalla.
-- Los datos simulados de usuarios, historial, reglas por dominio, caché y
-  métricas están en `platform/seed.js`, y solo el adaptador mock los lee. La
-  configuración entregada usa el backend para todos los puertos; el mock queda
-  para la demo sin conexión, las pruebas y configuraciones explícitas.
 - Ejecuta las pruebas con `node --test` desde la raíz. Necesitas Node 18 o
   superior, sin dependencias.
 
@@ -351,32 +307,24 @@ sereno-extension/
 
    ```js
    Sereno.providers.config = {
-     provider: "remote",            // Veredictos, historial, caché, métricas y versión del modelo
-     authProvider: "remote",        // Registro, login, sesión y logout
-     policyProvider: "remote",      // Solo GET/PUT de políticas por dominio
      baseUrl: "http://127.0.0.1:5000",
-     timeoutMs: 4000,
-     mockDelayMs: 700
+     timeoutMs: 4000
    };
    ```
 
-   `authProvider` y `policyProvider` usan `provider` cuando se omiten, para conservar
-   los consumidores anteriores. Los valores desconocidos fallan de forma cerrada.
-   La encuesta usa siempre el adaptador remoto y no tiene mock ni fallback. El
-   backend implementa todas las rutas del [Contrato REST](#contrato-rest); los
-   veredictos salen de un `FakeClassifier` hasta que exista el modelo de ML. Los
-   errores de API nunca activan el mock: la protección queda degradada y los
-   datos muestran su error. On remote auth operations,
-   account use cases remove legacy mock users/passwords and mock sessions from
-   local state. Submitted passwords go only to the auth port, not local storage.
+   Los cuatro puertos (`verdict`, `auth`, `data` y `survey`) usan el adaptador
+   remoto contra `baseUrl`; no hay otro adaptador ni fallback. El backend
+   implementa todas las rutas del [Contrato REST](#contrato-rest). Ante un error
+   de API la protección queda degradada y los datos muestran su error.
+   Submitted passwords go only to the auth port, not local storage.
    A successful session check adopts the server identity, replacing stale local
-   admin flags/tokens. An unreachable backend keeps only a previous nonmock session
+   admin flags/tokens. An unreachable backend keeps the previous session
    as unverified; logout clears local session even if server revocation fails.
 
 3. Load/reload the unpacked extension in `chrome://extensions`. Its manifest
    grants `http://127.0.0.1:5000/*`, matching the local auth origin. Register a
    new account, close/reopen the popup, log out, and log in again. Backend
-   accounts are not seeded; newly registered users have `isAdmin: false`. To promote
+   accounts are created only by registration; newly registered users have `isAdmin: false`. To promote
    a throwaway account, stop the server and follow the sibling
    [`sereno-backend/README.md`](../sereno-backend/README.md): back up its temporary
    auth JSON, change that user's stored role from `user` to `admin` (never a Spanish value),
@@ -397,9 +345,9 @@ sereno-extension/
    caché, métricas (administrador y `forbidden` para usuario), versión del modelo y
    `cache_down`. Al terminar detienen el servidor y eliminan sus datos temporales.
    Requieren el entorno virtual del backend hermano; de lo contrario informan un
-   `skip`. Nunca acceden a `data/*.json`. Las pruebas de cambio de proveedor
-   comparan el mock con un backend falso que aplica las mismas reglas de sesión y
-   de administrador, y excluyen el contrato de encuesta, que es deliberadamente remoto.
+   `skip`. Nunca acceden a `data/*.json`. El resto de las pruebas del adaptador
+   remoto usa `tests/rest-fake.js`, un backend falso solo de pruebas que responde
+   el contrato REST con las mismas reglas de sesión y de administrador.
 
 ### Cookie boundary and other configurations
 
@@ -417,11 +365,7 @@ See [network requests](https://developer.chrome.com/docs/extensions/develop/conc
 [cookies](https://developer.chrome.com/docs/extensions/develop/concepts/storage-and-cookies),
 and [match patterns](https://developer.chrome.com/docs/extensions/develop/concepts/match-patterns).
 
-For an entirely offline demo, set `provider`, `authProvider` and
-`policyProvider` to `"mock"`, clear `baseUrl`, and
-remove `host_permissions`; reload the extension. Previously purged demo users
-require a fresh extension state. Returning to remote auth does not migrate demo
-accounts to the backend. For a future remote deployment, use trusted HTTPS and
+For a future remote deployment, use trusted HTTPS and
 update `baseUrl` and the exact manifest permission together; the manifest test
 allows HTTP only for the documented loopback setup. Production hardening remains
 out of scope, including session expiry, rate limits and CSRF protection.
@@ -471,8 +415,9 @@ Formas:
   `verdict` es la clase del modelo con la que se reevaluó el dominio, o `null` mientras la
   reevaluación está pendiente. Varias entradas pueden compartir dominio. Aquí no se aplica
   política: el caché guarda lo que dijo el modelo.
-- `version` (`GET /v1/model`): la versión del modelo cargado (`2.0.0`).
-- `metrics`: la forma del panel (`Sereno.seed.metrics` en `platform/seed.js`).
+- `version` (`GET /v1/model`): la versión del modelo cargado.
+- `metrics`: la forma del panel, `{ analyzed, deltaPct, phishingPct, phishingCount,
+  latencyMs, latencyTargetMs, cacheHitPct, sparklines, hourly, queries }`.
 - `answers`: diez valores enteros de la escala SUS (1–5). El servidor obtiene la cuenta de la sesión; el cliente no envía el usuario.
 - `submitted`: indica si la cuenta autenticada ya participó. La participación se almacena separada de las respuestas.
 - `POST /v1/verdict` también registra la visita en el historial del usuario con
@@ -484,7 +429,7 @@ rutas solo para administradores (políticas, caché y métricas) también se con
 `forbidden`, con un mensaje específico para permisos de administrador; las rutas
 de autenticación, historial y encuesta mantienen su mapeo existente. Un 401
 `invalid` del historial significa que no hay sesión en el backend: el caso de uso
-lo muestra como historial vacío, igual que el mock, y no como error. En el POST de encuesta también se conserva `already_submitted`;
+lo muestra como historial vacío y no como error. En el POST de encuesta también se conserva `already_submitted`;
 no se interpreta así ningún 409 de otros endpoints. Un 504 es
 `timeout`; cualquier otro fallo es `server`. Sin red es `offline`. Si no hay
 respuesta en `timeoutMs`, el adaptador aborta la petición y devuelve `timeout`.
@@ -501,11 +446,10 @@ Cada método es asíncrono y no lanza. Devuelve `{ ok: true, ... }` o
 | `verdict` | `evaluate(url)` |
 | `auth` | `login(username, password)`, `register(username, password)`, `logout()`, `session()` |
 | `data` | `listHistory()`, `deleteHistory()`, `getDomainPolicies()`, `putDomainPolicies(domains)`, `getCache()`, `setCacheTtl(phishingDays, legitHours)`, `invalidateCache(domain)`, `getMetrics()`, `getModelVersion()` |
-| `survey` | `status()`, `submit(answers)` (siempre remoto, sin fallback mock) |
+| `survey` | `status()`, `submit(answers)` |
 
-La composición reemplaza únicamente `data.getDomainPolicies` y
-`data.putDomainPolicies` con `policyProvider`; historial, caché, métricas,
-veredictos y navegación conservan el proveedor general.
+La raíz de composición (`platform/providers/index.js`) construye los cuatro
+puertos sobre el adaptador remoto.
 
 ### Regla fail-open
 
@@ -519,17 +463,6 @@ Dos plazos: el adaptador remoto corta a los `timeoutMs` (4 s por defecto) y el
 caso de uso tiene su propio límite de 6 s. «Evaluando…» aparece solo si la espera
 pasa de 300 ms.
 
-### Cuentas de demo (solo mock)
-
-| Usuario | Contraseña | Rol |
-| --- | --- | --- |
-| `andres.torres` | `sereno123` | usuario, con historial |
-| `admin.sereno` | `sereno123` | administrador |
-
-These credentials work only with `authProvider: "mock"`. The default remote
-auth configuration requires backend registration and does not provide demo
-administrator access.
-
 ### Verificación manual en Chrome
 
 Nada de esto se ha hecho. Cárgala descomprimida, abre las DevTools del service
@@ -542,8 +475,8 @@ worker (`chrome://extensions` → «service worker») y revisa:
 - [ ] Modal en una página real: advertencia (se cierra con Esc, «Volver»,
       «Continuar bajo riesgo», «Ver detalle») y bloqueo (sin Esc, sin continuar).
 - [ ] Consola de una página real (por ejemplo, youtube.com) sin el error «Unsafe
-      attempt to load URL chrome-extension://…», y en `http://advertencia.localhost:8080`
-      y `http://bloqueo.localhost:8080` el modal con estilos y con sus íconos.
+      attempt to load URL chrome-extension://…», y en una página con veredicto de
+      advertencia y en otra de bloqueo, el modal con estilos y con sus íconos.
 - [ ] Un sitio con CSP estricta (por ejemplo, con `style-src` e `img-src`
       restringidos): el modal conserva estilos (hoja construida) e íconos (SVG en
       línea). Si falta el estilo, el navegador no admitió la hoja construida y cayó
@@ -568,8 +501,8 @@ worker (`chrome://extensions` → «service worker») y revisa:
       encuesta debe consultar el estado remoto antes de mostrar preguntas, impedir un
       segundo envío y mostrar el fallo sin fingir éxito. La confirmación no debe exponer
       el puntaje SUS. Los borradores no deben aparecer al cambiar de cuenta.
-- [ ] Backend local, datos: con el backend encendido, el badge y el modal de los
-      dominios de demo salen del `FakeClassifier`; la segunda visita llega con
+- [ ] Backend local, datos: con el backend encendido, el badge y el modal siguen
+      el veredicto del backend; la segunda visita llega con
       `source: "cache"`. El historial del popup lista las visitas de la cuenta con
       sesión y se borra; el panel muestra caché (TTL, invalidación) y métricas para
       un administrador. Con el backend apagado, la protección queda degradada (`?`)
