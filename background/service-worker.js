@@ -1,9 +1,8 @@
 /* Background · MV3 service worker (classic). A thin shell: it imports the
    platform, provider, verdict and protection scripts, registers the tab
    listeners synchronously at the top level and delegates every event to
-   Sereno.navigationService. It only knows Sereno.services, so switching the
-   provider from mock to remote never touches this file. The worker is
-   ephemeral: it keeps no state in globals (per-tab outcomes live in
+   Sereno.navigationService. It only knows Sereno.services, never the adapter
+   behind them. The worker is ephemeral: it keeps no state in globals (per-tab outcomes live in
    chrome.storage.session, the popup state in the shared state store) and uses
    no timers.
 
@@ -20,14 +19,11 @@ importScripts(
   "../platform/providers/config.js",
   "../platform/providers/ports.js",
   "../platform/providers/errors.js",
-  "../platform/providers/mock.js",
   "../platform/providers/remote.js",
   "../platform/providers/index.js",
   "../time/domain/time.js",
   "../verdict/domain/verdict.js",
   "../verdict/domain/outcome.js",
-  "../history/domain/history.js",
-  "../demo-store/domain/scenarios.js",
   "../verdict/application/verdict-service.js",
   "../ui/atoms.js",
   "../verdict/ui/verdict-ui.js",

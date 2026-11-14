@@ -276,9 +276,9 @@ test("the admin panel starts with a skip link to a focusable main region", () =>
   assert.match(adminViews.page({}, { session: null }), /<main[^>]* id="main"/);
 });
 
-test("admin navigation excludes the demo store while preserving its sections", () => {
+test("admin navigation lists its three sections and nothing else", () => {
   const html = adminHtml("metricas");
-  assert.doesNotMatch(html, /open-demo|Abrir tienda de demo/);
+  assert.equal(count(html, /data-action="nav"/g), 3);
   for (const section of ["metricas", "dominios", "cache"]) {
     assert.match(html, new RegExp('data-section="' + section + '"'));
   }
@@ -327,18 +327,13 @@ test("title check accepts attributes but rejects empty or missing text", () => {
   assert.doesNotMatch('<title data-i18n="title"><span>Sereno</span></title>', TITLE_PATTERN);
 });
 
-test("static pages declare their language, one h1, a main landmark and no page-wide live region", () => {
-  for (const file of ["app/popup/popup.html", "app/admin/admin.html", "app/demo-store/store.html"]) {
+test("static pages declare their language and a title, and have no page-wide live region", () => {
+  for (const file of ["app/popup/popup.html", "app/admin/admin.html"]) {
     const html = read(file);
     assert.match(html, /<html lang="es">/, file);
     assert.match(html, TITLE_PATTERN, file);
     assert.doesNotMatch(html, /id="app"[^>]*aria-live/, `${file}: a whole-app live region announces every render`);
   }
-  const store = read("app/demo-store/store.html");
-  assert.equal(count(store, /<h1\b/g), 1);
-  assert.equal(count(store, /<main\b/g), 1);
-  assert.deepEqual(problems(store), []);
-  assert.match(store, /<main[^>]*>[\s\S]*id="demo-panel"/);
 });
 
 /* ---------------- keyboard helpers ---------------- */

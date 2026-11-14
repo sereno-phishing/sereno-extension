@@ -8,26 +8,18 @@ const { history } = load("verdict/domain/verdict.js", "history/domain/history.js
 
 /* A backend record: the model verdict plus the policy in force when served. */
 function record(id, domain, verdict, ts, policy) {
-  return history.createRecord({ domain, verdict, policy: policy || "advertencia", score: 0.5, source: "modelo", latencyMs: 10 }, id, ts);
+  return { id, domain, verdict, policy: policy || "advertencia", score: 0.5, source: "modelo", ts, latencyMs: 10 };
+}
+
+/* The list the backend would serve after one more visit: newest first. */
+function visit(list, item) {
+  return history.normalize([item].concat(list));
 }
 
 /* The entry the views get for a backend record. */
 function entry(id, domain, verdict, ts, policy) {
   return history.toEntry(record(id, domain, verdict, ts, policy));
 }
-
-test("createRecord keeps the backend shape and fills defaults for source and latency", () => {
-  assert.deepEqual(history.createRecord({ domain: "a.pe", verdict: "legitima", policy: "advertencia", score: 0.1 }, "h-1", "2026-09-21T10:00"), {
-    id: "h-1",
-    domain: "a.pe",
-    verdict: "legitima",
-    policy: "advertencia",
-    score: 0.1,
-    source: "modelo",
-    ts: "2026-09-21T10:00",
-    latencyMs: null
-  });
-});
 
 test("toEntry applies the policy of a backend record and yields the entry the views read", () => {
   assert.deepEqual(entry("h-1", "a.pe", "phishing", "2026-09-21T10:00", "bloqueo"), {
@@ -50,33 +42,33 @@ test("toEntry has no entry for a record outside the contract", () => {
   assert.equal(history.toEntry(null), null);
 });
 
-test("append puts the newest visit first", () => {
-  const list = history.append([record("h-1", "a.pe", "legitima", "2026-09-21T10:00")], record("h-2", "b.pe", "legitima", "2026-09-21T10:05"));
+test("normalize keeps the newest visit first", () => {
+  const list = visit([record("h-1", "a.pe", "legitima", "2026-09-21T10:00")], record("h-2", "b.pe", "legitima", "2026-09-21T10:05"));
   assert.deepEqual(list.map((item) => item.id), ["h-2", "h-1"]);
 });
 
-test("append replaces the same domain and verdict within 60 seconds", () => {
+test("normalize keeps one visit for the same domain and verdict within 60 seconds", () => {
   const first = [record("h-1", "a.pe", "legitima", "2026-09-21T10:00"), record("h-0", "z.pe", "legitima", "2026-09-21T09:00")];
-  const list = history.append(first, record("h-2", "a.pe", "legitima", "2026-09-21T10:01"));
+  const list = visit(first, record("h-2", "a.pe", "legitima", "2026-09-21T10:01"));
   assert.deepEqual(list.map((item) => item.id), ["h-2", "h-0"]);
   const entries = [entry("h-1", "a.pe", "phishing", "2026-09-21T10:00"), entry("h-0", "z.pe", "legitima", "2026-09-21T09:00")];
-  assert.deepEqual(history.append(entries, entry("h-2", "a.pe", "phishing", "2026-09-21T10:01")).map((item) => item.id), ["h-2", "h-0"]);
+  assert.deepEqual(visit(entries, entry("h-2", "a.pe", "phishing", "2026-09-21T10:01")).map((item) => item.id), ["h-2", "h-0"]);
 });
 
-test("append keeps visits with another verdict or outside the window", () => {
+test("normalize keeps visits with another verdict or outside the window", () => {
   const first = [record("h-1", "a.pe", "legitima", "2026-09-21T10:00")];
-  assert.equal(history.append(first, record("h-2", "a.pe", "phishing", "2026-09-21T10:00")).length, 2);
-  assert.equal(history.append(first, record("h-3", "a.pe", "legitima", "2026-09-21T10:02")).length, 2);
+  assert.equal(visit(first, record("h-2", "a.pe", "phishing", "2026-09-21T10:00")).length, 2);
+  assert.equal(visit(first, record("h-3", "a.pe", "legitima", "2026-09-21T10:02")).length, 2);
   const warned = [record("h-4", "b.pe", "phishing", "2026-09-21T10:00", "advertencia")];
-  assert.equal(history.append(warned, record("h-5", "b.pe", "phishing", "2026-09-21T10:00", "bloqueo")).length, 2);
+  assert.equal(visit(warned, record("h-5", "b.pe", "phishing", "2026-09-21T10:00", "bloqueo")).length, 2);
   const entries = [entry("h-6", "c.pe", "phishing", "2026-09-21T10:00", "advertencia")];
-  assert.equal(history.append(entries, entry("h-7", "c.pe", "phishing", "2026-09-21T10:00", "bloqueo")).length, 2);
+  assert.equal(visit(entries, entry("h-7", "c.pe", "phishing", "2026-09-21T10:00", "bloqueo")).length, 2);
 });
 
-test("append caps the list at 200 entries and does not mutate the input", () => {
+test("normalize caps the list at 200 entries and does not mutate the input", () => {
   const full = Array.from({ length: 200 }, (_, index) => record("h-" + index, "d" + index + ".pe", "legitima", "2026-09-01T10:00"));
-  const list = history.append(full, record("h-new", "new.pe", "legitima", "2026-09-21T10:00"));
-  assert.equal(list.length, history.CAPACITY);
+  const list = visit(full, record("h-new", "new.pe", "legitima", "2026-09-21T10:00"));
+  assert.equal(list.length, 200);
   assert.equal(list[0].id, "h-new");
   assert.equal(list[199].id, "h-198");
   assert.equal(full.length, 200);
@@ -90,7 +82,4 @@ test("filter and lookup", () => {
   assert.deepEqual(history.filter(list, "advertencia"), []);
   assert.equal(history.findById(list, "h-2").domain, "b.pe");
   assert.equal(history.findById(list, "h-9"), null);
-  assert.deepEqual(history.entriesOf({ ana: list }, "ana"), list);
-  assert.deepEqual(history.entriesOf({}, "ana"), []);
-  assert.deepEqual(history.entriesOf({ ana: list }, null), []);
 });

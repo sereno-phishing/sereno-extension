@@ -1,5 +1,5 @@
-/* History: the per-user list of evaluated sites. Classic script that
-   registers Sereno.history. Pure: ids and stamps are passed in.
+/* History: the signed-in user's list of evaluated sites. Classic script that
+   registers Sereno.history. Pure.
    Two shapes live here:
      record  what the backend stores and serves
              { id, domain, verdict, policy, score, source, ts, latencyMs }
@@ -15,24 +15,6 @@
   /* Newest entries kept per user. */
   var CAPACITY = 200;
   var ALL = "todas";
-
-  function entriesOf(historyByUser, username) {
-    return historyByUser && username && historyByUser[username] ? historyByUser[username] : [];
-  }
-
-  /* The record a backend keeps for an evaluated site. */
-  function createRecord(result, id, stamp) {
-    return {
-      id: id,
-      domain: result.domain,
-      verdict: result.verdict,
-      policy: result.policy,
-      score: result.score,
-      source: result.source || "modelo",
-      ts: stamp,
-      latencyMs: result.latencyMs === undefined ? null : result.latencyMs
-    };
-  }
 
   /* The entry the views read for a backend record: the domain policy is
      applied here, once. Null when the record is outside the contract. */
@@ -119,13 +101,8 @@
   }
 
   Sereno.history = {
-    DEDUPE_WINDOW_MS: DEDUPE_WINDOW_MS,
-    CAPACITY: CAPACITY,
     ALL: ALL,
-    entriesOf: entriesOf,
-    createRecord: createRecord,
     toEntry: toEntry,
-    append: append,
     normalize: normalize,
     filterIds: filterIds,
     filter: filter,

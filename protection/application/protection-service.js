@@ -1,5 +1,5 @@
 /* Protection · use cases. Classic script that registers Sereno.protectionService.
-   showSite and dismissModelNotice only touch the local UI state.
+   dismissModelNotice only touches the local UI state.
    loadModelVersion is async, never throws and asks the data port which model
    the backend runs (HU-27). -> { ok: true, version } or
    { ok: false, error, message } (Sereno.providers.errors.CODES). */
@@ -9,11 +9,6 @@
 
   function failure(error) {
     return Sereno.providers.errors.failure(error);
-  }
-
-  /* Publishes the status of the site in the active tab to every page. */
-  function showSite(store, site) {
-    return store.set({ currentSite: site });
   }
 
   /* Remembers the model version the user has now seen. The old boolean is
@@ -41,7 +36,6 @@
   }
 
   Sereno.protectionService = {
-    showSite: showSite,
     dismissModelNotice: dismissModelNotice,
     loadModelVersion: loadModelVersion
   };

@@ -19,16 +19,6 @@
   };
   var REGISTER_INVALID = "Ingresa un usuario y una contraseña válidos.";
 
-  function findUser(users, username) {
-    var found = null;
-    (users || []).forEach(function (user) {
-      if (user.username === username) {
-        found = user;
-      }
-    });
-    return found;
-  }
-
   /* Whitelist copy: whatever else a record carries never leaves through here. */
   function publicUser(user) {
     return { username: user.username, isAdmin: user.isAdmin === true, createdAt: user.createdAt };
@@ -42,11 +32,6 @@
       loginAt: stamp,
       token: typeof token === "string" && token ? token : null
     };
-  }
-
-  /* A new account is never an administrator. */
-  function newUser(username, stamp) {
-    return { username: username, isAdmin: false, createdAt: stamp };
   }
 
   /* Format only (non-empty strings); the provider decides if they are right.
@@ -88,10 +73,8 @@
 
   Sereno.account = {
     ERRORS: ERRORS,
-    findUser: findUser,
     publicUser: publicUser,
     openSession: openSession,
-    newUser: newUser,
     validateCredentials: validateCredentials,
     errorMessage: errorMessage,
     isAdmin: isAdmin,

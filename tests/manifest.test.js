@@ -113,16 +113,12 @@ test("permissions: storage and tabs only, nothing that injects or reads page con
   assert.equal(manifest.optional_host_permissions, undefined);
 });
 
-test("host_permissions cover either remote axis and allow HTTP only for the exact loopback setup", () => {
+test("host_permissions name the configured backend origin and allow HTTP only for the exact loopback setup", () => {
   assert.ok(Array.isArray(manifest.host_permissions), "the key is present so the hand-off is a one-line edit");
   manifest.host_permissions.forEach((pattern) => {
     assert.match(pattern, /^(https:\/\/[a-z0-9.-]+(:\d+)?|http:\/\/127\.0\.0\.1:5000)\/\*$/, "one backend origin, no wildcard host: " + pattern);
   });
-  if (CONFIG.provider === "remote" || CONFIG.authProvider === "remote") {
-    const url = new URL(CONFIG.baseUrl);
-    assert.ok(url.protocol === "https:" || CONFIG.baseUrl === "http://127.0.0.1:5000", "HTTP is local development only");
-    assert.deepEqual(manifest.host_permissions, [url.origin + "/*"]);
-  } else {
-    assert.deepEqual(manifest.host_permissions, []);
-  }
+  const url = new URL(CONFIG.baseUrl);
+  assert.ok(url.protocol === "https:" || CONFIG.baseUrl === "http://127.0.0.1:5000", "HTTP is local development only");
+  assert.deepEqual(manifest.host_permissions, [url.origin + "/*"]);
 });

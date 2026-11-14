@@ -19,17 +19,14 @@ const Sereno = load(
   "administration/domain/domain-policy.js",
   "administration/domain/verdict-cache.js",
   "protection/domain/protection.js",
-  "demo-store/domain/scenarios.js",
   "account/application/account-service.js",
   "history/application/history-service.js",
   "survey/application/survey-service.js",
   "administration/application/administration-service.js",
   "platform/storage.js",
-  "platform/seed.js",
   "platform/state-store.js",
   "platform/providers/config.js",
   "platform/providers/ports.js",
-  "platform/providers/mock.js",
   "platform/providers/remote.js",
   "platform/providers/index.js"
 );
@@ -37,14 +34,6 @@ const Sereno = load(
 const { providers } = Sereno;
 const NOW = () => new Date(2026, 8, 21, 11, 30, 0);
 const BASE_URL = "https://api.sereno.test";
-
-function openStore() {
-  return Sereno.stateStore.create({
-    storage: Sereno.storage.memoryStorage(),
-    key: Sereno.stateStore.STORAGE_KEY,
-    defaults: Sereno.seed.defaultState
-  });
-}
 
 function reply(status, body) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
@@ -245,20 +234,22 @@ test("remote maps server failures, cache outage and admin-only authorization", a
   assert.deepEqual(await malformed.data.getCache(), { ok: false, error: "server" });
 });
 
-test("composition root picks the adapter from config", () => {
-  const store = openStore();
-  const mocked = providers.create({ config: { provider: "mock", baseUrl: "", timeoutMs: 100 }, store });
-  assert.equal(mocked.provider, "mock");
-  const remote = providers.create({ config: { provider: "remote", baseUrl: BASE_URL, timeoutMs: 100 }, fetch: async () => reply(200, {}) });
-  assert.equal(remote.provider, "remote");
-  assert.deepEqual(Object.keys(remote).sort(), ["auth", "data", "provider", "survey", "verdict"]);
-  assert.throws(() => providers.create({ config: { provider: "carrier-pigeon" } }), /provider/);
+test("the composition root builds every port on the remote adapter from config", async () => {
+  const fetchFake = fakeBackend();
+  const services = providers.create({ config: { baseUrl: BASE_URL, timeoutMs: 100 }, fetch: fetchFake });
+  assert.deepEqual(Object.keys(services).sort(), ["auth", "data", "survey", "verdict"]);
+  Object.keys(providers.ports.METHODS).forEach((port) => {
+    assert.deepEqual(Object.keys(services[port]).sort(), providers.ports.METHODS[port].slice().sort(), port);
+  });
+  assert.deepEqual(await services.data.getModelVersion(), { ok: true, version: "2.0.0" });
+  assert.deepEqual(fetchFake.calls.map((call) => [call.method, call.path, call.credentials]), [["GET", "/v1/model", "include"]]);
 });
 
-test("the default config serves verdicts, data, auth and policies from the backend", async () => {
-  assert.equal(providers.config.provider, "remote");
-  assert.equal(providers.config.authProvider, "remote");
-  assert.equal(providers.config.policyProvider, "remote");
-  assert.equal(Sereno.services.provider, "remote");
-  assert.deepEqual(Object.keys(Sereno.services).sort(), ["auth", "data", "provider", "survey", "verdict"]);
+test("the default config points every port at the local backend", async () => {
+  assert.deepEqual(providers.config, { baseUrl: "http://127.0.0.1:5000", timeoutMs: 4000 });
+  assert.deepEqual(Object.keys(Sereno.services).sort(), ["auth", "data", "survey", "verdict"]);
+  const requested = [];
+  const services = providers.create({ fetch: async (url) => { requested.push(url); return reply(200, { version: "x" }); } });
+  await services.data.getModelVersion();
+  assert.deepEqual(requested, ["http://127.0.0.1:5000/v1/model"]);
 });

@@ -69,21 +69,12 @@ function ruleColors(css, selector, palette) {
 
 test("every stylesheet that animates or transitions honors prefers-reduced-motion", () => {
   const sheets = stylesheets();
-  assert.ok(sheets.length >= 6, "found the stylesheets");
+  assert.equal(sheets.length, 5, "the popup, admin, content, token and verdict modal stylesheets");
   const animating = sheets.filter((file) => /@keyframes|\banimation\s*:|\btransition\s*:|scroll-behavior/.test(fs.readFileSync(file, "utf8")));
-  assert.ok(animating.length >= 3, "at least popup, store and content animate");
+  assert.ok(animating.length >= 3, "at least popup, admin and content animate");
   for (const file of animating) {
     assert.match(fs.readFileSync(file, "utf8"), /prefers-reduced-motion/, `${rel(file)} animates without a reduced-motion rule`);
   }
-});
-
-test("the demo store turns its fade animations and transitions off for reduced motion", () => {
-  const css = read("app/demo-store/store.css");
-  const block = css.match(/@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/);
-  assert.ok(block, "store.css has a reduce block");
-  assert.match(block[1], /\.demo-tooltip\.is-visible[\s\S]*animation: none/);
-  assert.match(block[1], /\.demo-toast\.is-visible/);
-  assert.match(block[1], /\.demo-panel[\s\S]*transition: none/);
 });
 
 test("the popup turns its tab slide off for reduced motion", () => {

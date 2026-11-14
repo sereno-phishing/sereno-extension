@@ -28,7 +28,7 @@
         window.open(PAGE_ROOT + path, "_blank");
       }
     } catch (error) {
-      /* prototype: never block the UI on a navigation error */
+      /* opening a page is best effort: an error never blocks the UI */
     }
   }
 
@@ -38,21 +38,6 @@
     var ext = chromeRef();
     await ext?.action?.setBadgeText?.({ tabId: tabId, text: text });
     await ext?.action?.setBadgeBackgroundColor?.({ tabId: tabId, color: color });
-  }
-
-  /* badge: { text, color } painted on the tab that hosts the calling page. */
-  async function setTabBadge(badge) {
-    var ext = chromeRef();
-    try {
-      var tab = await ext?.tabs?.getCurrent?.();
-      var tabId = tab && tab.id;
-      if (tabId === undefined || tabId === null) {
-        return;
-      }
-      await setBadge(tabId, badge.text, badge.color);
-    } catch (error) {
-      /* prototype: the badge is cosmetic and never blocks the demo flow */
-    }
   }
 
   /* Sends a message to the content script of a tab. A page without a content
@@ -150,7 +135,6 @@
 
   Sereno.browser = {
     openPage: openPage,
-    setTabBadge: setTabBadge,
     setBadge: setBadge,
     notifyTab: notifyTab,
     getActiveTabId: getActiveTabId,

@@ -113,18 +113,3 @@ test("outside the extension every real-tab call is a harmless no-op", async () =
   await assert.doesNotReject(Sereno.browser.saveTabRecord(1, {}));
   await assert.doesNotReject(Sereno.browser.removeTabRecord(1));
 });
-
-test("setTabBadge keeps painting the tab that hosts an extension page", async () => {
-  const { calls } = installChrome({
-    tabs: {
-      async getCurrent() {
-        return { id: 31 };
-      }
-    }
-  });
-  await Sereno.browser.setTabBadge({ text: "!", color: "#D97706" });
-  assert.deepEqual(calls, [
-    ["text", { tabId: 31, text: "!" }],
-    ["color", { tabId: 31, color: "#D97706" }]
-  ]);
-});

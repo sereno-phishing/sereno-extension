@@ -126,7 +126,6 @@
         }
       },
       auth: {
-        remote: true,
         login: function (username, password) {
           return request("POST", "/v1/auth/login", { username: username, password: password });
         },

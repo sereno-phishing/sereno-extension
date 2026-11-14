@@ -31,13 +31,6 @@
     return next;
   }
 
-  /* Adds a pending re-evaluation for the domain at the top of the list. */
-  function withInvalidation(cache, domain, dayText) {
-    var next = Object.assign({}, cache);
-    next.invalidations = [{ domain: domain, verdict: null, date: dayText }].concat(next.invalidations || []);
-    return next;
-  }
-
   /* Text of the state column for a cache entry: the model class when the
      entry carries one, the pending text when it carries none. Any other text
      the backend sends is shown as it came. */
@@ -53,7 +46,6 @@
     PENDING_REEVALUATION: PENDING_REEVALUATION,
     parseTtl: parseTtl,
     withTtl: withTtl,
-    withInvalidation: withInvalidation,
     statusText: statusText
   };
 })(globalThis.Sereno = globalThis.Sereno || {});

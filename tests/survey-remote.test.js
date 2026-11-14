@@ -13,15 +13,12 @@ const Sereno = load(
   "administration/domain/domain-policy.js",
   "administration/domain/verdict-cache.js",
   "protection/domain/protection.js",
-  "demo-store/domain/scenarios.js",
   "survey/application/survey-service.js",
   "platform/storage.js",
-  "platform/seed.js",
   "platform/state-store.js",
   "platform/providers/config.js",
   "platform/providers/ports.js",
   "platform/providers/errors.js",
-  "platform/providers/mock.js",
   "platform/providers/remote.js",
   "platform/providers/index.js"
 );
@@ -33,7 +30,7 @@ function reply(status, body) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
 }
 
-function openStore(defaults = Sereno.seed.defaultState) {
+function openStore(defaults = { session: null, survey: { byUser: {} } }) {
   return Sereno.stateStore.create({
     storage: Sereno.storage.memoryStorage(),
     key: "survey-remote-test",
@@ -45,22 +42,18 @@ async function signIn(store, username) {
   await store.set({ session: { username, isAdmin: false, token: "remote-token" } });
 }
 
-test("survey is a remote-only status and submit port while verdict and data remain mocked", async () => {
-  const store = openStore();
+test("the survey port has only status and submit and sends them to the backend", async () => {
   const calls = [];
   const services = Sereno.providers.create({
-    config: { provider: "mock", authProvider: "remote", baseUrl: "https://api.sereno.test", timeoutMs: 50, mockDelayMs: 0 },
-    store,
+    config: { baseUrl: "https://api.sereno.test", timeoutMs: 50 },
     fetch: async (url, init) => {
       calls.push({ url, method: init.method, credentials: init.credentials, body: init.body && JSON.parse(init.body) });
       return reply(200, init.method === "GET" ? { submitted: false } : {});
     }
   });
 
-  assert.equal((await services.verdict.evaluate("https://tienda-servicios.pe")).verdict, "legitima");
-  assert.equal((await services.data.getMetrics()).metrics.analyzed, 1284);
   assert.equal(typeof services.data.submitSurvey, "undefined");
-  assert.equal(typeof Sereno.providers.mock.create({ store }).survey, "undefined");
+  assert.deepEqual(Object.keys(services.survey).sort(), ["status", "submit"]);
   assert.deepEqual(Sereno.providers.ports.METHODS.survey, ["status", "submit"]);
   assert.ok(!Sereno.providers.ports.METHODS.data.includes("submitSurvey"));
 

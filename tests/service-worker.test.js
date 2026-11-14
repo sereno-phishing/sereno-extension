@@ -126,7 +126,7 @@ test("the worker imports its scripts first, in dependency order, with importScri
   const position = (file) => imported.indexOf(file);
   assert.ok(position("../verdict/domain/verdict.js") < position("../verdict/domain/outcome.js"));
   assert.ok(position("../verdict/domain/outcome.js") < position("../verdict/application/verdict-service.js"));
-  assert.ok(position("../platform/providers/mock.js") < position("../platform/providers/index.js"));
+  assert.ok(position("../platform/providers/remote.js") < position("../platform/providers/index.js"));
   assert.ok(position("../verdict/ui/verdict-ui.js") < position("../protection/application/navigation-service.js"));
   assert.ok(imported.every((file) => !/^\.\.\/app\//.test(file) && !/molecules|dom\.js|-views\.js|-page\.js/.test(file)));
 });
@@ -134,7 +134,7 @@ test("the worker imports its scripts first, in dependency order, with importScri
 test("the worker keeps no state in globals, no timers, no promise chains and no network", () => {
   assert.doesNotMatch(source, /\bsetTimeout\b|\bsetInterval\b/);
   assert.doesNotMatch(source, /\.then\(/);
-  assert.doesNotMatch(source, /\bfetch\s*\(|XMLHttpRequest|Sereno\.providers\.(mock|remote)/);
+  assert.doesNotMatch(source, /\bfetch\s*\(|XMLHttpRequest|Sereno\.providers\.(remote|create)/);
   assert.doesNotMatch(source, /^(let|var|const)\s/m);
 });
 

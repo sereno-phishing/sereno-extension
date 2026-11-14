@@ -16,7 +16,7 @@ function popupViews() {
     ui,
     account: { isAdmin: () => false },
     accountUi: load("ui/atoms.js", "account/domain/account.js", "account/ui/account-views.js").accountUi,
-    history: { entriesOf: () => [] },
+    history: { findById: () => null },
     historyUi: { listView: ({ tabsHtml }) => `<section class="view view-history">${tabsHtml}</section>` },
     surveyUi: { questionView: () => "Pregunta SUS" },
     protection: { isNoticeVisible: () => false },

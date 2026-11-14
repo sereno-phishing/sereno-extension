@@ -69,15 +69,6 @@ test("TTL accepts positive integers only", () => {
   assert.equal(verdictCache.parseTtl("2.9"), 2);
 });
 
-test("an invalidation is added first as pending re-evaluation", () => {
-  const cache = { ttlPhishingDays: 7, invalidations: [{ domain: "old.pe", verdict: "legitima", date: "2026-09-18" }] };
-  const next = verdictCache.withInvalidation(cache, "ejemplo.pe", "21/09/2026");
-  assert.deepEqual(next.invalidations[0], { domain: "ejemplo.pe", verdict: null, date: "21/09/2026" });
-  assert.equal(next.invalidations.length, 2);
-  assert.equal(cache.invalidations.length, 1);
-  assert.equal(verdictCache.withInvalidation({}, "a.pe", "d").invalidations.length, 1);
-});
-
 test("a cache entry reads as the model class it was re-evaluated to, or as pending", () => {
   assert.equal(verdictCache.statusText({ domain: "a.pe", verdict: "phishing", date: "d" }), "Reevaluado: phishing");
   assert.equal(verdictCache.statusText({ domain: "a.pe", verdict: "legitima", date: "d" }), "Reevaluado: legítimo");

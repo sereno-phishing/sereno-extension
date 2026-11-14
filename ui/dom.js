@@ -124,6 +124,5 @@
   Sereno.ui.trapTab = trapTab;
   Sereno.ui.captureFocus = captureFocus;
   Sereno.ui.onReady = onReady;
-  Sereno.ui.delegateClicks = delegateClicks;
   Sereno.ui.delegateActions = delegateActions;
 })(globalThis.Sereno = globalThis.Sereno || {});

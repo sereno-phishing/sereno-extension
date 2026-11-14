@@ -1,4 +1,4 @@
-/* Platform · port contracts every provider adapter implements. Classic script
+/* Platform · port contracts the backend adapter implements. Classic script
    that registers Sereno.providers.ports (the method names, so tests and the
    composition root can check conformance). There is no runtime class: a port
    is the shape documented here.
@@ -43,7 +43,7 @@
      getMetrics()                      -> { ok, metrics }   (dashboard shape of Sereno.seed.metrics)
      getModelVersion()                 -> { ok, version }
 
-   survey port (always remote; no mock implementation or fallback)
+   survey port
      status()                          -> { ok, submitted }
      submit(answers)                   -> { ok }   (answers: ten SUS values) */
 

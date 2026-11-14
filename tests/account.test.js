@@ -12,11 +12,6 @@ const USER = { username: "andres.torres", isAdmin: false, createdAt: "2026-09-01
 test("the domain handles no passwords: no credential comparison, no stored secret", () => {
   assert.equal(account.authenticate, undefined);
   assert.equal(account.createUser, undefined);
-  assert.deepEqual(account.newUser("nuevo", "2026-09-21T10:00"), {
-    username: "nuevo",
-    isAdmin: false,
-    createdAt: "2026-09-21T10:00"
-  });
 });
 
 test("validateCredentials checks only the format of username and password", () => {
@@ -49,8 +44,6 @@ test("roles and lookup", () => {
   assert.equal(account.isAdmin({ role: "admin" }), false);
   assert.equal(account.roleTitle, undefined);
   assert.equal(account.ROLES, undefined);
-  assert.equal(account.findUser([USER, ADMIN], "ghost"), null);
-  assert.equal(account.findUser([USER, ADMIN], "admin.sereno"), ADMIN);
 });
 
 test("error codes map to Spanish messages and unknown codes fall back to server", () => {

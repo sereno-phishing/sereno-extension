@@ -1,7 +1,8 @@
 "use strict";
 
-/* Only the provider seam may know about the network or about adapters:
-   everything else depends on the ports through Sereno.services. */
+/* Only the provider seam may know about the network, the adapter or how the
+   services are composed: everything else depends on the ports through
+   Sereno.services. */
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -14,8 +15,8 @@ const FORBIDDEN = [
   { name: "fetch(", pattern: /\bfetch\s*\(/ },
   { name: "XMLHttpRequest", pattern: /XMLHttpRequest/ },
   { name: "new WebSocket", pattern: /new\s+WebSocket/ },
-  { name: "Sereno.providers.mock", pattern: /Sereno\.providers\.mock/ },
-  { name: "Sereno.providers.remote", pattern: /Sereno\.providers\.remote/ }
+  { name: "Sereno.providers.remote", pattern: /Sereno\.providers\.remote/ },
+  { name: "Sereno.providers.create", pattern: /Sereno\.providers\.create/ }
 ];
 
 function sourceFiles(dir) {
@@ -37,7 +38,7 @@ test("the scan covers the extension sources", () => {
   assert.ok(!files.some((file) => file.startsWith("tests/") || file.startsWith("platform/providers/")));
 });
 
-test("only platform/providers touches the network or adapters", () => {
+test("only platform/providers touches the network, the adapter or the composition", () => {
   const offenders = [];
   sourceFiles(ROOT).forEach((file) => {
     const text = fs.readFileSync(path.join(ROOT, file), "utf8");
@@ -50,7 +51,7 @@ test("only platform/providers touches the network or adapters", () => {
   assert.deepEqual(offenders, []);
 });
 
-/* The provider switch is one file. Only the composition root reads it, and
+/* The backend settings are one file. Only the composition root reads it, and
    the backend address lives in it and nowhere else. */
 
 function providerFiles() {
@@ -64,6 +65,16 @@ test("only the composition root reads Sereno.providers.config", () => {
     .filter((file) => file !== "platform/providers/config.js")
     .sort();
   assert.deepEqual(readers, ["platform/providers/index.js"]);
+});
+
+test("the provider seam ships one adapter and no stand-in", () => {
+  assert.deepEqual(providerFiles().sort(), [
+    "platform/providers/config.js",
+    "platform/providers/errors.js",
+    "platform/providers/index.js",
+    "platform/providers/ports.js",
+    "platform/providers/remote.js"
+  ]);
 });
 
 test("admin page loads account session restoration before its container", () => {
