@@ -121,7 +121,8 @@ test("host_permissions grant the production backend and the loopback development
     assert.match(pattern, /^(https:\/\/[a-z0-9.-]+(:\d+)?|http:\/\/127\.0\.0\.1:5000)\/\*$/, "one backend origin, no wildcard host: " + pattern);
   });
   /* The loopback entry lets local development switch by editing baseUrl
-     only; drop it before a Chrome Web Store submission (README). */
+     only; scripts/store-package.js drops it from the Chrome Web Store zip
+     (tests/store-package.test.js). */
   assert.deepEqual(manifest.host_permissions, [PRODUCTION_ORIGIN + "/*", LOOPBACK_ORIGIN + "/*"]);
 });
 

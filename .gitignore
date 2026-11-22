@@ -6,3 +6,6 @@
 .codex/
 .mcp.json
 skills-lock.json
+
+# Chrome Web Store package (node scripts/store-package.js)
+dist/
