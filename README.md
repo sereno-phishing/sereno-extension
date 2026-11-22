@@ -129,6 +129,15 @@ El aviso en página solo aparece si la página llega a cargar: con un dominio qu
 no resuelve, el badge se pinta al empezar la navegación, pero el content script
 no se ejecuta. Esto no se ha probado en Chrome real.
 
+## Publicar en Chrome Web Store
+
+`node scripts/store-package.js` genera `dist/sereno-<versión>.zip` con solo los
+archivos que carga la extensión y un manifest sin `http://127.0.0.1:5000/*`
+(el manifest del repositorio la conserva). No usa dependencias ni `zip`: el
+script escribe el zip con `zlib` de Node. Los textos, justificaciones de
+permisos, respuestas de privacidad y pasos para el panel de desarrollador
+están en [`CHROMEWEBSTORE.md`](CHROMEWEBSTORE.md).
+
 ## Mapa de vistas ↔ HU
 
 Todos los datos los sirve el backend; las vistas no dependen de quién
@@ -180,6 +189,7 @@ sereno-extension/
 ├── background/                   # service-worker.js: escucha las pestañas y delega en navigation-service
 ├── content/                      # content-script.js (contenedor del aviso en página), content.css y content-assets.generated.js (estilos e íconos empaquetados; no se edita)
 ├── tools/                        # build-content-assets.js: genera content-assets.generated.js (paso de desarrollo)
+├── scripts/                      # store-package.js: genera el zip para Chrome Web Store (no se empaqueta)
 ├── verdict/                      # Veredicto y su resultado normalizado (outcome), caso de uso verdict-service, aviso en página, modal de veredicto, pills y badge
 ├── account/                      # Usuarios, sesión con token, roles; formularios y menú de cuenta
 ├── history/                      # Historial: deduplicación 60 s, tope 200, filtros; lista y detalle
@@ -278,9 +288,9 @@ sereno-extension/
   - `host_permissions`: `https://sereno-phishing.chilecentral.cloudapp.azure.com/*`
     (backend publicado) y `http://127.0.0.1:5000/*` (backend local de
     desarrollo), para veredictos, datos, autenticación, encuestas y políticas;
-    no se añade comodín de hosts ni acceso a la API `cookies`. **Antes de enviar
-    la extensión a Chrome Web Store, quita la entrada `http://127.0.0.1:5000/*`**
-    y ajusta `tests/manifest.test.js`, que la exige: solo sirve para desarrollo.
+    no se añade comodín de hosts ni acceso a la API `cookies`. La entrada
+    `http://127.0.0.1:5000/*` solo sirve para desarrollo: el paquete para
+    Chrome Web Store la quita solo (ver [Publicar en Chrome Web Store](#publicar-en-chrome-web-store)).
   - Sin `activeTab`, `scripting` ni `<all_urls>`: el content script se declara en
     el manifest, que le da acceso a las páginas http/https sin permisos de host.
 - **CSP.** Las páginas de la extensión declaran `script-src 'self'; object-src

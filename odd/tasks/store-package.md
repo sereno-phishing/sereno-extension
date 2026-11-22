@@ -18,7 +18,7 @@ Branch `feat/store-package` from `main`. Two work-unit commits (T1, T2). RDD: no
 
 ## Tasks
 - [x] T1: `scripts/store-package.js` + `tests/store-package.test.js` (RED first): packaged manifest without the loopback host permission, file selection from the real references (manifest, pages, worker imports, CSS `url()`, plus `assets/`, `icons/`, `_locales/`), dev-only guard, loopback-reference guard, deterministic zip writer and read-back verification; `dist/` ignored. Route: inline (two new files, no unresolved design).
-- [ ] T2: `CHROMEWEBSTORE.md` (template from the chrome-extensions skill) and a short README pointer. Route: inline (docs).
+- [x] T2: `CHROMEWEBSTORE.md` (template from the chrome-extensions skill) and a short README pointer. Route: inline (docs).
 
 ## Acceptance
 - `node scripts/store-package.js` writes `dist/sereno-0.3.0.zip`; its manifest lacks `http://127.0.0.1:5000/*` and is otherwise identical; every file referenced by the manifest, the pages, the worker and the CSS is inside; no `tests/`, `odd/`, `scripts/`, `tools/`, `.agents/`, `.git*`, Markdown or build-only CSS.
@@ -35,6 +35,9 @@ Branch `feat/store-package` from `main`. Two work-unit commits (T1, T2). RDD: no
 - GREEN (T1): `node --test tests/store-package.test.js tests/architecture.test.js` -> 15 tests, 15 pass. Full `node --test` -> 524 tests, 521 pass, 0 fail, 3 skipped (the three loopback-backend tests; baseline 515/512/0/3 plus 9 new).
 - Build: `node scripts/store-package.js` -> `dist/sereno-0.3.0.zip`, 196,722 bytes, 84 files; dropped `http://127.0.0.1:5000/*`. Two builds give the same SHA-256 (`d77eb191…c3e354`). Windows `tar.exe -tf` lists the same 84 entries; the extracted manifest grants only the Azure origin.
 - `git diff --check` -> exit 0.
+- Commit T1: `ed672bd` (build(store): add web store packaging script).
+- T2 checks (structural, passive docs): the privacy policy URL and the homepage answer 200 and the policy text matches `privacy/ui/privacy-views.js` (ten sections, dated 22 November 2026, contact u202220528@upc.edu.pe); backend `GET /v1/model` -> 200. `icons/icon128.png` read as 128x128 RGBA. Locale short descriptions: es 119, en 110 characters. Code scan: no `eval`, `new Function`, dynamic `import()` or remote scripts; the content script reads only `location.href`; the worker reads only `tab.url`; verdicts need no session; the options page is gated to administrators. Full `node --test` after T2 -> 524 tests, 521 pass, 0 fail, 3 skipped; rebuild unchanged (196,722 bytes, 84 files).
+- Commit T2: see `git log` (docs(store): add Chrome Web Store submission guide).
 
 ## Next step
 Owner: create screenshots and the small promo tile, register the developer account, upload the zip and fill the dashboard from `CHROMEWEBSTORE.md`.
