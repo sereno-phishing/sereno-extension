@@ -50,7 +50,7 @@ QUÉ HACE
 • Muestra el resultado en el ícono de la barra: ✓ seguro, ! advertencia, ✕ bloqueo, … evaluando y ? protección degradada.
 • Si el sitio parece de phishing, abre un aviso dentro de la página. En una advertencia puedes volver atrás, ver el detalle o continuar bajo tu propio riesgo. En un bloqueo no se ofrece continuar.
 • En la ventana de Sereno ves el estado del sitio actual y si la protección está activa.
-• Con una cuenta opcional, guardas el historial de los sitios evaluados, lo filtras por resultado y lo borras cuando quieras.
+• Con una cuenta opcional, guardas el historial de los sitios evaluados, lo filtras por resultado y lo vacías cuando quieras.
 • Disponible en español e inglés.
 • Si el servicio no responde, Sereno no bloquea nada: la página carga y verás el aviso «Protección degradada».
 
@@ -61,7 +61,7 @@ CÓMO USARLA
 4. Si quieres historial, crea una cuenta desde la ventana de Sereno. No pedimos correo.
 
 PRIVACIDAD
-Para evaluar un sitio, Sereno envía la dirección de la pestaña actual al servidor de Sereno por una conexión cifrada (HTTPS). El servidor guarda solo el hash y el dominio de cada dirección; la dirección completa no se conserva. Sereno no lee el contenido de las páginas. Si creas una cuenta, guardamos tu usuario y el hash de tu contraseña, y tus consultas quedan vinculadas a ella para mostrarte tu historial. No vendemos tus datos ni los compartimos. Política completa: https://sereno-phishing.github.io/sereno-landing/privacy.html
+Para evaluar un sitio, Sereno envía la dirección de la pestaña actual al servidor de Sereno por una conexión cifrada (HTTPS). El servidor guarda solo el hash y el dominio de cada dirección; la dirección completa no se conserva. Sereno no lee el contenido de las páginas. Si creas una cuenta, guardamos tu usuario y el hash de tu contraseña, y tus consultas quedan vinculadas a ella para mostrarte tu historial. No vendemos tus datos ni los compartimos con nadie, salvo con Microsoft Azure, que aloja el servicio. Política completa: https://sereno-phishing.github.io/sereno-landing/privacy.html
 
 PERMISOS
 • Leer tu historial de navegación: Sereno necesita la dirección de cada pestaña para evaluarla.
@@ -69,8 +69,6 @@ PERMISOS
 
 SOPORTE
 Escríbenos a u202220528@upc.edu.pe.
-
-Sereno forma parte de un proyecto de tesis de Ingeniería de Software de la Universidad Peruana de Ciencias Aplicadas (UPC).
 ```
 
 ### English
@@ -91,7 +89,7 @@ WHAT IT DOES
 • Shows the result on the toolbar icon: ✓ safe, ! warning, ✕ blocked, … evaluating and ? degraded protection.
 • If the site looks like phishing, it opens a notice inside the page. On a warning you can go back, see the details or continue at your own risk. On a block there is no option to continue.
 • The Sereno window shows the status of the current site and whether protection is active.
-• With an optional account, you keep a history of evaluated sites, filter it by result and delete it whenever you want.
+• With an optional account, you keep a history of evaluated sites, filter it by result and clear it whenever you want.
 • Available in Spanish and English.
 • If the service does not respond, Sereno blocks nothing: the page loads and you see a "Degraded protection" notice.
 
@@ -102,7 +100,7 @@ HOW TO USE IT
 4. If you want a history, create an account from the Sereno window. No email address is required.
 
 PRIVACY
-To evaluate a site, Sereno sends the address of the current tab to the Sereno server over an encrypted connection (HTTPS). The server stores only the hash and the domain of each address; the full address is not retained. Sereno does not read page content. If you create an account, we store your username and a hash of your password, and your queries are linked to it to show you your history. We do not sell or share your data. Full policy: https://sereno-phishing.github.io/sereno-landing/privacy.html
+To evaluate a site, Sereno sends the address of the current tab to the Sereno server over an encrypted connection (HTTPS). The server stores only the hash and the domain of each address; the full address is not retained. Sereno does not read page content. If you create an account, we store your username and a hash of your password, and your queries are linked to it to show you your history. We do not sell your data or share it with anyone except Microsoft Azure, which hosts the service. Full policy: https://sereno-phishing.github.io/sereno-landing/privacy.html
 
 PERMISSIONS
 • Read your browsing history: Sereno needs the address of each tab to evaluate it.
@@ -110,8 +108,6 @@ PERMISSIONS
 
 SUPPORT
 Write to u202220528@upc.edu.pe.
-
-Sereno is part of a Software Engineering thesis project at Universidad Peruana de Ciencias Aplicadas (UPC), Peru.
 ```
 
 Copy rules followed: no accuracy, speed or detection-rate figures (the code and README state none for the listing), no superlatives, no implementation details.
