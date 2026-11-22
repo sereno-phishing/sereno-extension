@@ -1,4 +1,4 @@
-/* Privacy · presentational view: the policy as four short rows inside the
+/* Privacy · presentational view: the policy as seven short rows inside the
    popup, with a back button. Classic script that registers Sereno.privacyUi. */
 
 (function (Sereno) {
@@ -6,7 +6,7 @@
 
   var ui = Sereno.ui;
 
-  var ROWS = ["send", "store", "account", "rights"];
+  var ROWS = ["send", "store", "account", "hosting", "retention", "rights", "contact"];
   var messages = {
     heading: ["Política de privacidad de Sereno", "Sereno privacy policy"],
     back: ["Volver al inicio", "Back to home"],
@@ -15,9 +15,15 @@
     store: ["Qué guardamos", "What we store"],
     storeBody: ["Solo el hash y el dominio de cada URL. La dirección completa se procesa en memoria y no se conserva.", "Only the hash and domain of each URL. The full address is processed in memory and is not retained."],
     account: ["Tu cuenta", "Your account"],
-    accountBody: ["Si creas una cuenta, guardamos tu usuario y el hash de tu contraseña. No pedimos correo.", "If you create an account, we store your username and password hash. We do not ask for an email address."],
+    accountBody: ["Si creas una cuenta, guardamos tu usuario y el hash de tu contraseña, y tus consultas quedan vinculadas a ella para mostrarte tu historial. Sin cuenta, las consultas no se vinculan a nadie. No pedimos correo.", "If you create an account, we store your username and password hash, and your queries are linked to it to show you your history. Without an account, queries are not linked to anyone. We do not ask for an email address."],
+    hosting: ["Dónde se alojan", "Where it is hosted"],
+    hostingBody: ["En Microsoft Azure, que actúa solo como proveedor de alojamiento e infraestructura. No vendemos tus datos ni los compartimos con nadie más.", "On Microsoft Azure, which acts only as the hosting and infrastructure provider. We do not sell your data or share it with anyone else."],
+    retention: ["Cuánto tiempo los guardamos", "How long we keep it"],
+    retentionBody: ["Mientras el servicio esté activo y los datos sean necesarios para detectar phishing. Los veredictos en caché caducan solos: por defecto, a los 7 días los de phishing y a las 24 horas los legítimos.", "While the service is active and the data is needed to detect phishing. Cached verdicts expire on their own: by default, after 7 days for phishing and 24 hours for legitimate sites."],
     rights: ["Tus derechos", "Your rights"],
-    rightsBody: ["Puedes borrar tu historial en cualquier momento desde el popup.", "You can delete your history at any time from the popup."]
+    rightsBody: ["Puedes borrar tu historial en cualquier momento desde el popup: tus consultas dejan de estar vinculadas a tu cuenta. Para pedir que eliminemos tus datos, escribe a u202220528@upc.edu.pe.", "You can delete your history at any time from the popup: your queries are no longer linked to your account. To ask us to delete your data, write to u202220528@upc.edu.pe."],
+    contact: ["Responsables", "Data controllers"],
+    contactBody: ["Andrés Torres García y Sebastián Lobato Pozo, autores del proyecto. Contacto: u202220528@upc.edu.pe.", "Andrés Torres García and Sebastián Lobato Pozo, the project's authors. Contact: u202220528@upc.edu.pe."]
   };
   if (Sereno.i18n && Sereno.i18n.register) {
     var catalog = {};
