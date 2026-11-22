@@ -15,6 +15,7 @@ const Sereno = load(
 );
 
 const BASE_URL = "http://127.0.0.1:5000";
+const PRODUCTION_URL = "https://sereno-phishing.chilecentral.cloudapp.azure.com";
 
 function openStore() {
   return Sereno.stateStore.create({ storage: Sereno.storage.memoryStorage(), key: "auth-test", defaults: { session: null } });
@@ -24,8 +25,8 @@ function compose(fetch) {
   return Sereno.providers.create({ config: { baseUrl: BASE_URL }, fetch });
 }
 
-test("the default services reach the local backend and surveys have their own port", () => {
-  assert.equal(Sereno.providers.config.baseUrl, BASE_URL);
+test("the default services reach the production backend and surveys have their own port", () => {
+  assert.equal(Sereno.providers.config.baseUrl, PRODUCTION_URL);
   assert.equal(typeof Sereno.services.survey.status, "function");
   assert.equal(typeof Sereno.services.survey.submit, "function");
   assert.equal(typeof Sereno.services.data.submitSurvey, "undefined");

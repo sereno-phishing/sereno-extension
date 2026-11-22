@@ -113,14 +113,22 @@ test("permissions: storage and tabs only, nothing that injects or reads page con
   assert.equal(manifest.optional_host_permissions, undefined);
 });
 
-test("host_permissions name the configured backend origin and allow HTTP only for the exact loopback setup", () => {
-  assert.ok(Array.isArray(manifest.host_permissions), "the key is present so the hand-off is a one-line edit");
+const PRODUCTION_ORIGIN = "https://sereno-phishing.chilecentral.cloudapp.azure.com";
+const LOOPBACK_ORIGIN = "http://127.0.0.1:5000";
+
+test("host_permissions grant the production backend and the loopback development backend only", () => {
   manifest.host_permissions.forEach((pattern) => {
     assert.match(pattern, /^(https:\/\/[a-z0-9.-]+(:\d+)?|http:\/\/127\.0\.0\.1:5000)\/\*$/, "one backend origin, no wildcard host: " + pattern);
   });
+  /* The loopback entry lets local development switch by editing baseUrl
+     only; drop it before a Chrome Web Store submission (README). */
+  assert.deepEqual(manifest.host_permissions, [PRODUCTION_ORIGIN + "/*", LOOPBACK_ORIGIN + "/*"]);
+});
+
+test("the configured backend is HTTPS or the exact loopback setup, and the manifest grants its origin", () => {
   const url = new URL(CONFIG.baseUrl);
-  assert.ok(url.protocol === "https:" || CONFIG.baseUrl === "http://127.0.0.1:5000", "HTTP is local development only");
-  assert.deepEqual(manifest.host_permissions, [url.origin + "/*"]);
+  assert.ok(url.protocol === "https:" || CONFIG.baseUrl === LOOPBACK_ORIGIN, "HTTP is local development only");
+  assert.ok(manifest.host_permissions.includes(url.origin + "/*"), "host_permissions grant " + url.origin);
 });
 
 test("every file the manifest, the pages and the service worker load is a real file", () => {

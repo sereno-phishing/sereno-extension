@@ -5,13 +5,13 @@ página http/https que abres y muestra el resultado de tres formas: el badge del
 ícono, un aviso dentro de la página y el detalle en el popup. Incluye el popup
 completo, el panel de administración y la política de privacidad.
 
-Todos los datos vienen del backend local hermano en `http://127.0.0.1:5000`:
-veredictos, historial, caché, métricas, versión del modelo, autenticación,
-encuestas SUS y políticas por dominio. La extensión no clasifica ni trae datos
-de ejemplo: con el backend apagado, la protección queda degradada y el popup y
-el panel muestran el error de conexión. Start
-the backend before using the extension; [Conectar el backend](#conectar-el-backend)
-has the local setup.
+Todos los datos vienen del backend de Sereno, publicado en
+`https://sereno-phishing.chilecentral.cloudapp.azure.com`: veredictos,
+historial, caché, métricas, versión del modelo, autenticación, encuestas SUS y
+políticas por dominio. La extensión no clasifica ni trae datos de ejemplo: si el
+backend no responde, la protección queda degradada y el popup y el panel
+muestran el error de conexión. Para desarrollar contra el backend hermano en
+`http://127.0.0.1:5000`, ver [Conectar el backend](#conectar-el-backend).
 
 **Estado de la verificación.** `node --test` cubre dominios, casos de uso,
 vistas (HTML y DOM simulado), el service worker, el content script y el
@@ -28,7 +28,8 @@ cookie jar and does not enforce browser cookie policy. Manual checks remain in
 - Google Chrome 102 o superior (Manifest V3, `chrome.storage.session` e
   `inert`). También debería funcionar en navegadores basados en Chromium (Edge,
   Brave, Opera), sin probar.
-- The sibling Flask backend must be running locally for verdicts, data and sign-in.
+- Acceso al backend publicado o, para desarrollo, el backend Flask hermano
+  corriendo en local (ver [Conectar el backend](#conectar-el-backend)).
 - Para correr las pruebas, Node 18 o superior, sin dependencias. Las tres
   pruebas contra el backend real necesitan además su entorno virtual y sus
   contenedores de PostgreSQL y Redis; sin ellos se omiten con un aviso.
@@ -58,8 +59,9 @@ lista de extensiones usa el idioma del navegador, independientemente del selecto
 
 ## Cómo probarla
 
-1. Enciende el backend local (ver [Conectar el backend](#conectar-el-backend)) y
-   carga o recarga la extensión.
+1. Carga o recarga la extensión. Por defecto usa el backend publicado; para
+   usar el local, enciéndelo y cambia `baseUrl` (ver
+   [Conectar el backend](#conectar-el-backend)).
 2. Abre el popup de Sereno. La primera vez verás el onboarding de 3 pasos
    (qué hace, qué permiso necesita y cómo leer una alerta). Pulsa **Empezar**.
    Antes de la primera navegación, la tarjeta «Este sitio» está en reposo:
@@ -129,7 +131,7 @@ no se ejecuta. Esto no se ha probado en Chrome real.
 
 ## Mapa de vistas ↔ HU
 
-Todos los datos los sirve el backend local; las vistas no dependen de quién
+Todos los datos los sirve el backend; las vistas no dependen de quién
 los produce. «Estado» indica lo que falta verificar.
 
 | Vista o flujo | HU | Dónde se ve | Estado |
@@ -273,14 +275,19 @@ sereno-extension/
   - `tabs`: leer `tab.url` y `changeInfo.url` en el worker. Sin este permiso (ni
     permisos de host) Chrome no entrega la URL. Es el que muestra el aviso de
     «historial de navegación» al instalar.
-  - `host_permissions`: `http://127.0.0.1:5000/*` para autenticación, encuestas y políticas
-    locales; no se añade comodín de hosts, permiso HTTPS ni acceso a la API `cookies`.
+  - `host_permissions`: `https://sereno-phishing.chilecentral.cloudapp.azure.com/*`
+    (backend publicado) y `http://127.0.0.1:5000/*` (backend local de
+    desarrollo), para veredictos, datos, autenticación, encuestas y políticas;
+    no se añade comodín de hosts ni acceso a la API `cookies`. **Antes de enviar
+    la extensión a Chrome Web Store, quita la entrada `http://127.0.0.1:5000/*`**
+    y ajusta `tests/manifest.test.js`, que la exige: solo sirve para desarrollo.
   - Sin `activeTab`, `scripting` ni `<all_urls>`: el content script se declara en
     el manifest, que le da acceso a las páginas http/https sin permisos de host.
 - **CSP.** Las páginas de la extensión declaran `script-src 'self'; object-src
   'self'` (igual que el valor por defecto de MV3, pero explícito). El HTML no usa
-  `onclick`, CDNs, fuentes ni imágenes remotas. No se restringe `connect-src`; si
-  quieres endurecerlo, es otro cambio a mano al conectar el backend.
+  `onclick`, CDNs, fuentes ni imágenes remotas. No se restringe `connect-src`,
+  así que nada bloquea las peticiones al backend; si se endurece, debe incluir
+  los orígenes de `host_permissions`.
 - **Estilos e íconos del aviso en página.** La página nunca pide una URL
   `chrome-extension://`: el manifest no declara `web_accessible_resources`, así que
   ningún sitio puede detectar la extensión pidiendo sus archivos. Los estilos
@@ -311,6 +318,27 @@ sereno-extension/
 
 ## Conectar el backend
 
+### Backend publicado (configuración por defecto)
+
+`platform/providers/config.js` apunta al backend desplegado en Azure:
+
+```js
+Sereno.providers.config = {
+  baseUrl: "https://sereno-phishing.chilecentral.cloudapp.azure.com",
+  timeoutMs: 4000
+};
+```
+
+Lo sirve Caddy, con un certificado de Let's Encrypt, delante de Flask. El
+manifest concede ese origen en `host_permissions`, así que basta con cargar la
+extensión. En este modo el backend emite la cookie de sesión `Secure; HttpOnly;
+SameSite=None` (sin `AUTH_LOCAL_HTTP`). Chrome trata como same-site las
+peticiones de la extensión a un origen con permiso de host, pero su
+documentación indica que ese trato no aplica si el navegador bloquea las cookies
+de terceros (incógnito lo hace por defecto); en ese caso la sesión podría no
+mantenerse. El comportamiento en Chrome real contra este backend está sin
+verificar.
+
 ### Inicio rápido: backend local
 
 1. From the sibling `sereno-backend/`, run its launcher:
@@ -325,7 +353,8 @@ sereno-extension/
    backend README covers the environment setup, the settings and the storage.
    Do not expose this server publicly.
 
-2. Keep the shipped `platform/providers/config.js` configuration:
+2. En `platform/providers/config.js`, cambia `baseUrl` al backend local. No
+   hace falta tocar otro archivo: el manifest ya concede `http://127.0.0.1:5000/*`.
 
    ```js
    Sereno.providers.config = {
@@ -333,6 +362,10 @@ sereno-extension/
      timeoutMs: 4000
    };
    ```
+
+   Devuelve la dirección publicada antes de hacer commit:
+   `tests/providers.test.js` y `tests/auth-remote-composition.test.js` exigen
+   esa dirección por defecto.
 
    Los cuatro puertos (`verdict`, `auth`, `data` y `survey`) usan el adaptador
    remoto contra `baseUrl`; no hay otro adaptador ni fallback. El backend
@@ -344,7 +377,7 @@ sereno-extension/
    as unverified; logout clears local session even if server revocation fails.
 
 3. Load/reload the unpacked extension in `chrome://extensions`. Its manifest
-   grants `http://127.0.0.1:5000/*`, matching the local auth origin. Register a
+   grants `http://127.0.0.1:5000/*` besides the published origin. Register a
    new account, close/reopen the popup, log out, and log in again. Backend
    accounts are created only by registration; newly registered users have `isAdmin: false`. To promote
    a throwaway account, follow the sibling
@@ -392,9 +425,9 @@ See [network requests](https://developer.chrome.com/docs/extensions/develop/conc
 [cookies](https://developer.chrome.com/docs/extensions/develop/concepts/storage-and-cookies),
 and [match patterns](https://developer.chrome.com/docs/extensions/develop/concepts/match-patterns).
 
-For a future remote deployment, use trusted HTTPS and
-update `baseUrl` and the exact manifest permission together; the manifest test
-allows HTTP only for the documented loopback setup. Production hardening remains
+Para apuntar a otro backend remoto, usa HTTPS de confianza y cambia `baseUrl`
+y su entrada de `host_permissions` a la vez; la prueba del manifest solo admite
+HTTP para la configuración local documentada. Production hardening remains
 out of scope, including session expiry, rate limits and CSRF protection.
 
 ### Contrato REST

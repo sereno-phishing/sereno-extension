@@ -9,7 +9,7 @@
 
   Sereno.providers = Sereno.providers || {};
   Sereno.providers.config = {
-    baseUrl: "http://127.0.0.1:5000",
+    baseUrl: "https://sereno-phishing.chilecentral.cloudapp.azure.com",
     timeoutMs: 4000
   };
 })(globalThis.Sereno = globalThis.Sereno || {});

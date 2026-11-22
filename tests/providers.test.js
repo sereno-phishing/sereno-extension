@@ -245,11 +245,11 @@ test("the composition root builds every port on the remote adapter from config",
   assert.deepEqual(fetchFake.calls.map((call) => [call.method, call.path, call.credentials]), [["GET", "/v1/model", "include"]]);
 });
 
-test("the default config points every port at the local backend", async () => {
-  assert.deepEqual(providers.config, { baseUrl: "http://127.0.0.1:5000", timeoutMs: 4000 });
+test("the default config points every port at the production backend", async () => {
+  assert.deepEqual(providers.config, { baseUrl: "https://sereno-phishing.chilecentral.cloudapp.azure.com", timeoutMs: 4000 });
   assert.deepEqual(Object.keys(Sereno.services).sort(), ["auth", "data", "survey", "verdict"]);
   const requested = [];
   const services = providers.create({ fetch: async (url) => { requested.push(url); return reply(200, { version: "x" }); } });
   await services.data.getModelVersion();
-  assert.deepEqual(requested, ["http://127.0.0.1:5000/v1/model"]);
+  assert.deepEqual(requested, ["https://sereno-phishing.chilecentral.cloudapp.azure.com/v1/model"]);
 });
