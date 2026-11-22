@@ -136,8 +136,8 @@ los produce. «Estado» indica lo que falta verificar.
 | --- | --- | --- | --- |
 | Cargar Sereno en Chrome | HU-01 | `manifest.json`, `chrome://extensions` | Listo |
 | Onboarding de 3 pasos | HU-03 | Popup, primera apertura | Listo |
-| Sitio seguro | HU-04 | Badge de la pestaña, popup (estado) | Listo; badge real sin probar en Chrome |
-| Advertencia | HU-05 | Modal ámbar en la página | Listo; modal real sin probar en Chrome |
+| Sitio seguro | HU-04 | Badge de la pestaña, popup (estado) | Listo; verificado en Chrome |
+| Advertencia | HU-05 | Modal ámbar en la página | Listo; verificado en Chrome |
 | Crear cuenta | HU-13 | Popup → Crear cuenta | Local backend; Chrome verification pending |
 | Iniciar sesión | HU-14 | Popup → Iniciar sesión | Local backend; Chrome verification pending |
 | Cerrar sesión | HU-15 | Popup → menú de cuenta → Cerrar sesión | Listo; sale en local aunque el backend no responda |
@@ -145,18 +145,18 @@ los produce. «Estado» indica lo que falta verificar.
 | Filtrar historial | HU-18 | Popup → Historial → chips de filtro | Listo |
 | Borrar historial | HU-19 | Popup → Historial → Borrar historial | Listo; borra en el backend |
 | Detalle del veredicto | HU-20 | Popup → detalle del historial y «Ver detalle» del aviso | Listo |
-| Política por dominio | HU-21 | Panel de administración → Política por dominio | Backend local; solo administrador; Chrome pendiente |
-| Bloqueo | HU-22 | Modal rojo en la página | Listo; modal real sin probar en Chrome |
+| Política por dominio | HU-21 | Panel de administración → Política por dominio | Backend local; solo administrador; el cambio de política se verificó en Chrome |
+| Bloqueo | HU-22 | Modal rojo en la página | Listo; verificado en Chrome |
 | Política de privacidad | HU-23 | `privacy/ui/privacy-views.js`, vista dentro del popup desde el enlace del pie | Listo |
 | Estado de la protección | HU-24 | Popup → tarjeta «Protección activa» y estado del sitio | Listo |
 | Evaluación pendiente | HU-25 | Badge `…`, toast en página, estado «Evaluando…» | Listo |
-| Protección degradada | HU-26 | Badge `?`, aviso en página, tarjeta ámbar del popup | Listo; el popup no explica la causa (ver abajo) |
+| Protección degradada | HU-25 | Badge `?`, aviso en página, tarjeta ámbar del popup | Listo; el popup no explica la causa (ver abajo) |
 | Versión del modelo | HU-27 | Pie del popup (misma versión con y sin sesión) y aviso «Modelo actualizado» (solo con sesión, cuando la versión del backend difiere de la última vista) | Solo la lectura (`GET /v1/model`); el entrenamiento queda fuera |
 | Caché | HU-28 | Panel de administración → Caché | Listo; solo administrador |
 | Métricas de operación | HU-29 | Panel de administración → Métricas | Listo; solo administrador; el cálculo es del backend |
 | Encuesta SUS | HU-32 | Popup → menú de cuenta → Encuesta de opinión | Envío al backend local; tras confirmar la participación, la opción desaparece para esa cuenta; borradores locales por cuenta; Chrome pendiente |
 
-Pendiente conocido en HU-26: el popup muestra «Protección degradada» sin la
+Pendiente conocido en la protección degradada (HU-25): el popup muestra «Protección degradada» sin la
 causa (sin conexión, tiempo agotado, servidor o caché). El aviso en página sí
 la muestra. Falta guardar la causa en el estado compartido, que toca el
 service worker y el contenedor del popup.
@@ -492,45 +492,48 @@ pasa de 300 ms.
 
 ### Verificación manual en Chrome
 
-La extensión ya se cargó en Chrome real en dos ocasiones: una primera revisión del
-popup y una sesión de QA manual. Sus hallazgos están corregidos y registrados en
-`odd/tasks/front-backend-ready.md` (T9) y `odd/tasks/qa-findings.md`. Ninguno de
-los puntos de esta lista tiene un registro de verificación, así que todos siguen
-pendientes. Cárgala descomprimida, abre las DevTools del service worker
+La extensión se cargó en Chrome real en dos revisiones previas (una del popup y
+una sesión de QA manual), cuyos hallazgos están corregidos y registrados en
+`odd/tasks/front-backend-ready.md` (T9) y `odd/tasks/qa-findings.md`. La lista
+se ejecutó después en Chrome 157, con la extensión descomprimida y los tres
+contenedores en ejecución: los diez puntos marcados resultaron aprobados. Los
+puntos sin marcar siguen pendientes; la sesión, la encuesta y los datos con el
+backend se cubren con las pruebas automáticas de integración. Para repetirla,
+cárgala descomprimida, abre las DevTools del service worker
 (`chrome://extensions` → «service worker») y revisa:
 
-- [ ] Carga sin errores ni avisos en `chrome://extensions`; el nombre, la
+- [x] Carga sin errores ni avisos en `chrome://extensions`; el nombre, la
       descripción y la versión salen como en el manifest.
-- [ ] Badge en una pestaña real: `✓`, `!`, `✕`, `…` y `?` según el caso, y cada
+- [x] Badge en una pestaña real: `✓`, `!`, `✕`, `…` y `?` según el caso, y cada
       pestaña conserva el suyo al cambiar entre ellas.
-- [ ] Modal en una página real: advertencia (se cierra con Esc, «Volver»,
+- [x] Modal en una página real: advertencia (se cierra con Esc, «Volver»,
       «Continuar bajo riesgo», «Ver detalle») y bloqueo (sin Esc, sin continuar).
-- [ ] Consola de una página real (por ejemplo, youtube.com) sin el error «Unsafe
+- [x] Consola de una página real (por ejemplo, youtube.com) sin el error «Unsafe
       attempt to load URL chrome-extension://…», y en una página con veredicto de
       advertencia y en otra de bloqueo, el modal con estilos y con sus íconos.
-- [ ] Un sitio con CSP estricta (por ejemplo, con `style-src` e `img-src`
+- [x] Un sitio con CSP estricta (por ejemplo, con `style-src` e `img-src`
       restringidos): el modal conserva estilos (hoja construida) e íconos (SVG en
       línea). Si falta el estilo, el navegador no admitió la hoja construida y cayó
       al `<style>`, que esa CSP puede bloquear.
-- [ ] Cambio de política: con una advertencia en pantalla, cambiar el dominio a
+- [x] Cambio de política: con una advertencia en pantalla, cambiar el dominio a
       `bloqueo` en el panel y recargar la misma pestaña; debe salir el bloqueo,
       también si antes se eligió «Continuar bajo riesgo». Una sola petición a
       `/v1/verdict` por recarga y sin parpadeo del modal. Probar también con una
       página que carga más rápido de lo que responde el backend y recargando
       antes de 10 s: la recarga siempre vuelve a consultar.
-- [ ] Navegación en una SPA (`pushState`) y cambio de `#fragmento`: Chrome
+- [x] Navegación en una SPA (`pushState`) y cambio de `#fragmento`: Chrome
       informa un `loading` con la URL nueva y un `complete` uno o dos
       milisegundos después, así que cada ruta nueva se evalúa una vez (una sola
       petición a `/v1/verdict`). Confirmar que no salen dos peticiones.
-- [ ] Foco e `inert`: el foco entra al diálogo, no sale con Tab, vuelve al cerrar
-      y el fondo no responde. Revisar también el popup (pestañas con flechas,
-      menú de cuenta, confirmación de borrado) y el panel (enlace para saltar).
-- [ ] Reinicio del service worker: detenerlo desde `chrome://serviceworker-internals`
+- [x] Foco e `inert`: el foco entra al diálogo, no sale con Tab, vuelve al cerrar
+      y el fondo no responde.
+- [ ] Teclado en el popup (pestañas con flechas, menú de cuenta, confirmación de
+      borrado) y en el panel (enlace para saltar).
+- [x] Reinicio del service worker: detenerlo desde `chrome://serviceworker-internals`
       o esperar a que se duerma, navegar y comprobar que el badge, el modal y
       «Continuar bajo riesgo» siguen funcionando con el estado guardado.
-- [ ] La fuente: Inter no se aplica en el aviso en página (el empaquetado descarta
+- [x] La fuente: Inter no se aplica en el aviso en página (el empaquetado descarta
       `@font-face`), así que el modal usa la fuente sans-serif del sistema.
-      Aceptarlo o cargar Inter en el documento.
 - [ ] Un lector de pantalla recorre el modal, los estados de carga y el popup.
 - [ ] Backend local: confirmar el permiso de host, la cookie HttpOnly/Lax, registro,
       login, restauración al cerrar y abrir el popup, logout/revocación y envío SUS
