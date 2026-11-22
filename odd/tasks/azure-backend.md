@@ -31,6 +31,7 @@ Feature branch `feat/azure-backend`. One work-unit commit for T1. RDD: not start
 - RED: `node --test tests/providers.test.js tests/auth-remote-composition.test.js tests/manifest.test.js` -> 37 tests, 34 pass, 3 fail (default config in providers and composition tests, manifest host_permissions).
 - GREEN: `node --test` -> 513 tests, 510 pass, 0 fail, 3 skipped (same three loopback backend tests as the baseline).
 - `git diff --check` -> exit 0.
+- Commit: `d4979cb` (feat(providers): point the extension at the published Azure backend).
 - `curl -sS -i https://sereno-phishing.chilecentral.cloudapp.azure.com/v1/model` -> `200 OK`, `{"version":"3.0.0"}`, served via Caddy with HSTS.
 
 ## Next step
